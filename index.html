@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Landing Page Quản lý Bán hàng</title>
+  <style>
+    :root {
+      --bg: #f2ece1;
+      --surface: #f7f3eb;
+      --surface-strong: #f0e8d9;
+      --text: #1c1b1a;
+      --muted: #67625a;
+      --border: rgba(28, 27, 26, 0.12);
+      --shadow: 0 22px 45px rgba(32, 32, 32, 0.12);
+      --shadow-soft: 0 18px 38px rgba(32, 32, 32, 0.08);
+      font-family: 'Inter', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.9), transparent 32%),
+        linear-gradient(180deg, #f5efe3 0%, #ede3d3 100%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 22%),
+        radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.35), transparent 18%);
+      pointer-events: none;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .top-banner {
+      width: 100%;
+      background: linear-gradient(90deg, rgba(48, 40, 34, 0.98), rgba(104, 92, 79, 0.98));
+      padding: 16px 0;
+      display: flex;
+      justify-content: center;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+    }
+
+    .top-banner__content {
+      width: min(1160px, calc(100% - 36px));
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      color: #f7f3eb;
+    }
+
+    .top-banner__label {
+      font-size: 0.82rem;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    .logo-badge {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 999;
+      width: 72px;
+      height: 72px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 18px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+    }
+
+    .logo-badge img {
+      width: 64px;
+      height: auto;
+      display: block;
+    }
+
+    .original-banner {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    .original-banner img {
+      width: 100%;
+      max-width: 1160px;
+      border-radius: 36px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-soft);
+      display: block;
+    }
+
+    .page {
+      width: min(1160px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 40px 0 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 40px;
+      align-items: stretch;
+      margin-bottom: 64px;
+    }
+
+    .hero-left {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 28px;
+    }
+
+    .hero-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      padding: 12px 22px;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid var(--border);
+      font-size: 0.84rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .hero-title {
+      margin: 0;
+      font-size: clamp(3rem, 4vw, 4.8rem);
+      line-height: 0.95;
+    }
+
+    .hero-copy {
+      margin: 0;
+      max-width: 650px;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .hero-copy strong {
+      color: var(--text);
+    }
+
+    .cta-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 28px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: #1c1b1a;
+      color: #fff;
+      font-weight: 600;
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .btn.secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      background: #111;
+    }
+
+    .hero-right {
+      display: grid;
+      gap: 18px;
+      padding: 28px;
+      background: #fbf6ed;
+      border-radius: 36px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-right .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .panel-card {
+      display: grid;
+      gap: 14px;
+      padding: 24px;
+      border-radius: 32px;
+      background: #fff;
+      border: 1px solid var(--border);
+      box-shadow: 0 18px 40px rgba(42, 41, 38, 0.08);
+    }
+
+    .panel-card strong {
+      font-size: 0.86rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .panel-card p {
+      margin: 0;
+      color: var(--text);
+      font-size: 0.96rem;
+      line-height: 1.7;
+    }
+
+    .panel-card.large {
+      grid-column: span 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 26px;
+      min-height: 180px;
+    }
+
+    .panel-card.large .inner-card {
+      padding: 0;
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .feature-section {
+      display: grid;
+      gap: 44px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: -0.02em;
+    }
+
+    .cards-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      padding: 28px;
+      border-radius: 32px;
+      background: #fff;
+      border: 1px solid var(--border);
+      box-shadow: 0 18px 38px rgba(42, 41, 38, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .feature-card h4 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .feature-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .cta-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 30px;
+      border-radius: 32px;
+      background: #fff;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 42px rgba(42, 41, 38, 0.08);
+    }
+
+    .cta-panel strong {
+      font-size: 1.05rem;
+      color: var(--text);
+    }
+
+    .cta-panel p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      max-width: 560px;
+    }
+
+    @media (max-width: 980px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-right .card-grid,
+      .panel-card.large {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-card.large {
+        grid-column: span 1;
+      }
+
+      .cards-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .page {
+        width: calc(100% - 24px);
+        padding: 28px 0 56px;
+      }
+
+      .hero-title {
+        font-size: 2.7rem;
+      }
+
+      .hero-left,
+      .hero-right,
+      .feature-card,
+      .cta-panel {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-badge">
+    <img src="Logo.png" alt="Logo" />
+  </div>
+  <div class="original-banner">
+    <img src="Banner.jpg" alt="Original banner image" />
+  </div>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-left">
+        <span class="hero-label">Quản lý bán hàng</span>
+        <h1 class="hero-title">MSI Viet Nam - Quản lý bán hàng & kho cho doanh nghiệp nhỏ</h1>
+        <p class="hero-copy">
+          Ứng dụng Landing Page chuyên nghiệp giúp đội ngũ kinh doanh và admin vận hành đơn hàng, tồn kho, báo cáo và chương trình khuyến mãi một cách
+          <strong>nhanh chóng</strong>, <strong>chính xác</strong> và <strong>liên tục</strong>.
+        </p>
+        <div class="cta-buttons">
+          <a href="#contact" class="btn">Dùng thử ngay</a>
+          <a href="#benefits" class="btn secondary">Nhận demo miễn phí</a>
+        </div>
+      </div>
+
+      <div class="hero-right">
+        <div class="card-grid">
+          <div class="panel-card">
+            <strong>Đơn hàng</strong>
+            <p>Trạng thái đơn hàng, tiến độ xử lý và cảnh báo trùng đơn trong thời gian thực.</p>
+          </div>
+          <div class="panel-card">
+            <strong>Tồn kho</strong>
+            <p>Kiểm soát số lượng tồn, cảnh báo thiếu hàng và duy trì cập nhật mới nhất.</p>
+          </div>
+        </div>
+
+        <div class="panel-card large">
+          <div class="inner-card">
+            <strong>Bảng điều khiển</strong>
+            <p>Hiển thị tồn kho, đơn hàng, báo cáo và chương trình khuyến mãi ngay trên một trang rõ ràng.</p>
+          </div>
+          <div class="inner-card">
+            <strong>Báo cáo</strong>
+            <p>Doanh số, hiệu suất kinh doanh và chương trình đang diễn ra được trình bày trực quan.</p>
+          </div>
+        </div>
+
+        <div class="card-grid">
+          <div class="panel-card">
+            <strong>Khuyến mãi</strong>
+            <p>Theo dõi chương trình sale, ưu đãi và chiến dịch đang chạy dễ dàng.</p>
+          </div>
+          <div class="panel-card">
+            <strong>Hiệu suất</strong>
+            <p>Cải thiện hiệu suất nhân viên kinh doanh, giảm sai sót và tăng tốc chốt đơn.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-section" id="problem">
+      <div>
+        <h2 class="section-title">Vấn đề nhân viên kinh doanh đang gặp phải</h2>
+      </div>
+      <div class="cards-row">
+        <div class="feature-card">
+          <h4>Đơn hàng rời rạc</h4>
+          <p>Quản lý đơn không tập trung, không biết trạng thái hiện tại và dễ bỏ sót khách hàng.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Báo cáo mất thời gian</h4>
+          <p>Doanh số, tồn kho và khuyến mãi cần tổng hợp thủ công, gây lộn xộn và sai sót.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Thông tin không đồng bộ</h4>
+          <p>Khách hàng, chương trình sale và tiến độ tư vấn không được cập nhật kịp thời.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-section" id="solution">
+      <div>
+        <h2 class="section-title">Giải pháp của tôi</h2>
+      </div>
+      <div class="cards-row">
+        <div class="feature-card">
+          <h4>Quản lý tập trung</h4>
+          <p>Đơn hàng, khách hàng và khuyến mãi được hiển thị rõ ràng trên cùng một giao diện.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Bảng điều khiển nhanh</h4>
+          <p>Hiển thị tồn kho, đơn hàng và báo cáo tức thì giúp ra quyết định ngay lập tức.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Giao diện trực quan</h4>
+          <p>Thiết kế tối giản, dễ dùng cho nhân viên kinh doanh và quản lý vận hành.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-section" id="benefits">
+      <div>
+        <h2 class="section-title">Lợi ích</h2>
+      </div>
+      <div class="cards-row">
+        <div class="feature-card">
+          <h4>Tiết kiệm thời gian</h4>
+          <p>Giảm thời gian quản lý và báo cáo để tập trung vào chốt đơn và chăm sóc khách hàng.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Tăng khả năng chốt đơn</h4>
+          <p>Thông tin rõ ràng giúp nhân viên nắm bắt cơ hội và phản hồi khách hàng nhanh hơn.</p>
+        </div>
+        <div class="feature-card">
+          <h4>Giảm sai sót</h4>
+          <p>Hạn chế lỗi tồn kho, trùng đơn và bỏ sót khi quản lý dữ liệu manual.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-panel" id="contact">
+      <div>
+        <strong>Khởi tạo Landing Page quản lý ngay hôm nay</strong>
+        <p>Bắt đầu nhanh với thiết kế chuyên nghiệp và nội dung được tối ưu cho bán hàng.</p>
+      </div>
+      <a href="#" class="btn">Nhận demo miễn phí</a>
+    </section>
+  </main>
+</body>
+</html>
