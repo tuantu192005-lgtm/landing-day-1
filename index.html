@@ -968,24 +968,39 @@
             </div>
           </div>
 
-          <div class="stat-grid">
-            <div class="stat-card">
-              <p>Tổng doanh số</p>
-              <strong id="adminTotalSales">0 ₫</strong>
-            </div>
-            <div class="stat-card">
-              <p>Doanh số trung bình / nhân viên</p>
-              <strong id="adminAverageSales">0 ₫</strong>
-            </div>
-            <div class="stat-card">
-              <p>Số báo cáo nhập</p>
-              <strong id="adminReportsCount">0</strong>
-            </div>
-          </div>
-
           <div class="panel">
             <h3>Tiến độ nhân viên</h3>
             <div class="employee-progress-grid" id="employeeProgressGrid"></div>
+          </div>
+
+          <div class="panel">
+            <h3>Giao việc mới</h3>
+            <form id="taskAssignForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="taskAssignee">Nhân viên</label>
+                  <select id="taskAssignee" required>
+                    <option value="">Chọn nhân viên</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="taskTitle">Tiêu đề</label>
+                  <input type="text" id="taskTitle" placeholder="Tiêu đề công việc" required />
+                </div>
+                <div class="form-group">
+                  <label for="taskDescription">Mô tả</label>
+                  <input type="text" id="taskDescription" placeholder="Mô tả (không bắt buộc)" />
+                </div>
+                <div class="form-group">
+                  <label for="taskDueDate">Ngày hạn</label>
+                  <input type="date" id="taskDueDate" />
+                </div>
+              </div>
+              <div class="dashboard-actions">
+                <button type="submit" class="btn-primary">Giao việc</button>
+              </div>
+              <div class="login-error" id="taskAssignMessage"></div>
+            </form>
           </div>
 
           <div class="report-panel">
@@ -1223,6 +1238,11 @@
             <h3>Lịch sử báo cáo</h3>
             <div class="history-list" id="staffHistoryList"></div>
           </div>
+
+          <div class="panel">
+            <h3>Nhiệm vụ của tôi</h3>
+            <div class="history-list" id="myTasksList"></div>
+          </div>
         </section>
       </section>
     </div>
@@ -1370,13 +1390,8 @@
       const reports = getStoredReports();
       const staffData = aggregateSales(reports);
       const adminStaffCount = staffData.length;
-      const adminTotalSales = staffData.reduce((sum, item) => sum + item.total, 0);
-      const adminAverage = adminStaffCount ? Math.round(adminTotalSales / adminStaffCount) : 0;
 
       document.getElementById('adminStaffCount').textContent = adminStaffCount;
-      document.getElementById('adminTotalSales').textContent = formatCurrency(adminTotalSales);
-      document.getElementById('adminAverageSales').textContent = formatCurrency(adminAverage);
-      document.getElementById('adminReportsCount').textContent = reports.length;
 
       const adminTableBody = document.getElementById('adminTableBody');
       adminTableBody.innerHTML = '';
@@ -1419,11 +1434,12 @@
         console.warn('Targets render skipped:', e);
       }
       loadEmployeeProgress();
+      loadTaskAssigneeOptions();
     }
 
     /* --- Tiến độ nhân viên: donut chart + trang chi tiết theo nhân viên --- */
     const EMPLOYEES = [
-      { id: 'cd48efc4-e255-4387-85db-d735076ad575', name: 'Tú' },
+      { id: '2a4d4e1b-f197-4d89-9d61-82abc346bba2', name: 'Tú' },
       { id: '80004214-c116-42e3-b511-36ebe488e51a', name: 'Lập' },
       { id: 'c21deac8-e2ab-4d11-8269-dada620941b6', name: 'Linh' },
       { id: '8ad49887-563a-44aa-bdcc-46a69734b402', name: 'Tâm' }
@@ -1493,24 +1509,32 @@
       historyList.innerHTML = '';
       ordersBody.innerHTML = '';
 
-      const [targetsRes, reportsRes, ordersRes] = await Promise.all([
+      const [targetsRes, achievedRes, reportsRes, ordersRes] = await Promise.all([
         sb.from('targets').select('*').eq('assigned_to', employeeId),
+        sb.from('v_kpi_achieved').select('*').eq('assigned_to', employeeId),
         sb.from('sales_reports').select('*').eq('assigned_to', employeeId).order('report_date', { ascending: false }),
         sb.from('orders').select('*').eq('assigned_to', employeeId).order('created_at', { ascending: false })
       ]);
 
       if (targetsRes.error) console.warn('[employeeDetail targets]', targetsRes.error.message);
+      if (achievedRes.error) console.warn('[employeeDetail v_kpi_achieved]', achievedRes.error.message);
       if (reportsRes.error) console.warn('[employeeDetail sales_reports]', reportsRes.error.message);
       if (ordersRes.error) console.warn('[employeeDetail orders]', ordersRes.error.message);
 
+      const achievedMap = {};
+      (achievedRes.data || []).forEach((a) => {
+        achievedMap[`${a.year} Q${a.quarter}|${a.category}`] = a.achieved_qty;
+      });
+
       (targetsRes.data || []).forEach((t) => {
-        const percent = t.target_qty ? Math.round((t.actual_qty / t.target_qty) * 100) : 0;
+        const achieved = achievedMap[`${t.quarter}|${t.category}`] ?? 0;
+        const percent = t.target_qty ? Math.round((achieved / t.target_qty) * 100) : 0;
         const statusClass = percent >= 100 ? 'status-pass' : 'status-fail';
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${t.category}</td>
           <td>${t.target_qty}</td>
-          <td>${t.actual_qty}</td>
+          <td>${achieved}</td>
           <td>${percent}%</td>
           <td><span class="${statusClass}">${percent >= 100 ? 'Đạt' : 'Chưa đạt'}</span></td>
         `;
@@ -1554,6 +1578,105 @@
     }
 
     document.getElementById('employeeDetailBackBtn').addEventListener('click', () => showScreen('adminDashboard'));
+
+    /* --- Giao nhiệm vụ (tasks) --- */
+    async function loadTaskAssigneeOptions() {
+      const select = document.getElementById('taskAssignee');
+      if (!select) return;
+      const { data, error } = await sb
+        .from('profiles').select('id, full_name').eq('role', 'staff').eq('status', 'active').order('full_name');
+      if (error) { console.warn('[taskAssignee]', error.message); return; }
+      select.innerHTML = '<option value="">Chọn nhân viên</option>';
+      (data || []).forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.full_name;
+        select.appendChild(opt);
+      });
+    }
+
+    document.getElementById('taskAssignForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const msg = document.getElementById('taskAssignMessage');
+      msg.style.color = '#b30012';
+      msg.textContent = '';
+
+      const assignedTo = document.getElementById('taskAssignee').value;
+      const title = document.getElementById('taskTitle').value.trim();
+      const description = document.getElementById('taskDescription').value.trim();
+      const dueDate = document.getElementById('taskDueDate').value;
+
+      if (!assignedTo || !title) {
+        msg.textContent = 'Vui lòng chọn nhân viên và nhập tiêu đề.';
+        return;
+      }
+
+      const { error } = await sb.from('tasks').insert({
+        assigned_to: assignedTo,
+        title,
+        description: description || null,
+        due_date: dueDate || null
+      });
+
+      if (error) {
+        msg.textContent = 'Lỗi: ' + error.message;
+        return;
+      }
+
+      msg.style.color = '#1c4d2b';
+      msg.textContent = 'Đã giao việc thành công.';
+      document.getElementById('taskAssignForm').reset();
+    });
+
+    async function loadMyTasks() {
+      const list = document.getElementById('myTasksList');
+      if (!list || !currentUser) return;
+      list.innerHTML = '';
+
+      const { data, error } = await sb
+        .from('tasks').select('*').eq('assigned_to', currentUser.id).order('created_at', { ascending: false });
+      if (error) {
+        console.warn('[myTasks]', error.message);
+        list.innerHTML = '<p style="color:var(--muted)">Không tải được nhiệm vụ.</p>';
+        return;
+      }
+
+      if (!data || !data.length) {
+        list.innerHTML = '<p style="color:var(--muted)">Chưa có nhiệm vụ nào.</p>';
+        return;
+      }
+
+      data.forEach((task) => {
+        const done = task.status === 'done';
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+            <input type="checkbox" data-task-id="${task.id}" ${done ? 'checked' : ''} style="margin-top:4px;" />
+            <span>
+              <strong style="${done ? 'text-decoration:line-through; opacity:0.6;' : ''}">${task.title}</strong>
+              ${task.description ? `<p>${task.description}</p>` : ''}
+              <span>${task.due_date ? 'Hạn: ' + task.due_date : ''}</span>
+            </span>
+          </label>
+        `;
+        list.appendChild(item);
+      });
+
+      list.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        cb.addEventListener('change', async (e) => {
+          const taskId = e.target.dataset.taskId;
+          const newStatus = e.target.checked ? 'done' : 'todo';
+          const { error: updErr } = await sb.from('tasks').update({ status: newStatus }).eq('id', taskId);
+          if (updErr) {
+            console.warn('[updateTask]', updErr.message);
+            e.target.checked = !e.target.checked;
+            return;
+          }
+          loadMyTasks();
+        });
+      });
+    }
 
     /* --- Targets: dữ liệu giả lập và hàm render --- */
     const personalTargetsKey = 'personalTargets_v1';
@@ -1698,6 +1821,7 @@
       document.getElementById('staffTeamName').textContent = currentUser.team;
       document.getElementById('staffTotalSales').textContent = formatCurrency(totalSales);
       document.getElementById('staffReportsCount').textContent = staffReports.length;
+      loadMyTasks();
 
       const historyList = document.getElementById('staffHistoryList');
       historyList.innerHTML = '';
