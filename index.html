@@ -1377,6 +1377,24 @@
           </div>
 
           <div class="panel">
+            <h3>Target theo dòng sản phẩm</h3>
+            <div class="table-wrapper">
+              <table class="target-table">
+                <thead>
+                  <tr>
+                    <th>Dòng sản phẩm</th>
+                    <th>Target</th>
+                    <th>Achieved</th>
+                    <th>% Hoàn thành</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTargetsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
             <h3>Lịch sử báo cáo</h3>
             <div class="history-list" id="staffHistoryList"></div>
           </div>
@@ -2076,6 +2094,43 @@
       drawBarChart(document.getElementById('leadChart'), sortedDates, sortedDates.map((date) => groupedByDate[date]));
     }
 
+    async function loadStaffTargets() {
+      const targetsBody = document.getElementById('staffTargetsBody');
+      if (!targetsBody || !currentUser) return;
+      targetsBody.innerHTML = '';
+
+      const [targetsRes, achievedRes] = await Promise.all([
+        sb.from('targets').select('*').eq('assigned_to', currentUser.id),
+        sb.from('v_kpi_achieved').select('*').eq('assigned_to', currentUser.id)
+      ]);
+
+      if (targetsRes.error) console.warn('[staffTargets targets]', targetsRes.error.message);
+      if (achievedRes.error) console.warn('[staffTargets v_kpi_achieved]', achievedRes.error.message);
+
+      const achievedMap = {};
+      (achievedRes.data || []).forEach((a) => {
+        achievedMap[`${a.year} Q${a.quarter}|${a.category}`] = a.achieved_qty;
+      });
+
+      (targetsRes.data || []).forEach((t) => {
+        const achieved = achievedMap[`${t.quarter}|${t.category}`] ?? 0;
+        const percent = t.target_qty ? Math.round((achieved / t.target_qty) * 100) : 0;
+        const statusClass = percent >= 100 ? 'status-pass' : 'status-fail';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${t.category}</td>
+          <td>${t.target_qty}</td>
+          <td>${achieved}</td>
+          <td>${percent}%</td>
+          <td><span class="${statusClass}">${percent >= 100 ? 'Đạt' : 'Chưa đạt'}</span></td>
+        `;
+        targetsBody.appendChild(tr);
+      });
+      if (!targetsRes.data || !targetsRes.data.length) {
+        targetsBody.innerHTML = '<tr><td colspan="5">Chưa có target.</td></tr>';
+      }
+    }
+
     function renderStaffDashboard() {
       const reports = getStoredReports();
       const staffReports = reports.filter((report) => report.email === currentUser.email);
@@ -2084,6 +2139,7 @@
       document.getElementById('staffTotalSales').textContent = formatCurrency(totalSales);
       document.getElementById('staffReportsCount').textContent = staffReports.length;
       loadMyTasks();
+      loadStaffTargets();
 
       const historyList = document.getElementById('staffHistoryList');
       historyList.innerHTML = '';
