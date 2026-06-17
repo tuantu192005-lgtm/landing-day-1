@@ -1352,6 +1352,17 @@
           </div>
 
           <div class="panel">
+            <h3>Dữ liệu Sellout (Excel)</h3>
+            <p style="margin:0 0 18px; color:var(--muted); line-height:1.7;">Import file Excel sellout hàng tuần của bạn (sheet "Data"), hoặc export toàn bộ dữ liệu sellout của chính bạn ra file Excel.</p>
+            <div class="dashboard-actions">
+              <button type="button" class="btn-primary" id="selloutImportBtn">Import dữ liệu tuần</button>
+              <button type="button" class="btn-secondary" id="selloutExportBtn">Export dữ liệu</button>
+              <input type="file" id="selloutImportInput" accept=".xlsx" class="hidden" />
+            </div>
+            <div class="login-error" id="selloutMessage"></div>
+          </div>
+
+          <div class="panel">
             <h3>Tổng quan cá nhân</h3>
             <div class="summary-block">
               <div class="summary-item">
@@ -1381,6 +1392,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>
     async function sha256(s) {
@@ -2214,6 +2226,174 @@
       document.getElementById('salesNote').value = '';
       renderStaffDashboard();
     });
+
+    /* --- Import / Export Excel sellout_data của chính nhân viên --- */
+    function excelSerialToISODate(serial) {
+      if (!serial) return null;
+      const utcMs = Date.UTC(1899, 11, 30) + Math.round(Number(serial)) * 86400000;
+      return new Date(utcMs).toISOString().slice(0, 10);
+    }
+
+    function getISOWeek(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = (d.getUTCDay() + 6) % 7;
+      d.setUTCDate(d.getUTCDate() - dayNum + 3);
+      const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+      const firstThursdayDayNum = (firstThursday.getUTCDay() + 6) % 7;
+      firstThursday.setUTCDate(firstThursday.getUTCDate() - firstThursdayDayNum + 3);
+      return 1 + Math.round((d - firstThursday) / (7 * 86400000));
+    }
+
+    const selloutImportBtn = document.getElementById('selloutImportBtn');
+    const selloutExportBtn = document.getElementById('selloutExportBtn');
+    const selloutImportInput = document.getElementById('selloutImportInput');
+    const selloutMessage = document.getElementById('selloutMessage');
+
+    function setSelloutMessage(text, kind) {
+      if (!selloutMessage) return;
+      selloutMessage.style.color = kind === 'error' ? '#b30012' : kind === 'success' ? '#1c4d2b' : '#5e6f8a';
+      selloutMessage.textContent = text;
+    }
+
+    if (selloutImportBtn) {
+      selloutImportBtn.addEventListener('click', () => selloutImportInput.click());
+    }
+
+    if (selloutImportInput) {
+      selloutImportInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        event.target.value = '';
+        if (!file || !currentUser) return;
+
+        setSelloutMessage('Đang đọc file...', 'info');
+        try {
+          const buf = await file.arrayBuffer();
+          const wb = XLSX.read(buf, { type: 'array' });
+          const sheet = wb.Sheets['Data'];
+          if (!sheet) {
+            setSelloutMessage('Không tìm thấy sheet "Data" trong file.', 'error');
+            return;
+          }
+
+          const rows = XLSX.utils.sheet_to_json(sheet, { raw: true });
+          if (!rows.length) {
+            setSelloutMessage('File không có dữ liệu.', 'error');
+            return;
+          }
+
+          const parsedRows = rows
+            .map((row) => ({
+              sale_date: excelSerialToISODate(row['Date']),
+              customer_name: row['Customer Name'] ?? null,
+              assigned_to: currentUser.id,
+              lob: row['LOB'] ?? null,
+              disty: row['Disty'] ?? null,
+              model: row['Model'] ?? null,
+              quantity: Number(row['Quantity']) || 0,
+              platform: row['Platform'] ?? null,
+              details_chipset: row['Details Chipset'] ?? null,
+              form_factor: row['Form Factor'] ?? null
+            }))
+            .filter((r) => r.sale_date);
+
+          if (!parsedRows.length) {
+            setSelloutMessage('Không đọc được dòng dữ liệu hợp lệ nào (thiếu cột Date?).', 'error');
+            return;
+          }
+
+          const datesInFile = [...new Set(parsedRows.map((r) => r.sale_date))];
+          const { data: existingRows, error: existErr } = await sb
+            .from('sellout_data')
+            .select('sale_date')
+            .eq('assigned_to', currentUser.id)
+            .in('sale_date', datesInFile);
+
+          if (existErr) {
+            setSelloutMessage('Lỗi kiểm tra dữ liệu trùng: ' + existErr.message, 'error');
+            return;
+          }
+
+          const existingDatesSet = new Set((existingRows || []).map((r) => r.sale_date));
+          const overlapCount = parsedRows.filter((r) => existingDatesSet.has(r.sale_date)).length;
+
+          if (overlapCount > 0) {
+            const proceed = window.confirm(
+              `Phát hiện ${overlapCount} dòng có ngày trùng dữ liệu đã có, vẫn tiếp tục cộng thêm hay huỷ?`
+            );
+            if (!proceed) {
+              setSelloutMessage('Đã huỷ import.', 'info');
+              return;
+            }
+          }
+
+          setSelloutMessage('Đang import...', 'info');
+          const BATCH = 500;
+          let insertedTotal = 0;
+          for (let i = 0; i < parsedRows.length; i += BATCH) {
+            const batch = parsedRows.slice(i, i + BATCH);
+            const { error: insErr } = await sb.from('sellout_data').insert(batch);
+            if (insErr) {
+              setSelloutMessage(`Lỗi khi import (đã thêm ${insertedTotal} dòng trước khi lỗi): ${insErr.message}`, 'error');
+              return;
+            }
+            insertedTotal += batch.length;
+          }
+
+          setSelloutMessage(`Đã import thành công ${insertedTotal} dòng.`, 'success');
+        } catch (err) {
+          setSelloutMessage('Lỗi đọc file: ' + err.message, 'error');
+        }
+      });
+    }
+
+    if (selloutExportBtn) {
+      selloutExportBtn.addEventListener('click', async () => {
+        if (!currentUser) return;
+        setSelloutMessage('Đang tải dữ liệu để export...', 'info');
+
+        const { data, error } = await sb
+          .from('sellout_data')
+          .select('*')
+          .eq('assigned_to', currentUser.id)
+          .order('sale_date', { ascending: true });
+
+        if (error) {
+          setSelloutMessage('Lỗi tải dữ liệu: ' + error.message, 'error');
+          return;
+        }
+        if (!data || !data.length) {
+          setSelloutMessage('Chưa có dữ liệu để export.', 'error');
+          return;
+        }
+
+        const exportRows = data.map((r) => {
+          const [y, m, dd] = r.sale_date.split('-').map(Number);
+          const d = new Date(y, m - 1, dd);
+          return {
+            'Date': r.sale_date,
+            'Period': d.getMonth() + 1,
+            'Week': getISOWeek(d),
+            'Year': `Y${d.getFullYear()}`,
+            'Customer Name': r.customer_name,
+            'Sales': currentUser.name,
+            'LOB': r.lob,
+            'Disty': r.disty,
+            'Model': r.model,
+            'Quantity': r.quantity,
+            'Platform': r.platform,
+            'Details Chipset': r.details_chipset,
+            'Form Factor': r.form_factor
+          };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportRows);
+        const wbOut = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wbOut, ws, 'Data');
+        XLSX.writeFile(wbOut, `sellout_${currentUser.name}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+        setSelloutMessage(`Đã export ${exportRows.length} dòng.`, 'success');
+      });
+    }
 
     updateSidebar(null);
     showScreen('loginScreen');
