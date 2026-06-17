@@ -1358,14 +1358,24 @@
               <table class="target-table">
                 <thead>
                   <tr>
-                    <th>Dòng sản phẩm</th>
-                    <th>Target</th>
-                    <th>Achieved</th>
-                    <th>% Hoàn thành</th>
-                    <th>Trạng thái</th>
+                    <th>Hạng mục</th>
+                    <th>D</th>
+                    <th>F</th>
+                    <th>K</th>
+                    <th>E</th>
+                    <th>Achieved (G)</th>
+                    <th>Hit Rate % (H)</th>
+                    <th>Final Score (I)</th>
+                    <th>Target score (J)</th>
                   </tr>
                 </thead>
                 <tbody id="staffTargetsBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="8" style="text-align:right; font-weight:700;">Achieve Rate</td>
+                    <td id="staffTargetsAchieveRate" style="font-weight:700;">—</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -2065,40 +2075,78 @@
       drawBarChart(document.getElementById('leadChart'), sortedDates, sortedDates.map((date) => groupedByDate[date]));
     }
 
+    function fmtKpiNumber(v) {
+      if (v === null || v === undefined) return '';
+      const n = Number(v);
+      return Number.isInteger(n) ? String(n) : n.toLocaleString('vi-VN', { maximumFractionDigits: 4 });
+    }
+
+    function fmtPercent1(ratio) {
+      if (ratio === null || ratio === undefined) return '—';
+      return `${(ratio * 100).toFixed(1)}%`;
+    }
+
+    async function saveStaffTargetField(rowId, column, value) {
+      const num = value === '' ? null : Number(value);
+      const { error } = await sb.from('targets').update({ [column]: num }).eq('id', rowId);
+      if (error) {
+        console.warn('[saveStaffTargetField]', column, error.message);
+        return;
+      }
+      await loadStaffTargets();
+    }
+
     async function loadStaffTargets() {
       const targetsBody = document.getElementById('staffTargetsBody');
+      const achieveRateCell = document.getElementById('staffTargetsAchieveRate');
       if (!targetsBody || !currentUser) return;
       targetsBody.innerHTML = '';
 
-      const [targetsRes, achievedRes] = await Promise.all([
-        sb.from('targets').select('*').eq('assigned_to', currentUser.id),
-        sb.from('v_kpi_achieved').select('*').eq('assigned_to', currentUser.id)
-      ]);
+      const { data, error } = await sb
+        .from('v_kpi_full')
+        .select('*')
+        .eq('assigned_to', currentUser.id)
+        .order('category');
 
-      if (targetsRes.error) console.warn('[staffTargets targets]', targetsRes.error.message);
-      if (achievedRes.error) console.warn('[staffTargets v_kpi_achieved]', achievedRes.error.message);
+      if (error) {
+        console.warn('[staffTargets v_kpi_full]', error.message);
+        targetsBody.innerHTML = '<tr><td colspan="9">Lỗi tải dữ liệu KPI.</td></tr>';
+        return;
+      }
 
-      const achievedMap = {};
-      (achievedRes.data || []).forEach((a) => {
-        achievedMap[`${a.year} Q${a.quarter}|${a.category}`] = a.achieved_qty;
-      });
+      const rows = data || [];
+      if (!rows.length) {
+        targetsBody.innerHTML = '<tr><td colspan="9">Chưa có target.</td></tr>';
+        if (achieveRateCell) achieveRateCell.textContent = '—';
+        return;
+      }
 
-      (targetsRes.data || []).forEach((t) => {
-        const achieved = achievedMap[`${t.quarter}|${t.category}`] ?? 0;
-        const percent = t.target_qty ? Math.round((achieved / t.target_qty) * 100) : 0;
-        const statusClass = percent >= 100 ? 'status-pass' : 'status-fail';
+      rows.forEach((r) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${t.category}</td>
-          <td>${t.target_qty}</td>
-          <td>${achieved}</td>
-          <td>${percent}%</td>
-          <td><span class="${statusClass}">${percent >= 100 ? 'Đạt' : 'Chưa đạt'}</span></td>
+          <td>${r.category}</td>
+          <td><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="item_weight" value="${r.item_weight ?? ''}" /></td>
+          <td><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="target_stretched" value="${r.target_f ?? ''}" /></td>
+          <td><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="y2023_avg" value="${r.y2023_avg ?? ''}" /></td>
+          <td>${fmtKpiNumber(r.target_e)}</td>
+          <td>${fmtKpiNumber(r.achieved_g)}</td>
+          <td>${fmtPercent1(r.hit_rate_h)}</td>
+          <td>${r.final_score_i === null ? '—' : fmtKpiNumber(r.final_score_i)}</td>
+          <td>${r.target_score_j === null ? '—' : fmtKpiNumber(r.target_score_j)}</td>
         `;
         targetsBody.appendChild(tr);
       });
-      if (!targetsRes.data || !targetsRes.data.length) {
-        targetsBody.innerHTML = '<tr><td colspan="5">Chưa có target.</td></tr>';
+
+      targetsBody.querySelectorAll('.target-input').forEach((input) => {
+        input.addEventListener('blur', (e) => {
+          saveStaffTargetField(e.target.dataset.rowId, e.target.dataset.field, e.target.value);
+        });
+      });
+
+      const sumI = rows.reduce((sum, r) => sum + (r.final_score_i ?? 0), 0);
+      const sumJ = rows.reduce((sum, r) => sum + (r.target_score_j ?? 0), 0);
+      if (achieveRateCell) {
+        achieveRateCell.textContent = sumJ ? fmtPercent1(sumI / sumJ) : '—';
       }
     }
 
