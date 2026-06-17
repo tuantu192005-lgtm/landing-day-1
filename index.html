@@ -605,6 +605,96 @@
       color: var(--text);
     }
 
+    /* Overview section: 3 card icon + bar chart + donut chart */
+    .overview-section {
+      margin-bottom: 28px;
+    }
+
+    .overview-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .overview-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 22px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, var(--navy-soft) 0%, var(--navy-strong) 100%);
+      color: #fff;
+      box-shadow: 0 16px 30px rgba(16, 42, 78, 0.18);
+      min-width: 0;
+    }
+
+    .overview-card-icon {
+      flex-shrink: 0;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+
+    .overview-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .overview-card-body strong {
+      font-size: 1.6rem;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .overview-card-body span {
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 0.88rem;
+      line-height: 1.3;
+    }
+
+    .overview-charts {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 20px;
+    }
+
+    .overview-chart-card {
+      min-height: 320px;
+    }
+
+    .overview-chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    .overview-chart-wrap canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    @media (max-width: 767px) {
+      .overview-cards {
+        grid-template-columns: 1fr;
+      }
+
+      .overview-charts {
+        grid-template-columns: 1fr;
+      }
+
+      .overview-card-body strong {
+        font-size: 1.4rem;
+        white-space: normal;
+      }
+    }
+
     .screen-title {
       margin-bottom: 18px;
       display: flex;
@@ -965,6 +1055,47 @@
             <div class="quick-card">
               <span>Tổng nhân viên</span>
               <h3 id="adminStaffCount">0</h3>
+            </div>
+          </div>
+
+          <div class="overview-section">
+            <div class="overview-cards">
+              <div class="overview-card">
+                <div class="overview-card-icon"><i class="fas fa-bullseye"></i></div>
+                <div class="overview-card-body">
+                  <strong id="ovTotalTarget">0</strong>
+                  <span>Tổng Target</span>
+                </div>
+              </div>
+              <div class="overview-card">
+                <div class="overview-card-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="overview-card-body">
+                  <strong id="ovTotalAchieved">0</strong>
+                  <span>Tổng Achieved</span>
+                </div>
+              </div>
+              <div class="overview-card">
+                <div class="overview-card-icon"><i class="fas fa-percentage"></i></div>
+                <div class="overview-card-body">
+                  <strong id="ovOverallPercent">0%</strong>
+                  <span>% Hoàn thành chung</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="overview-charts">
+              <div class="panel overview-chart-card">
+                <h3>% Hoàn thành theo nhân viên</h3>
+                <div class="overview-chart-wrap">
+                  <canvas id="overviewBarChart"></canvas>
+                </div>
+              </div>
+              <div class="panel overview-chart-card">
+                <h3>Tỉ trọng đóng góp Achieved</h3>
+                <div class="overview-chart-wrap">
+                  <canvas id="overviewDonutChart"></canvas>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1435,6 +1566,7 @@
       }
       loadEmployeeProgress();
       loadTaskAssigneeOptions();
+      loadOverviewSection();
     }
 
     /* --- Tiến độ nhân viên: donut chart + trang chi tiết theo nhân viên --- */
@@ -1446,6 +1578,124 @@
     ];
 
     const employeeCharts = {};
+
+    /* --- Tổng quan: 3 card icon + biểu đồ cột % hoàn thành + biểu đồ tròn tỉ trọng --- */
+    let overviewBarChartInstance = null;
+    let overviewDonutChartInstance = null;
+
+    function parseQuarterValue(quarter) {
+      const match = /^(\d{4})\s*Q(\d)$/.exec(quarter || '');
+      if (!match) return -Infinity;
+      return Number(match[1]) * 4 + Number(match[2]);
+    }
+
+    async function loadOverviewSection() {
+      if (!window.Chart) return;
+
+      const [targetsRes, achievedRes] = await Promise.all([
+        sb.from('targets').select('assigned_to, quarter, category, target_qty'),
+        sb.from('v_kpi_achieved').select('assigned_to, year, quarter, category, achieved_qty')
+      ]);
+
+      if (targetsRes.error) console.warn('[overview targets]', targetsRes.error.message);
+      if (achievedRes.error) console.warn('[overview v_kpi_achieved]', achievedRes.error.message);
+
+      const allTargets = targetsRes.data || [];
+      const allAchieved = achievedRes.data || [];
+
+      // Quý hiện có dữ liệu = quý mới nhất xuất hiện trong targets (không hardcode '2024 Q1')
+      let currentQuarter = null;
+      allTargets.forEach((t) => {
+        if (currentQuarter === null || parseQuarterValue(t.quarter) > parseQuarterValue(currentQuarter)) {
+          currentQuarter = t.quarter;
+        }
+      });
+
+      const targetsThisQuarter = currentQuarter ? allTargets.filter((t) => t.quarter === currentQuarter) : [];
+
+      const achievedMap = {};
+      allAchieved.forEach((a) => {
+        achievedMap[`${a.assigned_to}|${a.year} Q${a.quarter}|${a.category}`] = a.achieved_qty || 0;
+      });
+
+      let totalTarget = 0;
+      let totalAchieved = 0;
+      const perEmployee = {};
+      EMPLOYEES.forEach((emp) => { perEmployee[emp.id] = { target: 0, achieved: 0 }; });
+
+      targetsThisQuarter.forEach((t) => {
+        const achieved = achievedMap[`${t.assigned_to}|${t.quarter}|${t.category}`] ?? 0;
+        totalTarget += t.target_qty || 0;
+        totalAchieved += achieved;
+        if (perEmployee[t.assigned_to]) {
+          perEmployee[t.assigned_to].target += t.target_qty || 0;
+          perEmployee[t.assigned_to].achieved += achieved;
+        }
+      });
+
+      const overallPercent = totalTarget ? Math.round((totalAchieved / totalTarget) * 100) : 0;
+
+      const fmtQty = (n) => Math.round(n).toLocaleString('vi-VN');
+      document.getElementById('ovTotalTarget').textContent = fmtQty(totalTarget);
+      document.getElementById('ovTotalAchieved').textContent = fmtQty(totalAchieved);
+      document.getElementById('ovOverallPercent').textContent = `${overallPercent}%`;
+
+      const labels = EMPLOYEES.map((emp) => emp.name);
+      const percentByEmployee = EMPLOYEES.map((emp) => {
+        const row = perEmployee[emp.id];
+        return row.target ? Math.round((row.achieved / row.target) * 100) : 0;
+      });
+      const achievedByEmployee = EMPLOYEES.map((emp) => perEmployee[emp.id].achieved);
+      const totalAchievedAllEmployees = achievedByEmployee.reduce((sum, v) => sum + v, 0);
+      const shareByEmployee = achievedByEmployee.map((v) =>
+        totalAchievedAllEmployees ? Math.round((v / totalAchievedAllEmployees) * 100) : 0
+      );
+
+      const palette = ['#102a4e', '#2a4d7c', '#5b86b5', '#9db9dd'];
+
+      const barCtx = document.getElementById('overviewBarChart').getContext('2d');
+      if (overviewBarChartInstance) overviewBarChartInstance.destroy();
+      overviewBarChartInstance = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: '% Hoàn thành',
+            data: percentByEmployee,
+            backgroundColor: palette,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { callback: (v) => `${v}%` } } }
+        }
+      });
+
+      const donutCtx = document.getElementById('overviewDonutChart').getContext('2d');
+      if (overviewDonutChartInstance) overviewDonutChartInstance.destroy();
+      overviewDonutChartInstance = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: shareByEmployee,
+            backgroundColor: palette,
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}%` } }
+          }
+        }
+      });
+    }
 
     async function loadEmployeeProgress() {
       const grid = document.getElementById('employeeProgressGrid');
