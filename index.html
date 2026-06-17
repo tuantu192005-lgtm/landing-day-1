@@ -1328,30 +1328,6 @@
           </div>
 
           <div class="panel">
-            <h3>Nhập báo cáo doanh số</h3>
-            <form id="salesForm">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="salesDate">Ngày</label>
-                  <input type="date" id="salesDate" required />
-                </div>
-                <div class="form-group">
-                  <label for="salesAmount">Doanh số (VNĐ)</label>
-                  <input type="number" id="salesAmount" min="0" placeholder="Nhập giá trị" required />
-                </div>
-                <div class="form-group">
-                  <label for="salesNote">Ghi chú</label>
-                  <input type="text" id="salesNote" placeholder="Ghi chú nhanh" />
-                </div>
-              </div>
-              <div class="dashboard-actions">
-                <button type="submit" class="btn-primary">Lưu báo cáo</button>
-              </div>
-              <div class="login-error" id="staffFormMessage"></div>
-            </form>
-          </div>
-
-          <div class="panel">
             <h3>Dữ liệu Sellout (Excel)</h3>
             <p style="margin:0 0 18px; color:var(--muted); line-height:1.7;">Import file Excel sellout hàng tuần của bạn (sheet "Data"), hoặc export toàn bộ dữ liệu sellout của chính bạn ra file Excel.</p>
             <div class="dashboard-actions">
@@ -1392,11 +1368,6 @@
                 <tbody id="staffTargetsBody"></tbody>
               </table>
             </div>
-          </div>
-
-          <div class="panel">
-            <h3>Lịch sử báo cáo</h3>
-            <div class="history-list" id="staffHistoryList"></div>
           </div>
 
           <div class="panel">
@@ -2140,24 +2111,6 @@
       document.getElementById('staffReportsCount').textContent = staffReports.length;
       loadMyTasks();
       loadStaffTargets();
-
-      const historyList = document.getElementById('staffHistoryList');
-      historyList.innerHTML = '';
-      if (!staffReports.length) {
-        historyList.innerHTML = '<p style="color: var(--muted);">Chưa có báo cáo nào. Bắt đầu nhập báo cáo của bạn.</p>';
-        return;
-      }
-
-      staffReports.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((report) => {
-        const item = document.createElement('div');
-        item.className = 'history-item';
-        item.innerHTML = `
-          <strong>${report.date} — ${formatCurrency(report.sales)}</strong>
-          <p><strong>Ghi chú:</strong> ${report.note || 'Không có'}</p>
-          <span>Nhóm: ${report.team}</span>
-        `;
-        historyList.appendChild(item);
-      });
     }
 
     function updateDashboard() {
@@ -2253,34 +2206,6 @@
       if (link && link.dataset.screen) {
         showScreen(link.dataset.screen);
       }
-    });
-
-    document.getElementById('salesForm').addEventListener('submit', (event) => {
-      event.preventDefault();
-      const date = document.getElementById('salesDate').value;
-      const sales = Number(document.getElementById('salesAmount').value);
-      const note = document.getElementById('salesNote').value.trim();
-      const message = document.getElementById('staffFormMessage');
-
-      if (!date || !sales || sales <= 0) {
-        message.textContent = 'Vui lòng nhập ngày và doanh số hợp lệ.';
-        return;
-      }
-
-      const reports = getStoredReports();
-      reports.push({
-        email: currentUser.email,
-        team: currentUser.team,
-        date,
-        sales,
-        note
-      });
-      saveReports(reports);
-      message.textContent = 'Đã lưu báo cáo thành công.';
-      document.getElementById('salesDate').value = '';
-      document.getElementById('salesAmount').value = '';
-      document.getElementById('salesNote').value = '';
-      renderStaffDashboard();
     });
 
     /* --- Import / Export Excel sellout_data của chính nhân viên --- */
