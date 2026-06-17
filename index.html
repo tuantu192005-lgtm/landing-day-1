@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="Logo.png" type="image/png" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+  <title>Hệ thống Quản lý Nhân viên Bán hàng</title>
+  <style>
+    :root {
+      --navy: #102a4e;
+      --navy-strong: #0b1f3d;
+      --navy-soft: #2a4d7c;
+      --white: #ffffff;
+      --bg: #e8eff8;
+      --surface: #f7fbff;
+      --surface-strong: #dce6f3;
+      --text: #11213a;
+      --muted: #5e6f8a;
+      --border: rgba(17, 33, 58, 0.12);
+      --shadow: 0 24px 50px rgba(16, 42, 78, 0.12);
+      --shadow-soft: 0 16px 30px rgba(16, 42, 78, 0.08);
+      font-family: 'Inter', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: linear-gradient(180deg, #f1f6fd 0%, #e3ebf6 100%);
+      color: var(--text);
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 20px;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app-shell {
+      width: min(1200px, 100%);
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid rgba(16, 42, 78, 0.08);
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 24px 32px;
+      background: linear-gradient(90deg, var(--navy), var(--navy-soft));
+      color: var(--white);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand img {
+      width: 46px;
+      border-radius: 14px;
+      background: var(--white);
+      padding: 8px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.4rem;
+      letter-spacing: 0.02em;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--white);
+      font-size: 0.95rem;
+    }
+
+    .logout-btn,
+    .btn-primary,
+    .btn-secondary {
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .logout-btn {
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.18);
+      color: var(--white);
+    }
+
+    .logout-btn:hover {
+      transform: translateY(-1px);
+      opacity: 0.92;
+    }
+
+    .app-body {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 760px;
+    }
+
+    .sidebar {
+      padding: 30px 24px;
+      background: var(--navy-strong);
+      color: var(--white);
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .sidebar h2 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.88;
+    }
+
+    .nav-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--white);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .nav-link.active,
+    .nav-link:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .sidebar small {
+      color: rgba(255, 255, 255, 0.72);
+      line-height: 1.6;
+    }
+
+    .content {
+      padding: 32px 32px 40px;
+      background: var(--bg);
+      overflow: auto;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .welcome-panel,
+    .stat-grid,
+    .report-panel,
+    .card-grid,
+    .info-card {
+      display: grid;
+      gap: 20px;
+    }
+
+    .welcome-panel {
+      grid-template-columns: 1fr auto;
+      align-items: stretch;
+      margin-bottom: 28px;
+    }
+
+    .welcome-box {
+      padding: 28px;
+      border-radius: 24px;
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .welcome-box h2 {
+      margin: 0 0 12px;
+      font-size: 1.8rem;
+    }
+
+    .welcome-box p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .quick-card {
+      padding: 22px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, #0b1f3d 0%, #19355f 100%);
+      color: var(--white);
+      min-width: 220px;
+      display: grid;
+      gap: 12px;
+      align-content: center;
+    }
+
+    .quick-card h3 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+
+    .quick-card span {
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 0.95rem;
+    }
+
+    .stat-grid {
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+    }
+
+    .panel {
+      padding: 26px;
+      border-radius: 24px;
+      background: var(--white);
+      box-shadow: var(--shadow-soft);
+      border: 1px solid #e3eaf4;
+    }
+
+    .panel h3 {
+      margin: 0 0 18px;
+      font-size: 1.15rem;
+    }
+
+    .stat-card {
+      padding: 24px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
+      border: 1px solid rgba(16, 42, 78, 0.08);
+      box-shadow: 0 16px 30px rgba(16, 42, 78, 0.06);
+    }
+
+    .stat-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .stat-card strong {
+      display: block;
+      margin-top: 14px;
+      font-size: 1.8rem;
+      color: var(--navy-strong);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    th,
+    td {
+      padding: 16px 14px;
+      text-align: left;
+      border-bottom: 1px solid #edf1f7;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      background: #eff4ff;
+      color: #1c3d7a;
+    }
+
+    .badge.lead {
+      background: #daf0ff;
+      color: #0f4a7f;
+    }
+
+    .badge.staff {
+      background: #f5f7ff;
+      color: #2d4d8a;
+    }
+
+    /* Target tables */
+    .target-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    .target-table th,
+    .target-table td {
+      padding: 12px 12px;
+      border-bottom: 1px solid #e6eef9;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+
+    .target-table thead th {
+      background: linear-gradient(90deg, rgba(16,42,78,0.06), rgba(16,42,78,0.02));
+      color: var(--navy-strong);
+      font-weight: 700;
+    }
+
+    .target-input {
+      width: 100px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #cfe1fb;
+      background: #fbfdff;
+      color: var(--text);
+    }
+
+    .status-pass {
+      color: #0b663d;
+      font-weight: 700;
+      background: rgba(11,102,61,0.07);
+      padding: 6px 10px;
+      border-radius: 12px;
+      display: inline-block;
+    }
+
+    .status-fail {
+      color: #9b1c1c;
+      font-weight: 700;
+      background: rgba(155,28,28,0.06);
+      padding: 6px 10px;
+      border-radius: 12px;
+      display: inline-block;
+    }
+
+    .dashboard-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .btn-primary {
+      padding: 14px 24px;
+      background: var(--navy);
+      color: var(--white);
+    }
+
+    .btn-secondary {
+      padding: 14px 24px;
+      background: var(--white);
+      color: var(--navy);
+      border: 1px solid var(--navy);
+    }
+
+    .login-screen {
+      display: grid;
+      grid-template-columns: 500px 1fr;
+      min-height: 760px;
+    }
+
+    .login-panel,
+    .info-panel {
+      padding: 40px;
+      background: var(--white);
+      border-radius: 28px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .login-panel h2,
+    .info-panel h3 {
+      margin: 0 0 20px;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 16px 18px;
+      border-radius: 14px;
+      border: 1px solid #d9e2f0;
+      background: #f8fbff;
+      color: var(--text);
+      transition: border-color 0.2s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--navy);
+      outline: none;
+    }
+
+    .form-note {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .login-submit {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .login-submit button {
+      width: 100%;
+    }
+
+    .login-error {
+      color: #b30012;
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    .info-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 14px;
+    }
+
+    .info-panel li {
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: #f5f9ff;
+      border: 1px solid #dbe8ff;
+    }
+
+    .chart-card {
+      position: relative;
+      min-height: 320px;
+    }
+
+    .chart-card canvas {
+      width: 100% !important;
+      height: 300px !important;
+      display: block;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 26px;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .history-item {
+      padding: 18px;
+      border-radius: 18px;
+      background: #ffffff;
+      border: 1px solid #e2e8f4;
+      box-shadow: 0 14px 26px rgba(16, 42, 78, 0.05);
+    }
+
+    .history-item strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--navy-strong);
+    }
+
+    .history-item span,
+    .history-item p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.95rem;
+    }
+
+    .summary-block {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .summary-block .summary-item {
+      padding: 18px;
+      border-radius: 18px;
+      background: #f5f9ff;
+      border: 1px solid #dbe8ff;
+    }
+
+    .summary-item strong {
+      display: block;
+      font-size: 1.2rem;
+      margin-bottom: 6px;
+    }
+
+    /* Employee progress donuts */
+    .employee-progress-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .employee-progress-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 18px;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .employee-progress-card:hover {
+      background: #f5f9ff;
+      transform: translateY(-2px);
+    }
+
+    .employee-donut-wrap {
+      position: relative;
+      width: 140px;
+      height: 140px;
+    }
+
+    .employee-donut-wrap canvas {
+      width: 140px !important;
+      height: 140px !important;
+    }
+
+    .employee-donut-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--navy-strong);
+      pointer-events: none;
+    }
+
+    .employee-progress-name {
+      margin: 0;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .screen-title {
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .screen-title h2 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 1024px) {
+      .app-body {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar,
+      .content {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+
+      .sidebar {
+        order: 2;
+        border-radius: 0;
+      }
+
+      .content {
+        order: 1;
+      }
+
+      .login-screen {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 14px;
+      }
+
+      .app-shell {
+        border-radius: 22px;
+      }
+
+      .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .welcome-panel,
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .login-panel,
+      .info-panel {
+        padding: 26px;
+      }
+
+      .sidebar h2 {
+        font-size: 0.95rem;
+      }
+
+      .nav-link {
+        padding: 12px 14px;
+      }
+
+      .screen-title {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .chart-card {
+        min-height: 260px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .app-header {
+        padding: 20px;
+      }
+
+      .sidebar {
+        padding: 24px;
+      }
+
+      .btn-primary,
+      .btn-secondary,
+      .logout-btn {
+        width: 100%;
+      }
+
+      .login-submit {
+        flex-direction: column;
+      }
+
+      .history-item,
+      .stat-card,
+      .panel,
+      .quick-card {
+        padding: 18px;
+      }
+    }
+
+    /* ── Chatbot Widget ── */
+    #chatbot-fab {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--navy-soft), var(--navy-strong));
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 8px 24px rgba(16,42,78,0.38);
+      z-index: 9999;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #chatbot-fab:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(16,42,78,0.45); }
+    #chatbot-fab .fab-badge {
+      position: absolute; top: -4px; right: -4px;
+      width: 18px; height: 18px;
+      background: #e53e3e; border-radius: 50%; border: 2px solid #fff;
+      font-size: 0.62rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    #chatbot-window {
+      position: fixed;
+      bottom: 96px;
+      right: 28px;
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 20px 60px rgba(16,42,78,0.22);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 9998;
+      border: 1px solid rgba(16,42,78,0.1);
+      transform: scale(0.92) translateY(12px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), opacity 0.2s ease;
+    }
+    #chatbot-window.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
+
+    /* Header */
+    .cb-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 13px 16px;
+      background: linear-gradient(90deg, var(--navy-strong), var(--navy-soft));
+      color: #fff; flex-shrink: 0;
+    }
+    .cb-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,0.18);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .cb-header-info { flex: 1; min-width: 0; }
+    .cb-header-info strong { display: block; font-size: 0.92rem; }
+    .cb-header-info span { font-size: 0.76rem; opacity: 0.82; }
+    .cb-close {
+      background: none; border: none; color: #fff; opacity: 0.75;
+      cursor: pointer; font-size: 1rem; padding: 4px; flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .cb-close:hover { opacity: 1; }
+
+    /* Message area — single unified scroll container */
+    .cb-messages {
+      height: 450px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f4f8fd;
+    }
+    .cb-messages::-webkit-scrollbar { width: 4px; }
+    .cb-messages::-webkit-scrollbar-thumb { background: #c5d6ee; border-radius: 4px; }
+
+    /* Individual message bubbles — no border, no scrollbar */
+    .cb-msg {
+      max-width: 85%;
+      padding: 10px 13px;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    .cb-msg.bot {
+      align-self: flex-start;
+      background: #fff;
+      border-radius: 4px 16px 16px 16px;
+      color: #1a2a3a;
+      box-shadow: 0 1px 4px rgba(16,42,78,0.08);
+    }
+    .cb-msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--navy), var(--navy-soft));
+      color: #fff;
+      border-radius: 16px 16px 4px 16px;
+    }
+    .cb-msg ul { margin: 6px 0 0 0; padding-left: 16px; }
+    .cb-msg li { margin-bottom: 4px; }
+    .cb-msg strong { color: inherit; }
+    .cb-msg.user strong { color: #fff; }
+    .cb-msg code {
+      background: rgba(0,0,0,0.07); padding: 1px 5px;
+      border-radius: 4px; font-size: 0.8rem; font-family: monospace;
+    }
+    .cb-msg.user code { background: rgba(255,255,255,0.2); }
+
+    /* Typing animation */
+    .cb-typing { display: flex; gap: 4px; align-items: center; padding: 10px 13px; align-self: flex-start; }
+    .cb-typing span { width: 7px; height: 7px; background: #93afc8; border-radius: 50%; animation: cbBounce 1.1s infinite ease-in-out; }
+    .cb-typing span:nth-child(2) { animation-delay: 0.18s; }
+    .cb-typing span:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes cbBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+
+    /* Suggestion chips — below message area */
+    .cb-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 8px 12px;
+      background: #edf3fb;
+      border-top: 1px solid #d8e8f6;
+      flex-shrink: 0;
+    }
+    .cb-chips:empty { display: none; }
+    .cb-chip {
+      padding: 5px 12px; border-radius: 999px;
+      border: 1px solid #b8d0ef; background: #fff;
+      color: var(--navy); font-size: 0.78rem;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .cb-chip:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+    /* Input row */
+    .cb-input-row {
+      display: flex; gap: 8px;
+      padding: 10px 12px 12px;
+      background: #fff;
+      border-top: 1px solid #eaf0f9;
+      flex-shrink: 0;
+    }
+    .cb-input-row input {
+      flex: 1; min-width: 0;
+      padding: 9px 12px; border-radius: 10px;
+      border: 1px solid #c8dcf4; background: #f8fbff;
+      color: #1a2a3a; font: inherit; font-size: 0.875rem;
+      outline: none; transition: border-color 0.2s;
+    }
+    .cb-input-row input:focus { border-color: var(--navy); }
+    .cb-send {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: var(--navy); color: #fff; border: none;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 0.95rem; flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .cb-send:hover { background: var(--navy-soft); }
+
+    @media (max-width: 520px) {
+      #chatbot-window { width: calc(100vw - 24px); right: 12px; bottom: 82px; border-radius: 14px; }
+      .cb-messages { height: 380px; }
+      #chatbot-fab { right: 14px; bottom: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <img src="Logo.png" alt="Logo" />
+        <div>
+          <h1>Quản lý Nhân viên Bán hàng</h1>
+          <p style="margin:0; opacity:0.85; font-size:0.95rem;">Giao diện giả lập hệ thống doanh nghiệp</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="user-chip" id="currentUserChip">Chưa đăng nhập</span>
+        <button class="logout-btn hidden" id="logoutButton">Đăng xuất</button>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <aside class="sidebar" id="sidebarPanel">
+        <h2>Điều hướng</h2>
+        <ul class="nav-list" id="navList">
+          <li class="nav-link active" data-screen="loginScreen"><i class="fas fa-sign-in-alt"></i> Đăng nhập</li>
+        </ul>
+        <small>Hệ thống quản lý MSI — dữ liệu thật, đăng nhập bằng tài khoản được cấp.</small>
+      </aside>
+
+      <section class="content">
+        <section class="screen active" id="loginScreen">
+          <div class="login-screen">
+            <div class="login-panel">
+              <h2>Đăng nhập</h2>
+              <p>Nhập email và mật khẩu để truy cập Dashboard.</p>
+              <form id="loginForm">
+                <div class="form-group">
+                  <label for="emailInput">Email</label>
+                  <input type="email" id="emailInput" placeholder="Email của bạn" required />
+                </div>
+                <div class="form-group">
+                  <label for="passwordInput">Mật khẩu</label>
+                  <input type="password" id="passwordInput" placeholder="Mật khẩu" required />
+                </div>
+                <div class="login-submit">
+                  <button type="submit" class="btn-primary">Đăng nhập</button>
+                </div>
+                <div class="login-error" id="loginError"></div>
+              </form>
+            </div>
+            <aside class="info-panel">
+              <h3>Hướng dẫn đăng nhập</h3>
+              <ul>
+                <li><strong>Email</strong> đã được admin cấp</li>
+                <li><strong>Mật khẩu</strong> do admin thiết lập</li>
+              </ul>
+              <div style="margin-top:18px; padding:20px; border-radius:18px; background:#f5f9ff; border:1px solid #dbe8ff;">
+                <strong>Phân quyền</strong>
+                <p style="margin:10px 0 0; color:#5e6f8a; line-height:1.7;">Admin thấy toàn bộ hệ thống. Lead thấy nhóm mình. Nhân viên thấy phần của mình.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="screen" id="adminDashboard">
+          <div class="screen-title">
+            <h2>Dashboard Admin</h2>
+            <span class="badge lead">Chuyên viên quản lý</span>
+          </div>
+          <div class="welcome-panel">
+            <div class="welcome-box">
+              <h2>Xin chào, Admin.</h2>
+              <p>Xem tổng quan doanh số toàn bộ nhân viên, bảng thống kê và biểu đồ.</p>
+            </div>
+            <div class="quick-card">
+              <span>Tổng nhân viên</span>
+              <h3 id="adminStaffCount">0</h3>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card">
+              <p>Tổng doanh số</p>
+              <strong id="adminTotalSales">0 ₫</strong>
+            </div>
+            <div class="stat-card">
+              <p>Doanh số trung bình / nhân viên</p>
+              <strong id="adminAverageSales">0 ₫</strong>
+            </div>
+            <div class="stat-card">
+              <p>Số báo cáo nhập</p>
+              <strong id="adminReportsCount">0</strong>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Tiến độ nhân viên</h3>
+            <div class="employee-progress-grid" id="employeeProgressGrid"></div>
+          </div>
+
+          <div class="report-panel">
+            <div class="panel chart-card">
+              <h3>Biểu đồ doanh số theo nhân viên</h3>
+              <canvas id="adminChart"></canvas>
+            </div>
+            <div class="panel">
+              <h3>Thống kê nhóm</h3>
+              <div class="summary-block" id="adminTeamSummary"></div>
+            </div>
+          </div>
+
+          <!-- Target panels -->
+          <div class="panel">
+            <h3>Target cá nhân theo quý</h3>
+            <div class="table-wrapper">
+              <table class="target-table">
+                <thead>
+                  <tr>
+                    <th>Dòng sản phẩm</th>
+                    <th>Target</th>
+                    <th>Achieved</th>
+                    <th>% Hoàn thành</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody id="personalTargetsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Target theo khách hàng</h3>
+            <div class="table-wrapper">
+              <table class="target-table">
+                <thead>
+                  <tr>
+                    <th>Tên khách hàng</th>
+                    <th>Dòng sản phẩm</th>
+                    <th>Target quý</th>
+                    <th>Achieved</th>
+                    <th>% Hoàn thành</th>
+                  </tr>
+                </thead>
+                <tbody id="customerTargetsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Bảng doanh số nhân viên</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Nhóm</th>
+                    <th>Tổng doanh số</th>
+                    <th>Báo cáo gần nhất</th>
+                  </tr>
+                </thead>
+                <tbody id="adminTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="employeeDetailScreen">
+          <div class="screen-title">
+            <h2>Chi tiết nhân viên — <span id="employeeDetailName">-</span></h2>
+            <button type="button" class="btn-secondary" id="employeeDetailBackBtn">
+              <i class="fas fa-arrow-left"></i> Quay lại
+            </button>
+          </div>
+
+          <div class="panel">
+            <h3>Target theo dòng sản phẩm</h3>
+            <div class="table-wrapper">
+              <table class="target-table">
+                <thead>
+                  <tr>
+                    <th>Dòng sản phẩm</th>
+                    <th>Target</th>
+                    <th>Achieved</th>
+                    <th>% Hoàn thành</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody id="employeeDetailTargetsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Lịch sử báo cáo</h3>
+            <div class="history-list" id="employeeDetailHistory"></div>
+          </div>
+
+          <div class="panel">
+            <h3>Đơn hàng gắn với nhân viên</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Sản phẩm</th>
+                    <th>SL</th>
+                    <th>Đơn giá</th>
+                    <th>NPP</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody id="employeeDetailOrdersBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="leadDashboard">
+          <div class="screen-title">
+            <h2>Dashboard Lead</h2>
+            <span class="badge lead">Trưởng nhóm</span>
+          </div>
+          <div class="welcome-panel">
+            <div class="welcome-box">
+              <h2>Xin chào, trưởng nhóm.</h2>
+              <p>Xem và kiểm soát báo cáo doanh số của nhóm bạn với biểu đồ và thông tin chi tiết.</p>
+            </div>
+            <div class="quick-card">
+              <span>Nhóm của bạn</span>
+              <h3 id="leadTeamName">-</h3>
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card">
+              <p>Tổng doanh số nhóm</p>
+              <strong id="leadTotalSales">0 ₫</strong>
+            </div>
+            <div class="stat-card">
+              <p>Số nhân viên trong nhóm</p>
+              <strong id="leadTeamCount">0</strong>
+            </div>
+            <div class="stat-card">
+              <p>Số báo cáo nhóm</p>
+              <strong id="leadReportsCount">0</strong>
+            </div>
+          </div>
+
+          <div class="report-panel">
+            <div class="panel chart-card">
+              <h3>Biểu đồ doanh số theo ngày</h3>
+              <canvas id="leadChart"></canvas>
+            </div>
+            <div class="panel">
+              <h3>Thống kê nhân viên trong nhóm</h3>
+              <div class="summary-block" id="leadMemberSummary"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Báo cáo chi tiết nhóm</h3>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Ngày</th>
+                    <th>Doanh số</th>
+                    <th>Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody id="leadTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="staffDashboard">
+          <div class="screen-title">
+            <h2>Dashboard Nhân viên</h2>
+            <span class="badge staff">Nhân viên</span>
+          </div>
+          <div class="welcome-panel">
+            <div class="welcome-box">
+              <h2>Xin chào, nhân viên.</h2>
+              <p>Nhập báo cáo doanh số hàng ngày và quản lý lịch sử báo cáo của bạn.</p>
+            </div>
+            <div class="quick-card">
+              <span>Bạn thuộc nhóm</span>
+              <h3 id="staffTeamName">-</h3>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Nhập báo cáo doanh số</h3>
+            <form id="salesForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="salesDate">Ngày</label>
+                  <input type="date" id="salesDate" required />
+                </div>
+                <div class="form-group">
+                  <label for="salesAmount">Doanh số (VNĐ)</label>
+                  <input type="number" id="salesAmount" min="0" placeholder="Nhập giá trị" required />
+                </div>
+                <div class="form-group">
+                  <label for="salesNote">Ghi chú</label>
+                  <input type="text" id="salesNote" placeholder="Ghi chú nhanh" />
+                </div>
+              </div>
+              <div class="dashboard-actions">
+                <button type="submit" class="btn-primary">Lưu báo cáo</button>
+              </div>
+              <div class="login-error" id="staffFormMessage"></div>
+            </form>
+          </div>
+
+          <div class="panel">
+            <h3>Tổng quan cá nhân</h3>
+            <div class="summary-block">
+              <div class="summary-item">
+                <strong id="staffTotalSales">0 ₫</strong>
+                <span>Tổng doanh số hiện tại</span>
+              </div>
+              <div class="summary-item">
+                <strong id="staffReportsCount">0</strong>
+                <span>Số báo cáo đã lưu</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Lịch sử báo cáo</h3>
+            <div class="history-list" id="staffHistoryList"></div>
+          </div>
+        </section>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>
+    async function sha256(s) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    const accounts = [
+      { email: 'admin@company.vn', password: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', role: 'admin', name: 'Quản trị viên' },
+      { email: 'lead@company.vn',  password: '5830aa9ba1fd7843c92fd956cb640604e6d3bff683ddeeac778e0af21089a303', role: 'lead',  name: 'Trưởng nhóm', team: 'Nhóm A' },
+      { email: 'staff@company.vn', password: '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6', role: 'staff', name: 'Nhân viên Kinh doanh', team: 'Nhóm A' }
+    ];
+
+    const sampleReports = [
+      { email: 'staff@company.vn', team: 'Nhóm A', date: '2026-05-12', sales: 1420000, note: 'Gặp khách hàng lớn' },
+      { email: 'staff@company.vn', team: 'Nhóm A', date: '2026-05-13', sales: 980000, note: 'Chốt đơn gói dịch vụ' },
+      { email: 'staff@company.vn', team: 'Nhóm A', date: '2026-05-14', sales: 1250000, note: 'Cập nhật hợp đồng' },
+      { email: 'lead@company.vn', team: 'Nhóm A', date: '2026-05-11', sales: 750000, note: 'Hỗ trợ đội' },
+      { email: 'admin@company.vn', team: 'Quản lý', date: '2026-05-14', sales: 190000, note: 'Báo cáo nội bộ' }
+    ];
+
+    const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginError = document.getElementById('loginError');
+    const logoutButton = document.getElementById('logoutButton');
+    const currentUserChip = document.getElementById('currentUserChip');
+    const sidebarPanel = document.getElementById('sidebarPanel');
+    const navList = document.getElementById('navList');
+    const screens = document.querySelectorAll('.screen');
+    let currentUser = null;
+
+    function getStoredReports() {
+      const stored = localStorage.getItem('salesReports');
+      if (!stored) {
+        localStorage.setItem('salesReports', JSON.stringify(sampleReports));
+        return [...sampleReports];
+      }
+      try {
+        return JSON.parse(stored) || [...sampleReports];
+      } catch {
+        localStorage.setItem('salesReports', JSON.stringify(sampleReports));
+        return [...sampleReports];
+      }
+    }
+
+    function saveReports(reports) {
+      localStorage.setItem('salesReports', JSON.stringify(reports));
+    }
+
+    function formatCurrency(value) {
+      return value.toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+    }
+
+    function showScreen(id) {
+      screens.forEach((screen) => screen.classList.toggle('active', screen.id === id));
+      const currentLinks = document.querySelectorAll('.nav-link');
+      currentLinks.forEach((link) => link.classList.toggle('active', link.dataset.screen === id));
+    }
+
+    function updateSidebar(role) {
+      navList.innerHTML = '';
+      const links = [];
+      if (!role) {
+        links.push({ label: 'Đăng nhập', icon: 'fa-sign-in-alt', screen: 'loginScreen' });
+      } else if (role === 'admin') {
+        links.push({ label: 'Dashboard Admin', icon: 'fa-chart-line', screen: 'adminDashboard' });
+      } else if (role === 'lead') {
+        links.push({ label: 'Dashboard Lead', icon: 'fa-users', screen: 'leadDashboard' });
+      } else if (role === 'staff') {
+        links.push({ label: 'Dashboard Nhân viên', icon: 'fa-clipboard-list', screen: 'staffDashboard' });
+      }
+
+      links.forEach(({ label, icon, screen }) => {
+        const item = document.createElement('li');
+        item.className = 'nav-link';
+        item.dataset.screen = screen;
+        item.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
+        item.addEventListener('click', () => showScreen(screen));
+        navList.appendChild(item);
+      });
+    }
+
+    function drawBarChart(canvas, labels, values) {
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width = canvas.clientWidth * window.devicePixelRatio;
+      const height = canvas.height = canvas.clientHeight * window.devicePixelRatio;
+      ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      const cw = canvas.clientWidth;
+      const ch = canvas.clientHeight;
+      const padding = 40;
+      const maxValue = Math.max(...values, 1000);
+      const barWidth = (cw - padding * 2) / labels.length * 0.7;
+      const gap = (cw - padding * 2 - barWidth * labels.length) / Math.max(labels.length - 1, 1);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.strokeStyle = '#d9e2f0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding, ch - padding);
+      ctx.lineTo(cw - padding, ch - padding);
+      ctx.stroke();
+
+      labels.forEach((label, index) => {
+        const value = values[index];
+        const barHeight = ((ch - padding * 2) * value) / maxValue;
+        const x = padding + index * (barWidth + gap);
+        const y = ch - padding - barHeight;
+
+        ctx.fillStyle = '#0b1f3d';
+        ctx.fillRect(x, y, barWidth, barHeight);
+        ctx.fillStyle = '#102a4e';
+        ctx.font = '600 14px Inter, system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x + barWidth / 2, ch - padding + 22);
+        ctx.fillText(formatCurrency(value), x + barWidth / 2, y - 12);
+      });
+    }
+
+    function aggregateSales(reports) {
+      const staffData = {};
+      reports.forEach((report) => {
+        const key = report.email;
+        if (!staffData[key]) {
+          staffData[key] = { email: report.email, team: report.team, total: 0, latest: report.date };
+        }
+        staffData[key].total += report.sales;
+        if (new Date(report.date) > new Date(staffData[key].latest)) {
+          staffData[key].latest = report.date;
+        }
+      });
+      return Object.values(staffData);
+    }
+
+    function renderAdminDashboard() {
+      const reports = getStoredReports();
+      const staffData = aggregateSales(reports);
+      const adminStaffCount = staffData.length;
+      const adminTotalSales = staffData.reduce((sum, item) => sum + item.total, 0);
+      const adminAverage = adminStaffCount ? Math.round(adminTotalSales / adminStaffCount) : 0;
+
+      document.getElementById('adminStaffCount').textContent = adminStaffCount;
+      document.getElementById('adminTotalSales').textContent = formatCurrency(adminTotalSales);
+      document.getElementById('adminAverageSales').textContent = formatCurrency(adminAverage);
+      document.getElementById('adminReportsCount').textContent = reports.length;
+
+      const adminTableBody = document.getElementById('adminTableBody');
+      adminTableBody.innerHTML = '';
+      staffData.sort((a, b) => b.total - a.total).forEach((item) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.email}</td>
+          <td>${item.team}</td>
+          <td>${formatCurrency(item.total)}</td>
+          <td>${item.latest}</td>
+        `;
+        adminTableBody.appendChild(row);
+      });
+
+      const teamSummary = document.getElementById('adminTeamSummary');
+      const teams = {};
+      reports.forEach((report) => {
+        if (!teams[report.team]) {
+          teams[report.team] = { total: 0, count: 0 };
+        }
+        teams[report.team].total += report.sales;
+        teams[report.team].count += 1;
+      });
+      teamSummary.innerHTML = '';
+      Object.keys(teams).forEach((team) => {
+        const item = document.createElement('div');
+        item.className = 'summary-item';
+        item.innerHTML = `<strong>${team}</strong><span>Tổng doanh số: ${formatCurrency(teams[team].total)}</span><span>Số báo cáo: ${teams[team].count}</span>`;
+        teamSummary.appendChild(item);
+      });
+
+      const labels = staffData.map((item) => item.email.split('@')[0]);
+      const values = staffData.map((item) => item.total);
+      drawBarChart(document.getElementById('adminChart'), labels, values);
+      // Render targets tables for admin
+      try {
+        renderPersonalTargets();
+        renderCustomerTargets();
+      } catch (e) {
+        console.warn('Targets render skipped:', e);
+      }
+      loadEmployeeProgress();
+    }
+
+    /* --- Tiến độ nhân viên: donut chart + trang chi tiết theo nhân viên --- */
+    const EMPLOYEES = [
+      { id: 'cd48efc4-e255-4387-85db-d735076ad575', name: 'Tú' },
+      { id: '80004214-c116-42e3-b511-36ebe488e51a', name: 'Lập' },
+      { id: 'c21deac8-e2ab-4d11-8269-dada620941b6', name: 'Linh' },
+      { id: '8ad49887-563a-44aa-bdcc-46a69734b402', name: 'Tâm' }
+    ];
+
+    const employeeCharts = {};
+
+    async function loadEmployeeProgress() {
+      const grid = document.getElementById('employeeProgressGrid');
+      if (!grid || !window.Chart) return;
+      grid.innerHTML = '';
+
+      for (const emp of EMPLOYEES) {
+        const { data, error } = await sb
+          .from('targets')
+          .select('target_qty, actual_qty')
+          .eq('assigned_to', emp.id);
+
+        if (error) console.warn(`[targets] ${emp.name}:`, error.message);
+
+        const rows = data || [];
+        const totalTarget = rows.reduce((sum, r) => sum + (r.target_qty || 0), 0);
+        const totalAchieved = rows.reduce((sum, r) => sum + (r.actual_qty || 0), 0);
+        const percent = totalTarget ? Math.round((totalAchieved / totalTarget) * 100) : 0;
+
+        const card = document.createElement('div');
+        card.className = 'employee-progress-card';
+        card.innerHTML = `
+          <div class="employee-donut-wrap">
+            <canvas id="donut-${emp.id}"></canvas>
+            <div class="employee-donut-center">${percent}%</div>
+          </div>
+          <p class="employee-progress-name">${emp.name}</p>
+        `;
+        card.addEventListener('click', () => openEmployeeDetail(emp.id));
+        grid.appendChild(card);
+
+        const ctx = card.querySelector('canvas').getContext('2d');
+        if (employeeCharts[emp.id]) employeeCharts[emp.id].destroy();
+        employeeCharts[emp.id] = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            datasets: [{
+              data: [Math.min(percent, 100), Math.max(100 - percent, 0)],
+              backgroundColor: ['#102a4e', '#e3eaf4'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            cutout: '72%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            animation: false
+          }
+        });
+      }
+    }
+
+    async function openEmployeeDetail(employeeId) {
+      const emp = EMPLOYEES.find((e) => e.id === employeeId);
+      if (!emp) return;
+      document.getElementById('employeeDetailName').textContent = emp.name;
+
+      const targetsBody = document.getElementById('employeeDetailTargetsBody');
+      const historyList = document.getElementById('employeeDetailHistory');
+      const ordersBody = document.getElementById('employeeDetailOrdersBody');
+      targetsBody.innerHTML = '';
+      historyList.innerHTML = '';
+      ordersBody.innerHTML = '';
+
+      const [targetsRes, reportsRes, ordersRes] = await Promise.all([
+        sb.from('targets').select('*').eq('assigned_to', employeeId),
+        sb.from('sales_reports').select('*').eq('assigned_to', employeeId).order('report_date', { ascending: false }),
+        sb.from('orders').select('*').eq('assigned_to', employeeId).order('created_at', { ascending: false })
+      ]);
+
+      if (targetsRes.error) console.warn('[employeeDetail targets]', targetsRes.error.message);
+      if (reportsRes.error) console.warn('[employeeDetail sales_reports]', reportsRes.error.message);
+      if (ordersRes.error) console.warn('[employeeDetail orders]', ordersRes.error.message);
+
+      (targetsRes.data || []).forEach((t) => {
+        const percent = t.target_qty ? Math.round((t.actual_qty / t.target_qty) * 100) : 0;
+        const statusClass = percent >= 100 ? 'status-pass' : 'status-fail';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${t.category}</td>
+          <td>${t.target_qty}</td>
+          <td>${t.actual_qty}</td>
+          <td>${percent}%</td>
+          <td><span class="${statusClass}">${percent >= 100 ? 'Đạt' : 'Chưa đạt'}</span></td>
+        `;
+        targetsBody.appendChild(tr);
+      });
+      if (!targetsRes.data || !targetsRes.data.length) {
+        targetsBody.innerHTML = '<tr><td colspan="5">Chưa có target.</td></tr>';
+      }
+
+      (reportsRes.data || []).forEach((r) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+          <strong>${r.report_date ?? '-'}</strong>
+          <span>Doanh số: ${formatCurrency(r.revenue || 0)}</span>
+          <p>${r.notes ?? ''}</p>
+        `;
+        historyList.appendChild(item);
+      });
+      if (!reportsRes.data || !reportsRes.data.length) {
+        historyList.innerHTML = '<p style="color:var(--muted)">Chưa có báo cáo.</p>';
+      }
+
+      (ordersRes.data || []).forEach((o) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${o.sku}</td>
+          <td>${o.product_name}</td>
+          <td>${o.qty}</td>
+          <td>${formatCurrency(o.unit_price)}</td>
+          <td>${o.npp}</td>
+          <td>${o.status}</td>
+        `;
+        ordersBody.appendChild(tr);
+      });
+      if (!ordersRes.data || !ordersRes.data.length) {
+        ordersBody.innerHTML = '<tr><td colspan="6">Chưa có đơn hàng.</td></tr>';
+      }
+
+      showScreen('employeeDetailScreen');
+    }
+
+    document.getElementById('employeeDetailBackBtn').addEventListener('click', () => showScreen('adminDashboard'));
+
+    /* --- Targets: dữ liệu giả lập và hàm render --- */
+    const personalTargetsKey = 'personalTargets_v1';
+    const customerTargetsKey = 'customerTargets_v1';
+
+    let personalTargets = JSON.parse(localStorage.getItem(personalTargetsKey) || 'null');
+    if (!personalTargets) {
+      personalTargets = [
+        { product: 'Mainboard', target: 120, achieved: 95 },
+        { product: 'VGA', target: 80, achieved: 90 },
+        { product: 'LCD', target: 40, achieved: 28 },
+        { product: 'Chassis', target: 60, achieved: 60 },
+        { product: 'Nguồn', target: 50, achieved: 35 },
+        { product: 'Tản', target: 30, achieved: 12 },
+        { product: 'SSD', target: 70, achieved: 70 }
+      ];
+      localStorage.setItem(personalTargetsKey, JSON.stringify(personalTargets));
+    }
+
+    let customerTargets = JSON.parse(localStorage.getItem(customerTargetsKey) || 'null');
+    if (!customerTargets) {
+      customerTargets = [
+        { customer: 'Công ty A', product: 'VGA', target: 40, achieved: 30 },
+        { customer: 'Công ty B', product: 'Mainboard', target: 60, achieved: 65 },
+        { customer: 'Công ty C', product: 'SSD', target: 20, achieved: 5 },
+        { customer: 'Công ty D', product: 'LCD', target: 15, achieved: 15 }
+      ];
+      localStorage.setItem(customerTargetsKey, JSON.stringify(customerTargets));
+    }
+
+    function saveTargets() {
+      localStorage.setItem(personalTargetsKey, JSON.stringify(personalTargets));
+      localStorage.setItem(customerTargetsKey, JSON.stringify(customerTargets));
+    }
+
+    function renderPersonalTargets() {
+      const tbody = document.getElementById('personalTargetsBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      personalTargets.forEach((item, i) => {
+        const percent = item.target ? Math.round((item.achieved / item.target) * 100) : 0;
+        const statusClass = percent >= 100 ? 'status-pass' : 'status-fail';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.product}</td>
+          <td><input type="number" class="target-input" data-index="${i}" value="${item.target}" /></td>
+          <td>${item.achieved}</td>
+          <td>${percent}%</td>
+          <td><span class="${statusClass}">${percent >= 100 ? 'Đạt' : 'Chưa đạt'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // attach listeners
+      tbody.querySelectorAll('.target-input').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          const idx = Number(e.target.dataset.index);
+          const val = Number(e.target.value) || 0;
+          personalTargets[idx].target = val;
+          saveTargets();
+          renderPersonalTargets();
+        });
+      });
+    }
+
+    function renderCustomerTargets() {
+      const tbody = document.getElementById('customerTargetsBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      customerTargets.forEach((item, i) => {
+        const percent = item.target ? Math.round((item.achieved / item.target) * 100) : 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.customer}</td>
+          <td>${item.product}</td>
+          <td><input type="number" class="target-input" data-customer-index="${i}" value="${item.target}" /></td>
+          <td>${item.achieved}</td>
+          <td>${percent}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('input.target-input').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          const idx = Number(e.target.dataset.customerIndex);
+          const val = Number(e.target.value) || 0;
+          customerTargets[idx].target = val;
+          saveTargets();
+          renderCustomerTargets();
+        });
+      });
+    }
+
+
+    function renderLeadDashboard() {
+      const reports = getStoredReports();
+      const leadTeam = currentUser.team;
+      const teamReports = reports.filter((report) => report.team === leadTeam);
+      const teamStaff = [...new Set(teamReports.map((report) => report.email))];
+      const totalSales = teamReports.reduce((sum, item) => sum + item.sales, 0);
+
+      document.getElementById('leadTeamName').textContent = leadTeam;
+      document.getElementById('leadTotalSales').textContent = formatCurrency(totalSales);
+      document.getElementById('leadTeamCount').textContent = teamStaff.length;
+      document.getElementById('leadReportsCount').textContent = teamReports.length;
+
+      const leadMemberSummary = document.getElementById('leadMemberSummary');
+      leadMemberSummary.innerHTML = '';
+      teamStaff.forEach((email) => {
+        const memberTotal = teamReports.filter((report) => report.email === email).reduce((sum, item) => sum + item.sales, 0);
+        const item = document.createElement('div');
+        item.className = 'summary-item';
+        item.innerHTML = `<strong>${email}</strong><span>Tổng doanh số: ${formatCurrency(memberTotal)}</span><span>Số báo cáo: ${teamReports.filter((report) => report.email === email).length}</span>`;
+        leadMemberSummary.appendChild(item);
+      });
+
+      const leadTableBody = document.getElementById('leadTableBody');
+      leadTableBody.innerHTML = '';
+      teamReports.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((report) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${report.email}</td>
+          <td>${report.date}</td>
+          <td>${formatCurrency(report.sales)}</td>
+          <td>${report.note}</td>
+        `;
+        leadTableBody.appendChild(row);
+      });
+
+      const groupedByDate = teamReports.reduce((acc, report) => {
+        acc[report.date] = (acc[report.date] || 0) + report.sales;
+        return acc;
+      }, {});
+      const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(a) - new Date(b));
+      drawBarChart(document.getElementById('leadChart'), sortedDates, sortedDates.map((date) => groupedByDate[date]));
+    }
+
+    function renderStaffDashboard() {
+      const reports = getStoredReports();
+      const staffReports = reports.filter((report) => report.email === currentUser.email);
+      const totalSales = staffReports.reduce((sum, report) => sum + report.sales, 0);
+      document.getElementById('staffTeamName').textContent = currentUser.team;
+      document.getElementById('staffTotalSales').textContent = formatCurrency(totalSales);
+      document.getElementById('staffReportsCount').textContent = staffReports.length;
+
+      const historyList = document.getElementById('staffHistoryList');
+      historyList.innerHTML = '';
+      if (!staffReports.length) {
+        historyList.innerHTML = '<p style="color: var(--muted);">Chưa có báo cáo nào. Bắt đầu nhập báo cáo của bạn.</p>';
+        return;
+      }
+
+      staffReports.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((report) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+          <strong>${report.date} — ${formatCurrency(report.sales)}</strong>
+          <p><strong>Ghi chú:</strong> ${report.note || 'Không có'}</p>
+          <span>Nhóm: ${report.team}</span>
+        `;
+        historyList.appendChild(item);
+      });
+    }
+
+    function updateDashboard() {
+      if (!currentUser) return;
+      if (currentUser.role === 'admin') renderAdminDashboard();
+      if (currentUser.role === 'lead') renderLeadDashboard();
+      if (currentUser.role === 'staff') renderStaffDashboard();
+    }
+
+    function initEmailJS() {
+      try {
+        if (window.emailjs) {
+          emailjs.init('5rLmSGO9F77w6RyYE');
+          console.log('[EmailJS] Đã khởi tạo thành công với Public Key: 5rLmSGO9F77w6RyYE');
+        } else {
+          console.warn('[EmailJS] SDK đã tải nhưng emailjs object không tồn tại, thử lại sau 500ms...');
+          setTimeout(initEmailJS, 500);
+        }
+      } catch (error) {
+        console.error('[EmailJS] Lỗi khởi tạo:', error);
+      }
+    }
+
+    // ══ SUPABASE AUTH ══════════════════════════════════════
+    const SUPA_URL = 'https://ojmzgewuuoaqffnhcild.supabase.co';
+    const SUPA_KEY = 'sb_publishable_TuxE4XIKNk3JBMplbPc_5w_IIIx78hm';
+    const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+    async function loadProfile(userId) {
+      const { data } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+      return data;
+    }
+
+    async function applySession(session) {
+      if (!session?.user) return;
+      const profile = await loadProfile(session.user.id);
+      if (!profile) {
+        loginError.textContent = 'Tài khoản chưa có hồ sơ. Liên hệ admin để tạo.';
+        await sb.auth.signOut();
+        return;
+      }
+      if (profile.status !== 'active') {
+        loginError.textContent = 'Tài khoản chưa được kích hoạt. Liên hệ admin.';
+        await sb.auth.signOut();
+        return;
+      }
+      currentUser = {
+        id:    session.user.id,
+        email: session.user.email,
+        name:  profile.full_name || session.user.email,
+        role:  profile.role      || 'staff',
+        team:  profile.team      || ''
+      };
+      loginError.textContent = '';
+      currentUserChip.textContent = `${currentUser.name} (${currentUser.email})`;
+      logoutButton.classList.remove('hidden');
+      updateSidebar(currentUser.role);
+      const screen = currentUser.role === 'admin' ? 'adminDashboard'
+                   : currentUser.role === 'lead'  ? 'leadDashboard'
+                   : 'staffDashboard';
+      showScreen(screen);
+      updateDashboard();
+    }
+
+    // Khôi phục session khi reload trang
+    sb.auth.getSession().then(({ data: { session } }) => applySession(session));
+
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      loginError.textContent = 'Đang xác thực…';
+      const { data, error } = await sb.auth.signInWithPassword({
+        email:    emailInput.value.trim(),
+        password: passwordInput.value
+      });
+      if (error) {
+        loginError.textContent = 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
+        return;
+      }
+      await applySession(data.session);
+    });
+
+    logoutButton.addEventListener('click', async () => {
+      await sb.auth.signOut();
+      currentUser = null;
+      currentUserChip.textContent = 'Chưa đăng nhập';
+      logoutButton.classList.add('hidden');
+      updateSidebar(null);
+      showScreen('loginScreen');
+    });
+
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('.nav-link');
+      if (link && link.dataset.screen) {
+        showScreen(link.dataset.screen);
+      }
+    });
+
+    document.getElementById('salesForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const date = document.getElementById('salesDate').value;
+      const sales = Number(document.getElementById('salesAmount').value);
+      const note = document.getElementById('salesNote').value.trim();
+      const message = document.getElementById('staffFormMessage');
+
+      if (!date || !sales || sales <= 0) {
+        message.textContent = 'Vui lòng nhập ngày và doanh số hợp lệ.';
+        return;
+      }
+
+      const reports = getStoredReports();
+      reports.push({
+        email: currentUser.email,
+        team: currentUser.team,
+        date,
+        sales,
+        note
+      });
+      saveReports(reports);
+      message.textContent = 'Đã lưu báo cáo thành công.';
+      document.getElementById('salesDate').value = '';
+      document.getElementById('salesAmount').value = '';
+      document.getElementById('salesNote').value = '';
+      renderStaffDashboard();
+    });
+
+    updateSidebar(null);
+    showScreen('loginScreen');
+    initEmailJS();
+  </script>
+
+  <!-- Chatbot Widget -->
+  <button id="chatbot-fab" title="Hỏi bot MSI">
+    <i class="fas fa-robot"></i>
+    <span class="fab-badge" id="cb-badge">1</span>
+  </button>
+
+  <div id="chatbot-window">
+    <div class="cb-header">
+      <div class="cb-avatar"><i class="fas fa-robot"></i></div>
+      <div class="cb-header-info">
+        <strong>MSI Sales Bot</strong>
+        <span>Hỗ trợ chính sách · tồn kho · NPP</span>
+      </div>
+      <button class="cb-close" id="cb-close-btn" title="Đóng"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="cb-messages" id="cb-msg-list"></div>
+    <div class="cb-chips" id="cb-chips-row"></div>
+    <div class="cb-input-row">
+      <input type="text" id="cb-input" placeholder="Hỏi gì đi, tui nghe…" autocomplete="off" />
+      <button class="cb-send" id="cb-send-btn"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <script>
+    /* ── CHATBOT ── */
+    (function () {
+      const fab = document.getElementById('chatbot-fab');
+      const win = document.getElementById('chatbot-window');
+      const msgList = document.getElementById('cb-msg-list');
+      const inputEl = document.getElementById('cb-input');
+      const sendBtn = document.getElementById('cb-send-btn');
+      const closeBtn = document.getElementById('cb-close-btn');
+      const badge = document.getElementById('cb-badge');
+      let opened = false;
+      let badgeCount = 1;
+
+      /* ── Product database (aliases → card) ── */
+      function pc(name, sku, npps, rsp, policy, note) {
+        return `<strong>${name}</strong><br/>SKU: <code>${sku}</code><br/>NPP có hàng: ${npps}<br/>Giá RSP: <strong>${rsp}</strong><br/>Chính sách 05/2026: ${policy}${note ? '<br/>💡 '+note : ''}`;
+      }
+      const PRODUCTS = [
+        /* ── VGA ── */
+        { aliases:['rtx 5090','5090','suprim x 32g'], card: pc('MSI GeForce RTX 5090 SUPRIM X 32G','RTX-5090-SUPRIM-X-32G','DGW ✓ / SPC — / KTC — / NWH — / MH — / AD —','95.000.000đ','CK NPP: 10% / CK ĐL: 6% — Phân bổ có hạn, chỉ DGW','Bắt buộc dây PCIe 5.0 16-pin') },
+        { aliases:['rtx 5080','5080','gaming x trio 16g 5080'], card: pc('MSI GeForce RTX 5080 GAMING X TRIO 16G','RTX-5080-GAMING-X-TRIO-16G','DGW ✓ / SPC ✓ / MH ✓','38.000.000đ','CK NPP: 11% / CK ĐL: 7%','Bắt buộc dây PCIe 5.0 16-pin') },
+        { aliases:['rtx 5070 ti','5070ti','5070 ti','gaming x trio 16g 5070ti'], card: pc('MSI GeForce RTX 5070 Ti GAMING X TRIO 16G','RTX-5070TI-GAMING-X-TRIO-16G','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','25.000.000đ','CK NPP: 12% / CK ĐL: 8%','') },
+        { aliases:['rtx 5070','5070','gaming x trio 12g'], card: pc('MSI GeForce RTX 5070 GAMING X TRIO 12G','RTX-5070-GAMING-X-TRIO-12G','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓','17.500.000đ','CK NPP: 13% / CK ĐL: 9%','') },
+        { aliases:['rtx 5060 ti','5060ti','5060 ti','gaming x trio 16g 5060'], card: pc('MSI GeForce RTX 5060 Ti GAMING X TRIO 16G','RTX-5060TI-GAMING-X-TRIO-16G','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','10.500.000đ','CK NPP: 15% / CK ĐL: 10% — <strong>Nên push tháng này</strong>','Tồn tốt cả 6 NPP') },
+        { aliases:['rx 9070 xt','9070xt','9070 xt','radeon 9070 xt'], card: pc('MSI Radeon RX 9070 XT GAMING X TRIO 16G','RX-9070XT-GAMING-X-TRIO-16G','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','15.000.000đ','CK NPP: 14% / CK ĐL: 9%','') },
+        { aliases:['rx 9070','9070','radeon 9070'], card: pc('MSI Radeon RX 9070 GAMING X TRIO 16G','RX-9070-GAMING-X-TRIO-16G','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','12.000.000đ','CK NPP: 15% / CK ĐL: 10%','Tồn tốt cả 6 NPP') },
+        /* ── Mainboard ── */
+        { aliases:['meg x870e ace','x870e ace','meg x870e','x870e'], card: pc('MSI MEG X870E ACE','MEG-X870E-ACE','DGW ✓ (còn lại order)','14.000.000đ','CK NPP: 12% / CK ĐL: 8% — Hàng order 2–3 tuần','') },
+        { aliases:['mag x870 tomahawk','x870 tomahawk','mag x870','x870'], card: pc('MSI MAG X870 TOMAHAWK WIFI','MAG-X870-TOMAHAWK-WIFI','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','7.200.000đ','CK NPP: 14% / CK ĐL: 9%','') },
+        { aliases:['mag z890 tomahawk','z890 tomahawk','mag z890','z890'], card: pc('MSI MAG Z890 TOMAHAWK WIFI','MAG-Z890-TOMAHAWK-WIFI','DGW ✓ / SPC ✓','8.500.000đ','CK NPP: 14% / CK ĐL: 9%','') },
+        { aliases:['pro z890-a','pro z890','z890-a','z890 a wifi'], card: pc('MSI PRO Z890-A WIFI','PRO-Z890-A-WIFI','DGW ✓ / SPC ✓ / KTC ✓','6.800.000đ','CK NPP: 15% / CK ĐL: 10%','') },
+        { aliases:['mag b860 tomahawk','b860 tomahawk','mag b860','b860'], card: pc('MSI MAG B860 TOMAHAWK WIFI','MAG-B860-TOMAHAWK-WIFI','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓','4.500.000đ','CK NPP: 16% / CK ĐL: 11%','Tồn tốt') },
+        { aliases:['pro b850-p','pro b850','b850-p','b850'], card: pc('MSI PRO B850-P WIFI','PRO-B850-P-WIFI','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','3.800.000đ','CK NPP: 17% / CK ĐL: 12% — Hàng chạy tốt','Tồn tốt cả 6 NPP') },
+        { aliases:['h610m-e ddr4','h610m-e d4','h610m-e','h610m','h610','h6','pro h610m'], card: pc('MSI PRO H610M-E DDR4','PRO-H610M-E-DDR4','DGW ✓ / SPC ✓ / KTC ✓','~1.000.000đ','<strong>10 tặng 1</strong> — Chính sách tháng 05','Entry build văn phòng / PC giá rẻ, không ép xung') },
+        /* ── LCD ── */
+        { aliases:['321urx','mpg 321urx','mpg 321','qd-oled 32','oled 32'], card: pc('MSI MPG 321URX QD-OLED','MPG-321URX-QD-OLED','DGW ✓ / MH ✓','28.000.000đ','CK NPP: 12% / CK ĐL: 8% — Phân bổ có hạn','') },
+        { aliases:['274qrxw','mpg 274qrxw'], card: pc('MSI MPG 274QRXW','MPG-274QRXW','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','14.000.000đ','CK NPP: 14% / CK ĐL: 9%','') },
+        { aliases:['274qrfw','mag 274qrfw'], card: pc('MSI MAG 274QRFW','MAG-274QRFW','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓','8.500.000đ','CK NPP: 16% / CK ĐL: 11%','') },
+        { aliases:['274qrf-qd','274qrf qd','274qrf','mag 274qrf'], card: pc('MSI MAG 274QRF-QD','MAG-274QRF-QD','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','10.500.000đ','CK NPP: 16% / CK ĐL: 11% — <strong>Đang sale</strong>','') },
+        { aliases:['272c4pf','mag 272c4pf'], card: pc('MSI MAG 272C4PF','MAG-272C4PF','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','4.800.000đ','CK NPP: 18% / CK ĐL: 13%','') },
+        { aliases:['g274f','msi g274f'], card: pc('MSI G274F','G274F','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','3.800.000đ','CK NPP: 18% / CK ĐL: 13%','') },
+        { aliases:['g2412f','msi g2412f'], card: pc('MSI G2412F','G2412F','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','3.200.000đ','CK NPP: 18% / CK ĐL: 13%','') },
+        /* ── Nguồn ── */
+        { aliases:['mpg a1000g','mpg a1000','a1000g mpg'], card: pc('MSI MPG A1000G PCIE5','MPG-A1000G-PCIE5','DGW ✓ / SPC ✓ / MH ✓','4.000.000đ','CK NPP: 15% / CK ĐL: 10%','') },
+        { aliases:['mag a1000g','a1000g mag','a1000g'], card: pc('MSI MAG A1000G PCIE5','MAG-A1000G-PCIE5','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','3.200.000đ','CK NPP: 16% / CK ĐL: 11%','') },
+        { aliases:['mag a850g','a850g'], card: pc('MSI MAG A850G PCIE5','MAG-A850G-PCIE5','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','2.600.000đ','CK NPP: 17% / CK ĐL: 12%','Tồn tốt, nên push') },
+        { aliases:['mag a750gl','a750gl'], card: pc('MSI MAG A750GL PCIE5','MAG-A750GL-PCIE5','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','2.100.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['mag a650bn','a650bn'], card: pc('MSI MAG A650BN','MAG-A650BN','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','1.200.000đ','CK NPP: 18% / CK ĐL: 13%','') },
+        /* ── SSD ── */
+        { aliases:['m580 frozr 2tb','m580 2tb','m580 2t'], card: pc('MSI SPATIUM M580 FROZR 2TB','SPATIUM-M580-FROZR-2TB','DGW ✓ / SPC ✓','7.200.000đ','CK NPP: 14% / CK ĐL: 9%','PCIe 5.0') },
+        { aliases:['m580 frozr 1tb','m580 1tb','m580 1t','m580'], card: pc('MSI SPATIUM M580 FROZR 1TB','SPATIUM-M580-FROZR-1TB','DGW ✓ / SPC ✓ / MH ✓','3.800.000đ','CK NPP: 14% / CK ĐL: 9%','PCIe 5.0') },
+        { aliases:['m480 pro 2tb','m480 pro 2t'], card: pc('MSI SPATIUM M480 PRO 2TB','SPATIUM-M480-PRO-2TB','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','2.900.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['m480 pro 1tb','m480 pro 1t','m480 pro'], card: pc('MSI SPATIUM M480 PRO 1TB','SPATIUM-M480-PRO-1TB','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','1.600.000đ','CK NPP: 17% / CK ĐL: 12% — <strong>Nên push</strong>','Tồn tốt cả 6 NPP') },
+        { aliases:['m480 1tb','m480 1t','m480'], card: pc('MSI SPATIUM M480 1TB','SPATIUM-M480-1TB','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','1.400.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['m370 1tb','m370 1t','m370'], card: pc('MSI SPATIUM M370 1TB','SPATIUM-M370-1TB','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','950.000đ','CK NPP: 16% / CK ĐL: 11%','') },
+        /* ── Tản nhiệt ── */
+        { aliases:['coreliquid e360','e360'], card: pc('MSI MAG CORELIQUID E360','MAG-CORELIQUID-E360','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','3.800.000đ','CK NPP: 16% / CK ĐL: 11%','') },
+        { aliases:['coreliquid e240','e240'], card: pc('MSI MAG CORELIQUID E240','MAG-CORELIQUID-E240','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','2.800.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['coreliquid 360r v2','360r v2','360r'], card: pc('MSI MAG CORELIQUID 360R V2','MAG-CORELIQUID-360R-V2','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓','2.200.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['coreliquid 240r v2','240r v2','240r'], card: pc('MSI MAG CORELIQUID 240R V2','MAG-CORELIQUID-240R-V2','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','1.600.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['corefreeze 360','cf360'], card: pc('MSI MAG COREFREEZE 360 BLACK','MAG-COREFREEZE-360-BLACK','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','1.800.000đ','CK NPP: 17% / CK ĐL: 12%','') },
+        { aliases:['corefreeze 120','cf120'], card: pc('MSI MAG COREFREEZE 120','MAG-COREFREEZE-120','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','650.000đ','CK NPP: 18% / CK ĐL: 13%','') },
+        /* ── Case ── */
+        { aliases:['sekira 500x','sekira'], card: pc('MSI MPG SEKIRA 500X','MPG-SEKIRA-500X','DGW ✓ / MH ✓ (order 1–2 tuần)','5.500.000đ','CK NPP: 15% / CK ĐL: 10% — Hàng order','') },
+        { aliases:['gungnir 300r','gungnir'], card: pc('MSI MPG GUNGNIR 300R AIRFLOW','MPG-GUNGNIR-300R-AIRFLOW','DGW ✓ / SPC ✓ / KTC ✓ / MH ✓','3.500.000đ','CK NPP: 16% / CK ĐL: 11%','') },
+        { aliases:['pano m100r','pano'], card: pc('MSI MAG PANO M100R PZ','MAG-PANO-M100R-PZ','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓','2.200.000đ','CK NPP: 18% / CK ĐL: 13%','') },
+        { aliases:['forge 320r airflow','forge 320r','forge 320'], card: pc('MSI MAG FORGE 320R AIRFLOW','MAG-FORGE-320R-AIRFLOW','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','1.800.000đ','CK NPP: 17% / CK ĐL: 12% — <strong>Nên push</strong>','') },
+        { aliases:['forge 111r','forge 111'], card: pc('MSI MAG FORGE 111R','MAG-FORGE-111R','DGW ✓ / SPC ✓ / KTC ✓ / NWH ✓ / MH ✓ / AD ✓','950.000đ','CK NPP: 18% / CK ĐL: 13%','') }
+      ];
+
+      function norm(s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+
+      function matchProduct(text) {
+        const t = norm(text);
+        for (const p of PRODUCTS) {
+          for (const a of p.aliases) {
+            if (t.includes(norm(a))) return p.card;
+          }
+        }
+        return null;
+      }
+
+      /* ── Knowledge base ── */
+      const KB = [
+        {
+          id: 'terms',
+          chips: ['NPP là gì?', 'CK / SI / SO?'],
+          keys: ['npp la gi','npp là gì','ck la gi','ck là gì','so la gi','so là gì','si la gi','si là gì','sku','rsp','ttbh','kham tu viet tat','khám từ viết tắt','thuat ngu','thuật ngữ','tu viet tat','từ viết tắt','bh la gi','bh là gì','po la gi','km la gi'],
+          answer: `<strong>Từ viết tắt ngành hay dùng:</strong>
+<ul>
+<li><strong>NPP</strong> — Nhà Phân Phối (DGW, SPC, KTC, NWH, MH, AD)</li>
+<li><strong>CK</strong> — Chiết khấu, Discount % theo chính sách tháng</li>
+<li><strong>SI</strong> — Sell-in, doanh số bán <em>vào kho</em> NPP/ĐL</li>
+<li><strong>SO</strong> — Sell-out, doanh số bán <em>ra</em> tới người dùng cuối</li>
+<li><strong>SKU</strong> — Mã hàng đặt/theo dõi tồn kho</li>
+<li><strong>RSP</strong> — Giá đề xuất bán lẻ (giá niêm yết)</li>
+<li><strong>BH</strong> — Bảo hành, thời gian/điều kiện</li>
+<li><strong>TTBH</strong> — Trung tâm bảo hành MSI chính hãng</li>
+<li><strong>PO</strong> — Purchase Order, đơn đặt hàng</li>
+<li><strong>KM</strong> — Khuyến mãi, chương trình ưu đãi/gift</li>
+</ul>`
+        },
+        {
+          id: 'q1',
+          chips: ['Chiết khấu tháng 05', 'CK VGA / Main / LCD'],
+          keys: ['chiết khấu','ck','discount','%','chính sách giá','tháng này','policy','bao nhiêu %'],
+          answer: `<strong>Chiết khấu tháng 05/2026</strong> (NPP / Đại lý):
+<ul>
+<li>RTX 5090 SUPRIM X — <strong>10% / 6%</strong></li>
+<li>RTX 5080 / 5070 Ti — <strong>11–12% / 7–8%</strong></li>
+<li>RTX 5070 / 5060 Ti — <strong>13–15% / 9–10%</strong></li>
+<li>RX 9070 XT / 9070 — <strong>14–15% / 9–10%</strong></li>
+<li>MEG X870E ACE — <strong>12% / 8%</strong></li>
+<li>MAG Z890 / X870 — <strong>14% / 9%</strong></li>
+<li>PRO Z890 / B850 — <strong>15–17% / 10–12%</strong></li>
+<li>MAG B860 — <strong>16% / 11%</strong></li>
+<li>MPG LCD (QD-OLED…) — <strong>12–14% / 8–9%</strong></li>
+<li>MAG LCD — <strong>16% / 11%</strong></li>
+<li>G Series / LCD entry — <strong>18% / 13%</strong></li>
+<li>Nguồn / Tản / SSD / Case — <strong>15–18% / 10–13%</strong></li>
+</ul>
+⚠️ Ngoài khung → <strong>Trưởng nhóm duyệt email</strong>, không tự deal.`
+        },
+        {
+          id: 'q2',
+          chips: ['Tồn kho NPP', 'NPP nào có hàng'],
+          keys: ['còn hàng','npp nào có','tồn kho','hết hàng','lô này còn','hàng về','còn không','in stock'],
+          answer: `<strong>Tình trạng tồn kho (05/2026)</strong>:
+
+<strong>Phân bổ có hạn — cần kiểm tra thường xuyên:</strong>
+<ul>
+<li>RTX 5090 SUPRIM X → chỉ <strong>DGW</strong> ✓</li>
+<li>RTX 5080 GAMING X TRIO → DGW ✓, SPC ✓, MH ✓</li>
+<li>MPG 321URX QD-OLED → DGW ✓, MH ✓</li>
+<li>MEG X870E ACE → DGW ✓ (còn lại order 2–3 tuần)</li>
+<li>SPATIUM M580 FROZR 2TB → DGW ✓, SPC ✓</li>
+</ul>
+
+<strong>Tồn kho tốt cả 6 NPP:</strong>
+RTX 5060 Ti · RX 9070 · PRO B850 · MAG B860 · M480 PRO 1TB · MAG A850G · CORELIQUID 240R V2 · MAG FORGE 320R
+
+📌 Confirm lại với NPP trước khi báo giá khách — tồn thay đổi nhanh lắm.`
+        },
+        {
+          id: 'q3',
+          chips: ['Hàng order bao lâu về?'],
+          keys: ['order','đặt hàng','bao lâu','thời gian giao','giá order','đặt trước','hàng đặt'],
+          answer: `<strong>Thời gian hàng order:</strong>
+<ul>
+<li>MEG X870E ACE, RTX 5090 → <strong>2–3 tuần</strong></li>
+<li>MPG SEKIRA 500X (Case) → <strong>1–2 tuần</strong></li>
+<li>Hàng thông thường khan → <strong>2–4 tuần</strong> tùy model</li>
+</ul>
+
+💡 <strong>Giá tính theo lúc nào?</strong><br/>
+Tính theo chính sách <strong>tại thời điểm xuất hóa đơn</strong>, không phải lúc đặt cọc.<br/>
+Nếu khách lo giá thay đổi → đề xuất ký hợp đồng cố định giá.`
+        },
+        {
+          id: 'q4',
+          chips: ['Xin thêm CK ngoài khung'],
+          keys: ['xin thêm','vượt khung','deal thêm','đại lý kèo','ngoài chính sách','thêm chiết','tự duyệt'],
+          answer: `Không được tự duyệt — <strong>kể cả deal ngon cỡ nào</strong>.
+
+Quy trình đúng:
+<ol style="margin:6px 0 0 0; padding-left:18px;">
+<li>Ghi rõ lý do (đại lý nào, số lượng, mức xin thêm)</li>
+<li>Gửi email cho <strong>Trưởng nhóm kinh doanh</strong> xin duyệt</li>
+<li>Chờ xác nhận email chính thức → mới confirm với đại lý</li>
+</ol>
+
+Tự deal vượt khung không có duyệt = rủi ro về sau. Đừng để deal nhỏ thành vấn đề lớn.`
+        },
+        {
+          id: 'q5',
+          chips: ['Phân vùng NPP', 'Miền Trung NPP nào'],
+          keys: ['khu vực','vùng','miền bắc','miền trung','miền nam','đbscl','phân vùng','npp phụ trách','tphcm','hà nội','cần thơ'],
+          answer: `<strong>Phân vùng NPP tháng 05/2026:</strong>
+<ul>
+<li>🔵 <strong>Miền Bắc</strong> → KTC (hỗ trợ: DGW, SPC)</li>
+<li>🟡 <strong>Miền Trung</strong> → NWH (hỗ trợ: DGW)</li>
+<li>🔴 <strong>TP.HCM & vùng ven</strong> → DGW, MH (hỗ trợ: SPC)</li>
+<li>🟢 <strong>B2B toàn quốc</strong> → SPC (hỗ trợ: DGW)</li>
+<li>🟠 <strong>ĐBSCL</strong> → AD (hỗ trợ: DGW)</li>
+</ul>
+<strong>Thanh toán:</strong> Cấp 1 (DGW/SPC/KTC) → Net 30 · Cấp 2 (NWH/MH/AD) → Net 15<br/>
+NPP hết hàng → mua NPP khác nhưng cần báo bộ phận KD MSI trước.`
+        },
+        {
+          id: 'q6',
+          chips: ['Đơn > 100 triệu — thủ tục'],
+          keys: ['đơn lớn','trên 100','deal lớn','hợp đồng','thủ tục','100 triệu','crm','duyệt deal'],
+          answer: `<strong>Deal trên 100 triệu — checklist bắt buộc:</strong>
+
+<ul>
+<li>✅ Tạo Deal trên <strong>CRM</strong>, gắn NPP phụ trách</li>
+<li>✅ Gắn tên đại lý / khách hàng đầu cuối</li>
+<li>✅ <strong>Trưởng nhóm ký duyệt</strong> qua email</li>
+<li>✅ Sau khi có duyệt → mới confirm với khách / đại lý</li>
+</ul>
+
+Đừng confirm miệng trước rồi mới làm thủ tục sau — rủi ro cao.`
+        },
+        {
+          id: 'q7',
+          chips: ['Bảo hành & đổi trả', 'Dead pixel màn hình'],
+          keys: ['lỗi','bị hư','đổi hàng','bảo hành','trả lại','dead pixel','khách phàn nàn','đổi mới','sửa chữa'],
+          answer: `<strong>Chính sách bảo hành & đổi trả:</strong>
+
+<strong>Trong 7 ngày (linh kiện) / 14 ngày (màn hình):</strong><br/>
+→ Đổi mới cùng model nếu lỗi nhà sản xuất<br/>
+→ Yêu cầu: còn đủ hộp + phụ kiện + hóa đơn + không tác động vật lý
+
+<strong>Sau thời gian đổi mới:</strong>
+<ul>
+<li>Mainboard / VGA / Case / Nguồn / Tản → BH <strong>24 tháng</strong></li>
+<li>Màn hình → BH <strong>36 tháng</strong></li>
+<li>SSD SPATIUM → BH <strong>5 năm</strong></li>
+</ul>
+
+<strong>Trường hợp đặc biệt:</strong>
+<ul>
+<li>Mất hộp → vẫn bảo hành được, nhưng <strong>không đổi mới</strong></li>
+<li>Dead pixel: dưới 3 pixel = không đổi; từ 3 trở lên hoặc ở vùng trung tâm → đổi mới trong 14 ngày</li>
+</ul>`
+        },
+        {
+          id: 'q8',
+          chips: ['Gợi ý nguồn theo GPU'],
+          keys: ['nguồn','psu','watt','build','mấy w','cần nguồn','công suất','rtx 50','rx 90'],
+          answer: `<strong>Gợi ý nguồn MSI theo GPU:</strong>
+<ul>
+<li><strong>5060 Ti / RX 9070</strong><br/>Tối thiểu: A650BN 650W (1,2tr) · Nên dùng: A750GL 750W (2,1tr)</li>
+<li><strong>5070 / RX 9070 XT</strong><br/>Tối thiểu: A750GL 750W (2,1tr) · Nên dùng: A850G 850W (2,6tr)</li>
+<li><strong>5070 Ti / 5080</strong><br/>Tối thiểu: A850G 850W (2,6tr) · Nên dùng: A1000G 1000W (3,2tr)</li>
+<li><strong>RTX 5090</strong><br/>Tối thiểu: A1000G (3,2tr) · Nên dùng: MPG A1000G (4tr)</li>
+</ul>
+⚡ RTX 5090/5080 <strong>bắt buộc dây PCIe 5.0 (16-pin)</strong> — confirm trước khi push đơn.`
+        },
+        {
+          id: 'q9',
+          chips: ['KM tháng 05', 'Combo Gaming'],
+          keys: ['km','khuyến mãi','combo','push','chương trình','quà tặng','balo','trưng bày','sale','tháng 5'],
+          answer: `<strong>Chương trình tháng 05/2026:</strong>
+
+🎮 <strong>Combo Gaming:</strong>
+<ul>
+<li>Laptop Gaming (Katana/Sword/Pulse) + Màn hình MAG → giảm thêm <strong>3% tổng đơn</strong></li>
+<li>Mua từ 3 unit Katana → tặng <strong>1 balo MSI Gaming</strong></li>
+</ul>
+
+🖥️ <strong>Hỗ trợ trưng bày:</strong>
+<ul>
+<li>Đại lý trưng bày ≥ 5 sản phẩm MSI → hỗ trợ <strong>500.000đ/tháng</strong></li>
+<li>Đặt logo MSI → tặng <strong>vật phẩm POP</strong> (standee, banner)</li>
+</ul>
+
+📊 <strong>Nên push tháng này:</strong><br/>
+RTX 5060 Ti (CK 15%) · MAG 274QRF-QD (đang sale) · MAG A850G · SPATIUM M480 PRO 1TB · MAG FORGE 320R`
+        },
+        {
+          id: 'q10',
+          chips: ['Nộp báo cáo lúc nào?'],
+          keys: ['báo cáo','report','doanh số','nộp tuần','nộp tháng','deadline','sharepoint','format báo cáo'],
+          answer: `<strong>Lịch nộp báo cáo:</strong>
+<ul>
+<li>📅 <strong>Hàng tuần:</strong> Thứ Sáu trước <strong>17:00</strong></li>
+<li>📅 <strong>Cuối tháng:</strong> Ngày <strong>28</strong> mỗi tháng</li>
+</ul>
+
+Format theo <strong>mẫu trên SharePoint</strong> — không tự làm format riêng.
+
+Xin hỗ trợ marketing cho đại lý → gửi email nội bộ kèm: tên đại lý, địa chỉ, doanh số 3 tháng gần nhất, loại hỗ trợ đề xuất. Marketing phản hồi trong <strong>3 ngày làm việc</strong>.`
+        },
+        {
+          id: 'q11',
+          chips: ['Target tháng này của Tú'],
+          keys: ['target','chỉ tiêu','kpi','target của tú','tháng này bao nhiêu','chỉ tiêu tháng','target mb','target vga','target lcd','target psu'],
+          answer: `<strong>Target tháng 05/2026 của Tú:</strong>
+<ul>
+<li>🖥️ Mainboard (MB) — <strong>3.000 units</strong></li>
+<li>🎮 VGA — <strong>500 units</strong></li>
+<li>🖥️ LCD (Màn hình) — <strong>2.000 units</strong></li>
+<li>🔌 Nguồn (PSU) — <strong>1.000 units</strong></li>
+</ul>
+Hỏi về tiến độ hay cách push → Zalo anh Tú <strong>0906840384</strong>.`
+        }
+      ];
+
+      const WELCOME = `Ê, có tui đây! 👋<br/><br/>
+Tui là bot hỗ trợ team MSI — hỏi mã hàng, chính sách, tồn kho hay deal tháng này tui đều trả lời được.<br/><br/>
+<strong>Gợi ý nhanh:</strong>
+<ul>
+<li>🔍 <strong>Tra mã hàng</strong> — gõ tên/mã: H610M-E, RTX 5060Ti, MAG 274QRF-QD…</li>
+<li>💰 <strong>Chiết khấu</strong> — CK NPP/đại lý tháng 05/2026</li>
+<li>📦 <strong>Tồn kho</strong> — NPP nào đang có hàng gì</li>
+<li>🏢 <strong>NPP</strong> — phân vùng, điều kiện TT, hạn mức</li>
+<li>📊 <strong>Target tháng này</strong> — chỉ tiêu của Tú</li>
+</ul>
+Không tìm được? Tui báo thẳng anh Tú — Zalo <strong>0906840384</strong>.`;
+
+      const FALLBACK = `Mã này anh Tú cần xác nhận thêm — liên hệ Zalo: <strong>0906840384</strong> 📲`;
+
+      function matchKB(text) {
+        const t = norm(text);
+        for (const item of KB) {
+          for (const k of item.keys) {
+            if (t.includes(norm(k))) return item;
+          }
+        }
+        return null;
+      }
+
+      function addMsg(html, role) {
+        const d = document.createElement('div');
+        d.className = 'cb-msg ' + role;
+        d.innerHTML = html;
+        msgList.appendChild(d);
+        msgList.scrollTop = msgList.scrollHeight;
+        return d;
+      }
+
+      function showTyping() {
+        const d = document.createElement('div');
+        d.className = 'cb-typing';
+        d.id = 'cb-typing-indicator';
+        d.innerHTML = '<span></span><span></span><span></span>';
+        msgList.appendChild(d);
+        msgList.scrollTop = msgList.scrollHeight;
+      }
+
+      function hideTyping() {
+        const t = document.getElementById('cb-typing-indicator');
+        if (t) t.remove();
+      }
+
+      function renderChips(items) {
+        const row = document.getElementById('cb-chips-row');
+        row.innerHTML = '';
+        items.forEach(label => {
+          const btn = document.createElement('button');
+          btn.className = 'cb-chip';
+          btn.textContent = label;
+          btn.onclick = () => handleSend(label);
+          row.appendChild(btn);
+        });
+      }
+
+      function botReply(html, chips) {
+        showTyping();
+        setTimeout(() => {
+          hideTyping();
+          addMsg(html, 'bot');
+          const defaultChips = KB.slice(0,4).map(x => x.chips[0]);
+          renderChips(chips || defaultChips);
+        }, 680);
+      }
+
+      function handleSend(text) {
+        if (!text.trim()) return;
+        inputEl.value = '';
+        addMsg(text, 'user');
+        document.getElementById('cb-chips-row').innerHTML = '';
+
+        const productCard = matchProduct(text);
+        if (productCard) {
+          botReply(productCard, KB.slice(0,4).map(x => x.chips[0]));
+          return;
+        }
+        const match = matchKB(text);
+        if (match) {
+          botReply(match.answer, match.chips.concat(KB.filter(x => x.id !== match.id).slice(0,3).map(x => x.chips[0])));
+        } else {
+          botReply(FALLBACK);
+        }
+      }
+
+      sendBtn.addEventListener('click', () => handleSend(inputEl.value));
+      inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(inputEl.value); });
+
+      closeBtn.addEventListener('click', () => {
+        win.classList.remove('open');
+        opened = false;
+      });
+
+      fab.addEventListener('click', () => {
+        opened = !opened;
+        win.classList.toggle('open', opened);
+        badge.style.display = 'none';
+        badgeCount = 0;
+        if (opened && msgList.children.length === 0) {
+          setTimeout(() => {
+            showTyping();
+            setTimeout(() => {
+              hideTyping();
+              addMsg(WELCOME, 'bot');
+              renderChips(KB.slice(0,5).map(x => x.chips[0]));
+            }, 800);
+          }, 200);
+        }
+        if (opened) inputEl.focus();
+      });
+    })();
+  </script>
+</body>
+</html>

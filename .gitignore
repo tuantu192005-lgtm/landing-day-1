@@ -1,0 +1,11 @@
+.claude/
+node_modules/
+resend_config.txt
+verify_*.png
+send_test.py
+nginx_config.txt
+deploy_checklist.md
+supabase_service_key.txt
+.mcp.json
+mcp_functions_draft.md
+data-imports/

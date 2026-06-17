@@ -1,0 +1,17 @@
+{
+  "name": "msi-sales-mcp",
+  "version": "1.0.0",
+  "description": "MCP server cho hệ thống quản lý bán hàng MSI",
+  "type": "module",
+  "main": "mcp_server.js",
+  "scripts": {
+    "start": "node mcp_server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "resend": "^6.12.4",
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.4"
+  }
+}

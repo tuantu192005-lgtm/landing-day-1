@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSI Admin Panel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root {
+  --navy:       #102a4e;
+  --navy-dark:  #0b1f3d;
+  --navy-soft:  #2a4d7c;
+  --navy-light: #3b6ea5;
+  --accent:     #e8b43a;
+  --bg:         #f0f4fa;
+  --surface:    #fff;
+  --text:       #1a2a3a;
+  --text-muted: #6b7a8d;
+  --border:     #d4e0f0;
+  --danger:     #dc3545;
+  --success:    #28a745;
+  --warning:    #ffc107;
+  --info:       #17a2b8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 0.9rem; }
+
+/* ── Login ── */
+#login-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-soft) 100%);
+}
+.login-card {
+  background: var(--surface); border-radius: 20px; padding: 44px 40px;
+  width: 100%; max-width: 380px; box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+  text-align: center;
+}
+.login-logo { font-size: 2.2rem; font-weight: 900; color: var(--navy-dark); letter-spacing: 2px; margin-bottom: 4px; }
+.login-sub { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 32px; }
+.login-card label { display: block; text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.login-card input {
+  width: 100%; padding: 12px 16px; border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 0.95rem; outline: none; transition: border-color 0.2s; margin-bottom: 20px;
+}
+.login-card input:focus { border-color: var(--navy-soft); }
+.login-btn {
+  width: 100%; padding: 13px; background: linear-gradient(135deg, var(--navy-dark), var(--navy-soft));
+  color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
+  cursor: pointer; transition: opacity 0.2s;
+}
+.login-btn:hover { opacity: 0.92; }
+.login-err { color: var(--danger); font-size: 0.82rem; margin-top: 10px; min-height: 18px; }
+
+/* ── App Shell ── */
+#app { display: none; min-height: 100vh; flex-direction: column; }
+#app.visible { display: flex; }
+
+/* Header */
+.app-header {
+  background: linear-gradient(90deg, var(--navy-dark), var(--navy-soft));
+  color: #fff; padding: 0 20px;
+  display: flex; align-items: center; gap: 16px;
+  height: 58px; flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+.app-header .brand { font-size: 1rem; font-weight: 800; letter-spacing: 1px; }
+.app-header .sub { font-size: 0.72rem; opacity: 0.7; }
+.header-spacer { flex: 1; }
+.header-user { font-size: 0.8rem; opacity: 0.9; margin-right: 4px; }
+.header-logout {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; padding: 6px 14px; border-radius: 8px; font-size: 0.8rem;
+  cursor: pointer; transition: background 0.15s;
+}
+.header-logout:hover { background: rgba(255,255,255,0.25); }
+
+/* Tab nav */
+.tab-nav {
+  background: var(--navy-dark); display: flex; gap: 2px;
+  padding: 0 16px; overflow-x: auto; flex-shrink: 0;
+}
+.tab-nav::-webkit-scrollbar { height: 0; }
+.tab-btn {
+  padding: 12px 18px; color: rgba(255,255,255,0.6); background: none; border: none;
+  font-size: 0.84rem; font-weight: 500; cursor: pointer; white-space: nowrap;
+  border-bottom: 3px solid transparent; transition: color 0.15s, border-color 0.15s;
+  display: flex; align-items: center; gap: 7px;
+}
+.tab-btn:hover { color: rgba(255,255,255,0.9); }
+.tab-btn.active { color: #fff; border-bottom-color: var(--accent); }
+
+/* Main content */
+.tab-content { flex: 1; overflow-y: auto; }
+.tab-pane { display: none; padding: 20px; }
+.tab-pane.active { display: block; }
+
+/* Page header */
+.page-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px; flex-wrap: wrap; gap: 10px;
+}
+.page-hd h2 { font-size: 1.15rem; font-weight: 700; color: var(--navy-dark); display: flex; align-items: center; gap: 8px; }
+.page-hd h2 i { color: var(--navy-soft); }
+
+/* Stat cards */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--surface); border-radius: 12px; padding: 16px;
+  border-left: 4px solid var(--navy-soft);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+.stat-card .val { font-size: 1.6rem; font-weight: 800; color: var(--navy-dark); line-height: 1; }
+.stat-card .lbl { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+
+/* Toolbar */
+.toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.search-box {
+  flex: 1; min-width: 180px; padding: 8px 12px 8px 34px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 0.875rem; outline: none; background: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7a8d' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 10px center;
+  transition: border-color 0.2s;
+}
+.search-box:focus { border-color: var(--navy-soft); }
+select.filter-sel {
+  padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 0.875rem; outline: none; background: var(--surface); cursor: pointer;
+}
+select.filter-sel:focus { border-color: var(--navy-soft); }
+
+/* Buttons */
+.btn {
+  padding: 8px 16px; border-radius: 8px; font-size: 0.84rem; font-weight: 600;
+  cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--navy-soft); color: #fff; }
+.btn-primary:hover { background: var(--navy-dark); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-danger  { background: var(--danger); color: #fff; }
+.btn-warning { background: var(--warning); color: #1a2a3a; }
+.btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+.btn-ghost { background: var(--bg); color: var(--navy-soft); border: 1.5px solid var(--border); }
+.btn-ghost:hover { background: var(--border); }
+
+/* Table */
+.table-wrap { background: var(--surface); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 600px; }
+thead tr { background: var(--navy-dark); color: #fff; }
+thead th { padding: 12px 14px; text-align: left; font-size: 0.78rem; font-weight: 600; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.4px; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: #f7fbff; }
+td { padding: 11px 14px; font-size: 0.875rem; vertical-align: middle; }
+.td-actions { display: flex; gap: 6px; }
+
+/* Badges */
+.badge {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.badge-gold    { background: #fff3cd; color: #856404; }
+.badge-silver  { background: #e9ecef; color: #495057; }
+.badge-bronze  { background: #ffe5d0; color: #7c4a1e; }
+.badge-done    { background: #d1fae5; color: #065f46; }
+.badge-shipped { background: #dbeafe; color: #1e40af; }
+.badge-confirmed { background: #ede9fe; color: #4c1d95; }
+.badge-pending { background: #fef3c7; color: #92400e; }
+.badge-cancelled { background: #fee2e2; color: #991b1b; }
+.badge-vga { background: #e0e7ff; color: #3730a3; }
+.badge-mainboard { background: #dcfce7; color: #14532d; }
+.badge-lcd { background: #fce7f3; color: #831843; }
+.badge-psu { background: #ffedd5; color: #7c2d12; }
+.badge-ssd { background: #f0f9ff; color: #0c4a6e; }
+.badge-cooling { background: #e0f2fe; color: #075985; }
+.badge-chassis { background: #f5f3ff; color: #4c1d95; }
+.badge-active   { background: #d1fae5; color: #065f46; }
+.badge-follow   { background: #fef3c7; color: #92400e; }
+.badge-new      { background: #cffafe; color: #0e7490; }
+.badge-inactive { background: #f3f4f6; color: #6b7280; }
+
+/* Progress bar */
+.prog-wrap { background: var(--border); border-radius: 999px; height: 6px; margin-top: 4px; width: 100%; min-width: 80px; }
+.prog-bar  { height: 6px; border-radius: 999px; background: var(--navy-soft); transition: width 0.4s; }
+.prog-bar.over  { background: var(--success); }
+.prog-bar.warn  { background: var(--warning); }
+.prog-bar.low   { background: var(--danger); }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000;
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border-radius: 16px; padding: 28px;
+  width: 100%; max-width: 480px; box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal h3 { font-size: 1.05rem; font-weight: 700; color: var(--navy-dark); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.4px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 0.875rem; outline: none; font-family: inherit; transition: border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--navy-soft); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+/* Inventory qty cell */
+.qty-wrap { display: flex; align-items: center; gap: 8px; }
+.qty-num { font-weight: 700; font-size: 1rem; min-width: 28px; text-align: right; }
+.qty-num.low { color: var(--danger); }
+.qty-num.warn { color: #e59400; }
+.qty-num.ok   { color: var(--success); }
+.qty-edit-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 7px; font-size: 0.75rem; cursor: pointer; color: var(--text-muted); transition: background 0.12s; }
+.qty-edit-btn:hover { background: var(--bg); color: var(--navy-soft); }
+
+/* Target progress section */
+.target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.target-card { background: var(--surface); border-radius: 14px; padding: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+.target-card .tc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.target-card .tc-name { font-weight: 700; font-size: 0.9rem; color: var(--navy-dark); }
+.target-card .tc-month { font-size: 0.75rem; color: var(--text-muted); }
+.target-card .tc-nums { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 6px; }
+.target-card .tc-nums b { color: var(--text); }
+.target-card .tc-pct { font-size: 1.3rem; font-weight: 800; margin-bottom: 6px; }
+.tc-pct.over { color: var(--success); }
+.tc-pct.near { color: #e59400; }
+.tc-pct.low  { color: var(--danger); }
+
+/* Follow-up dot */
+.follow-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+.follow-dot.active   { background: var(--success); }
+.follow-dot.follow   { background: var(--warning); }
+.follow-dot.new      { background: var(--info); }
+.follow-dot.inactive { background: #9ca3af; }
+
+/* Empty state */
+.empty-state { padding: 48px 0; text-align: center; color: var(--text-muted); }
+.empty-state i { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.35; display: block; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--navy-dark); color: #fff; padding: 10px 24px;
+  border-radius: 10px; font-size: 0.875rem; font-weight: 600;
+  opacity: 0; transition: opacity 0.25s, transform 0.25s; z-index: 9999;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.28); pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 600px) {
+  .tab-pane { padding: 14px; }
+  .page-hd { margin-bottom: 12px; }
+  .modal { padding: 20px 18px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .target-grid { grid-template-columns: repeat(2, 1fr); }
+  td, th { padding: 9px 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">MSI</div>
+    <div class="login-sub">Sales Management — Admin Panel</div>
+    <label for="pw-input">Mật khẩu</label>
+    <input type="password" id="pw-input" placeholder="Nhập mật khẩu..." autocomplete="current-password">
+    <button class="login-btn" onclick="doLogin()"><i class="fas fa-sign-in-alt" style="margin-right:6px"></i>Đăng nhập</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <header class="app-header">
+    <div>
+      <div class="brand">MSI ADMIN</div>
+      <div class="sub">Sales Management System</div>
+    </div>
+    <div class="header-spacer"></div>
+    <span class="header-user"><i class="fas fa-user-circle"></i> Admin</span>
+    <button class="header-logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> Đăng xuất</button>
+  </header>
+
+  <nav class="tab-nav" id="tab-nav">
+    <button class="tab-btn active" data-tab="staff"><i class="fas fa-users"></i> Nhân viên</button>
+    <button class="tab-btn" data-tab="customers"><i class="fas fa-store"></i> Khách hàng</button>
+    <button class="tab-btn" data-tab="orders"><i class="fas fa-file-invoice"></i> Đơn hàng</button>
+    <button class="tab-btn" data-tab="inventory"><i class="fas fa-boxes"></i> Tồn kho</button>
+  </nav>
+
+  <main class="tab-content">
+
+    <!-- ══ TAB 1: NHÂN VIÊN ══ -->
+    <section class="tab-pane active" id="tab-staff">
+      <div class="page-hd">
+        <h2><i class="fas fa-users"></i> Danh sách Nhân viên</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-warning" id="btn-remind" onclick="sendBulkReportReminder()"><i class="fas fa-bell"></i> Gửi nhắc báo cáo</button>
+          <button class="btn btn-primary" onclick="openStaffModal()"><i class="fas fa-plus"></i> Thêm nhân viên</button>
+        </div>
+      </div>
+      <div class="stats-row" id="staff-stats"></div>
+      <div class="toolbar">
+        <input class="search-box" id="staff-search" placeholder="Tìm tên, SĐT, khu vực..." oninput="renderStaff()">
+        <select class="filter-sel" id="staff-role-filter" onchange="renderStaff()">
+          <option value="">Tất cả vai trò</option>
+          <option>Sales Rep</option>
+          <option>Sales Manager</option>
+          <option>KAM</option>
+          <option>Admin</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Họ tên</th><th>Vai trò</th><th>SĐT</th><th>Khu vực</th><th>Email</th><th>Trạng thái</th><th></th>
+          </tr></thead>
+          <tbody id="staff-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ══ TAB 2: KHÁCH HÀNG ══ -->
+    <section class="tab-pane" id="tab-customers">
+      <div class="page-hd">
+        <h2><i class="fas fa-store"></i> Danh sách Đại lý</h2>
+        <button class="btn btn-primary" onclick="openCustomerModal()"><i class="fas fa-plus"></i> Thêm đại lý</button>
+      </div>
+      <div class="stats-row" id="cust-stats"></div>
+      <div class="toolbar">
+        <input class="search-box" id="cust-search" placeholder="Tìm tên cửa hàng, SĐT, thành phố..." oninput="renderCustomers()">
+        <select class="filter-sel" id="cust-npp-filter" onchange="renderCustomers()">
+          <option value="">Tất cả NPP</option>
+          <option>DGW</option><option>SPC</option><option>KTC</option>
+          <option>NWH</option><option>MH</option><option>AD</option>
+        </select>
+        <select class="filter-sel" id="cust-follow-filter" onchange="renderCustomers()">
+          <option value="">Trạng thái follow</option>
+          <option value="active">Đang hoạt động</option>
+          <option value="follow">Cần follow up</option>
+          <option value="new">Mới</option>
+          <option value="inactive">Ngừng</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Cửa hàng</th><th>Liên hệ</th><th>SĐT</th><th>Thành phố</th><th>NPP</th><th>Tier</th><th>Follow up</th><th>NV phụ trách</th><th></th>
+          </tr></thead>
+          <tbody id="cust-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ══ TAB 3: ĐƠN HÀNG ══ -->
+    <section class="tab-pane" id="tab-orders">
+      <div class="page-hd">
+        <h2><i class="fas fa-file-invoice"></i> Lịch sử Đơn hàng</h2>
+        <button class="btn btn-primary" onclick="openOrderModal()"><i class="fas fa-plus"></i> Thêm đơn hàng mới</button>
+      </div>
+      <div class="stats-row" id="order-stats"></div>
+      <div class="toolbar">
+        <input class="search-box" id="order-search" placeholder="Tìm đại lý, sản phẩm, SKU..." oninput="renderOrders()">
+        <select class="filter-sel" id="order-month-filter" onchange="renderOrders()">
+          <option value="">Tất cả tháng</option>
+          <option value="2026-05">05/2026</option>
+          <option value="2026-04">04/2026</option>
+        </select>
+        <select class="filter-sel" id="order-npp-filter" onchange="renderOrders()">
+          <option value="">Tất cả NPP</option>
+          <option>DGW</option><option>SPC</option><option>KTC</option>
+          <option>NWH</option><option>MH</option><option>AD</option>
+        </select>
+        <select class="filter-sel" id="order-status-filter" onchange="renderOrders()">
+          <option value="">Tất cả trạng thái</option>
+          <option value="new">Mới</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="shipped">Shipped</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Đại lý</th><th>Sản phẩm</th><th>SL</th><th>Đơn giá</th><th>Tổng</th><th>NPP</th><th>Ngày</th><th>Trạng thái</th><th>Ghi chú</th>
+          </tr></thead>
+          <tbody id="order-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ══ TAB 4: TỒN KHO ══ -->
+    <section class="tab-pane" id="tab-inventory">
+      <div class="page-hd">
+        <h2><i class="fas fa-boxes"></i> Tồn kho theo NPP</h2>
+      </div>
+      <div class="stats-row" id="inv-stats"></div>
+      <div class="toolbar">
+        <input class="search-box" id="inv-search" placeholder="Tìm SKU, tên sản phẩm..." oninput="renderInventory()">
+        <select class="filter-sel" id="inv-npp-filter" onchange="renderInventory()">
+          <option value="">Tất cả NPP</option>
+          <option>DGW</option><option>SPC</option><option>KTC</option>
+          <option>NWH</option><option>MH</option><option>AD</option>
+        </select>
+        <select class="filter-sel" id="inv-cat-filter" onchange="renderInventory()">
+          <option value="">Tất cả danh mục</option>
+          <option value="vga">VGA</option>
+          <option value="mainboard">Mainboard</option>
+          <option value="lcd">Màn hình</option>
+          <option value="psu">Nguồn</option>
+          <option value="ssd">SSD</option>
+          <option value="cooling">Tản nhiệt</option>
+          <option value="chassis">Case</option>
+        </select>
+        <select class="filter-sel" id="inv-stock-filter" onchange="renderInventory()">
+          <option value="">Tất cả tồn</option>
+          <option value="low">Tồn thấp ⚠️</option>
+          <option value="ok">Tồn ổn</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>SKU</th><th>Sản phẩm</th><th>Danh mục</th><th>NPP</th><th>Tồn kho</th><th>Mức tối thiểu</th><th>Cập nhật</th><th></th>
+          </tr></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── MODAL: Staff ── -->
+<div class="modal-overlay" id="staff-modal">
+  <div class="modal">
+    <h3><i class="fas fa-user-edit"></i> <span id="staff-modal-title">Thêm nhân viên</span></h3>
+    <input type="hidden" id="sf-id">
+    <div class="form-group"><label>Họ tên</label><input id="sf-name" placeholder="Nguyễn Văn A"></div>
+    <div class="form-group"><label>Vai trò</label>
+      <select id="sf-role">
+        <option>Sales Rep</option><option>Sales Manager</option><option>KAM</option><option>Admin</option>
+      </select>
+    </div>
+    <div class="form-group"><label>SĐT</label><input id="sf-phone" placeholder="09xx..."></div>
+    <div class="form-group"><label>Email</label><input id="sf-email" placeholder="ten@msi.com.vn"></div>
+    <div class="form-group"><label>Khu vực</label><input id="sf-area" placeholder="TP.HCM / Miền Nam..."></div>
+    <div class="form-group"><label>Trạng thái</label>
+      <select id="sf-status"><option value="active">Đang làm</option><option value="leave">Nghỉ phép</option><option value="inactive">Đã nghỉ</option></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('staff-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveStaff()"><i class="fas fa-save"></i> Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Customer ── -->
+<div class="modal-overlay" id="cust-modal">
+  <div class="modal">
+    <h3><i class="fas fa-store"></i> <span id="cust-modal-title">Thêm đại lý</span></h3>
+    <input type="hidden" id="cm-id">
+    <div class="form-group"><label>Tên cửa hàng</label><input id="cm-name"></div>
+    <div class="form-group"><label>Người liên hệ</label><input id="cm-contact"></div>
+    <div class="form-group"><label>SĐT</label><input id="cm-phone"></div>
+    <div class="form-group"><label>Địa chỉ</label><input id="cm-address"></div>
+    <div class="form-group"><label>Thành phố</label><input id="cm-city"></div>
+    <div class="form-group"><label>NPP phụ trách</label>
+      <select id="cm-npp"><option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option><option>MH</option><option>AD</option></select>
+    </div>
+    <div class="form-group"><label>Tier</label>
+      <select id="cm-tier"><option value="gold">Gold</option><option value="silver">Silver</option><option value="bronze">Bronze</option></select>
+    </div>
+    <div class="form-group"><label>Trạng thái Follow</label>
+      <select id="cm-follow"><option value="active">Đang hoạt động</option><option value="follow">Cần follow up</option><option value="new">Mới</option><option value="inactive">Ngừng</option></select>
+    </div>
+    <div class="form-group"><label>NV phụ trách</label><input id="cm-rep" value="Tú"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('cust-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveCustomer()"><i class="fas fa-save"></i> Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Qty Edit ── -->
+<div class="modal-overlay" id="qty-modal">
+  <div class="modal" style="max-width:340px">
+    <h3><i class="fas fa-edit"></i> Cập nhật tồn kho</h3>
+    <input type="hidden" id="qm-id">
+    <div id="qm-info" style="background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:0.85rem;color:var(--text-muted)"></div>
+    <div class="form-group"><label>Số lượng tồn mới</label><input type="number" id="qm-qty" min="0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('qty-modal')">Hủy</button>
+      <button class="btn btn-primary" onclick="saveQty()"><i class="fas fa-check"></i> Cập nhật</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: New Order ── -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal">
+    <h3><i class="fas fa-plus-circle"></i> Thêm đơn hàng mới</h3>
+    <div class="form-group">
+      <label>Đại lý <span style="color:var(--danger)">*</span></label>
+      <select id="om-customer"></select>
+    </div>
+    <div class="form-group">
+      <label>Mã hàng <span style="color:var(--danger)">*</span></label>
+      <select id="om-category">
+        <option value="mainboard">Mainboard</option>
+        <option value="vga">VGA</option>
+        <option value="lcd">LCD</option>
+        <option value="chassis">Chassis</option>
+        <option value="psu">Nguồn</option>
+        <option value="cooling">Tản</option>
+        <option value="ssd">SSD</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>NPP xuất hàng <span style="color:var(--danger)">*</span></label>
+      <select id="om-npp">
+        <option>DGW</option><option>SPC</option><option>KTC</option>
+        <option>NWH</option><option>MH</option><option>AD</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Số lượng <span style="color:var(--danger)">*</span></label>
+      <input type="number" id="om-qty" min="1" value="1">
+    </div>
+    <div class="form-group">
+      <label>Ngày đặt hàng</label>
+      <input type="date" id="om-date">
+    </div>
+    <div class="form-group">
+      <label>Ghi chú</label>
+      <textarea id="om-note" rows="2" placeholder="Thêm thông tin chi tiết về đơn hàng..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('order-modal')">Hủy</button>
+      <button class="btn btn-success" onclick="saveOrder()"><i class="fas fa-check"></i> Lưu đơn</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// SEED DATA FROM brain.db
+// ═══════════════════════════════════════════
+const DB_CUSTOMERS = [
+  {id:1,store_name:"Phong Vũ HCM",contact:"Anh Minh",phone:"0901234001",address:"240 Võ Văn Tần, Q3",city:"TP.HCM",npp:"DGW",rep:"Tú",tier:"gold",created_at:"2026-05-22"},
+  {id:2,store_name:"Gearvn Hà Nội",contact:"Chị Lan",phone:"0901234002",address:"45 Lý Thường Kiệt, HK",city:"Hà Nội",npp:"KTC",rep:"Tú",tier:"gold",created_at:"2026-05-22"},
+  {id:3,store_name:"An Phát HCM",contact:"Anh Hùng",phone:"0901234003",address:"120 Hoàng Diệu 2, Thủ Đức",city:"TP.HCM",npp:"MH",rep:"Tú",tier:"silver",created_at:"2026-05-22"},
+  {id:4,store_name:"CellphoneS",contact:"Anh Trường",phone:"0901234004",address:"74 Cách Mạng Tháng 8, Q10",city:"TP.HCM",npp:"SPC",rep:"Tú",tier:"silver",created_at:"2026-05-22"},
+  {id:5,store_name:"HanoiComputer",contact:"Chị Hoa",phone:"0901234005",address:"100 Bà Triệu, Hai Bà Trưng",city:"Hà Nội",npp:"KTC",rep:"Tú",tier:"silver",created_at:"2026-05-22"},
+  {id:6,store_name:"XGear Đà Nẵng",contact:"Anh Bình",phone:"0901234006",address:"34 Lê Duẩn, Hải Châu",city:"Đà Nẵng",npp:"NWH",rep:"Tú",tier:"bronze",created_at:"2026-05-22"},
+  {id:7,store_name:"Techzone Cần Thơ",contact:"Anh Thoại",phone:"0901234007",address:"56 Trần Hưng Đạo, NK",city:"Cần Thơ",npp:"AD",rep:"Tú",tier:"bronze",created_at:"2026-05-22"},
+  {id:8,store_name:"GAM3GEAR",contact:"Anh Khoa",phone:"0901234008",address:"350 Ung Văn Khiêm, BT",city:"TP.HCM",npp:"DGW",rep:"Tú",tier:"silver",created_at:"2026-05-22"},
+  {id:9,store_name:"Nguyễn Kim",contact:"Chị Thu",phone:"0901234009",address:"63 Trần Hưng Đạo, Q1",city:"TP.HCM",npp:"DGW",rep:"Tú",tier:"gold",created_at:"2026-05-22"},
+  {id:10,store_name:"Long Châu Computer",contact:"Anh Long",phone:"0901234010",address:"10 Đinh Tiên Hoàng, Q1",city:"TP.HCM",npp:"SPC",rep:"Tú",tier:"bronze",created_at:"2026-05-22"}
+];
+const DB_ORDERS = [
+  {id:15,customer_id:1,sku:"PRO-H610M-E-DDR4",product_name:"MSI PRO H610M-E DDR4",qty:10,unit_price:1000000,npp:"DGW",order_date:"2026-05-20",status:"pending",note:"10 tặng 1",store_name:"Phong Vũ HCM"},
+  {id:14,customer_id:3,sku:"MAG-COREFREEZE-120",product_name:"MSI MAG COREFREEZE 120",qty:12,unit_price:650000,npp:"MH",order_date:"2026-05-19",status:"pending",note:null,store_name:"An Phát HCM"},
+  {id:13,customer_id:10,sku:"SPATIUM-M370-1TB",product_name:"MSI SPATIUM M370 1TB",qty:30,unit_price:950000,npp:"SPC",order_date:"2026-05-18",status:"pending",note:null,store_name:"Long Châu Computer"},
+  {id:11,customer_id:9,sku:"MPG321URX-QDOLED",product_name:"MSI MPG 321URX QD-OLED",qty:1,unit_price:28000000,npp:"DGW",order_date:"2026-05-16",status:"confirmed",note:null,store_name:"Nguyễn Kim"},
+  {id:12,customer_id:9,sku:"MAG-A1000G-PCIE5",product_name:"MSI MAG A1000G PCIE5",qty:1,unit_price:3200000,npp:"DGW",order_date:"2026-05-16",status:"confirmed",note:null,store_name:"Nguyễn Kim"},
+  {id:10,customer_id:8,sku:"RTX5080-GAMINGXTRIO-16G",product_name:"MSI RTX 5080 GAMING X TRIO 16G",qty:2,unit_price:38000000,npp:"DGW",order_date:"2026-05-15",status:"shipped",note:null,store_name:"GAM3GEAR"},
+  {id:9,customer_id:7,sku:"MAG-FORGE-320R-AIRFLOW",product_name:"MSI MAG FORGE 320R AIRFLOW",qty:6,unit_price:1800000,npp:"AD",order_date:"2026-05-14",status:"done",note:null,store_name:"Techzone Cần Thơ"},
+  {id:8,customer_id:6,sku:"MAG-CORELIQUID-E240",product_name:"MSI MAG CORELIQUID E240",qty:4,unit_price:2800000,npp:"NWH",order_date:"2026-05-13",status:"shipped",note:null,store_name:"XGear Đà Nẵng"},
+  {id:7,customer_id:5,sku:"PRO-B850-P-WIFI",product_name:"MSI PRO B850-P WIFI",qty:15,unit_price:3800000,npp:"KTC",order_date:"2026-05-12",status:"confirmed",note:null,store_name:"HanoiComputer"},
+  {id:6,customer_id:4,sku:"MAG-274QRF-QD",product_name:"MSI MAG 274QRF-QD",qty:6,unit_price:10500000,npp:"SPC",order_date:"2026-05-10",status:"confirmed",note:null,store_name:"CellphoneS"},
+  {id:5,customer_id:3,sku:"MAG-A850G-PCIE5",product_name:"MSI MAG A850G PCIE5",qty:8,unit_price:2600000,npp:"MH",order_date:"2026-05-07",status:"done",note:null,store_name:"An Phát HCM"},
+  {id:3,customer_id:2,sku:"MAG-B860-TOMAHAWK-WIFI",product_name:"MSI MAG B860 TOMAHAWK WIFI",qty:10,unit_price:4500000,npp:"KTC",order_date:"2026-05-04",status:"shipped",note:null,store_name:"Gearvn Hà Nội"},
+  {id:4,customer_id:2,sku:"SPATIUM-M480-PRO-1TB",product_name:"MSI SPATIUM M480 PRO 1TB",qty:20,unit_price:1600000,npp:"KTC",order_date:"2026-05-04",status:"shipped",note:null,store_name:"Gearvn Hà Nội"},
+  {id:2,customer_id:1,sku:"RTX5060TI-GAMINGXTRIO-16G",product_name:"MSI RTX 5060 Ti GAMING X TRIO 16G",qty:5,unit_price:10500000,npp:"DGW",order_date:"2026-05-02",status:"done",note:null,store_name:"Phong Vũ HCM"},
+  {id:1,customer_id:1,sku:"RTX-5090-SUPRIM-X-32G",product_name:"MSI RTX 5090 SUPRIM X 32G",qty:1,unit_price:95000000,npp:"DGW",order_date:"2026-04-27",status:"done",note:null,store_name:"Phong Vũ HCM"}
+];
+const DB_INVENTORY = [
+  {id:35,sku:"MAG-FORGE-111R",product_name:"FORGE 111R",category:"chassis",npp:"DGW",qty:25,min_qty:8,updated_at:"2026-05-22"},
+  {id:33,sku:"MAG-FORGE-320R-AIRFLOW",product_name:"FORGE 320R AIRFLOW",category:"chassis",npp:"DGW",qty:18,min_qty:5,updated_at:"2026-05-22"},
+  {id:34,sku:"MAG-FORGE-320R-AIRFLOW",product_name:"FORGE 320R AIRFLOW",category:"chassis",npp:"SPC",qty:12,min_qty:5,updated_at:"2026-05-22"},
+  {id:32,sku:"MAG-CORELIQUID-240R-V2",product_name:"CORELIQUID 240R V2",category:"cooling",npp:"DGW",qty:20,min_qty:5,updated_at:"2026-05-22"},
+  {id:31,sku:"MAG-CORELIQUID-E240",product_name:"CORELIQUID E240",category:"cooling",npp:"DGW",qty:15,min_qty:5,updated_at:"2026-05-22"},
+  {id:22,sku:"MAG272C4PF",product_name:"MAG 272C4PF",category:"lcd",npp:"DGW",qty:20,min_qty:5,updated_at:"2026-05-22"},
+  {id:20,sku:"MAG274QRF-QD",product_name:"MAG 274QRF-QD",category:"lcd",npp:"DGW",qty:14,min_qty:5,updated_at:"2026-05-22"},
+  {id:21,sku:"MAG274QRF-QD",product_name:"MAG 274QRF-QD",category:"lcd",npp:"SPC",qty:10,min_qty:5,updated_at:"2026-05-22"},
+  {id:18,sku:"MPG321URX-QDOLED",product_name:"MPG 321URX QD-OLED",category:"lcd",npp:"DGW",qty:3,min_qty:2,updated_at:"2026-05-22"},
+  {id:19,sku:"MPG321URX-QDOLED",product_name:"MPG 321URX QD-OLED",category:"lcd",npp:"MH",qty:2,min_qty:2,updated_at:"2026-05-22"},
+  {id:10,sku:"MAG-B860-TOMAHAWK-WIFI",product_name:"MAG B860 TOMAHAWK WIFI",category:"mainboard",npp:"DGW",qty:25,min_qty:10,updated_at:"2026-05-22"},
+  {id:12,sku:"MAG-B860-TOMAHAWK-WIFI",product_name:"MAG B860 TOMAHAWK WIFI",category:"mainboard",npp:"KTC",qty:15,min_qty:10,updated_at:"2026-05-22"},
+  {id:11,sku:"MAG-B860-TOMAHAWK-WIFI",product_name:"MAG B860 TOMAHAWK WIFI",category:"mainboard",npp:"SPC",qty:20,min_qty:10,updated_at:"2026-05-22"},
+  {id:13,sku:"PRO-B850-P-WIFI",product_name:"PRO B850-P WIFI",category:"mainboard",npp:"DGW",qty:30,min_qty:10,updated_at:"2026-05-22"},
+  {id:14,sku:"PRO-B850-P-WIFI",product_name:"PRO B850-P WIFI",category:"mainboard",npp:"SPC",qty:22,min_qty:10,updated_at:"2026-05-22"},
+  {id:15,sku:"PRO-H610M-E-DDR4",product_name:"PRO H610M-E DDR4",category:"mainboard",npp:"DGW",qty:40,min_qty:15,updated_at:"2026-05-22"},
+  {id:17,sku:"PRO-H610M-E-DDR4",product_name:"PRO H610M-E DDR4",category:"mainboard",npp:"KTC",qty:28,min_qty:15,updated_at:"2026-05-22"},
+  {id:16,sku:"PRO-H610M-E-DDR4",product_name:"PRO H610M-E DDR4",category:"mainboard",npp:"SPC",qty:35,min_qty:15,updated_at:"2026-05-22"},
+  {id:26,sku:"MAG-A650BN",product_name:"MAG A650BN",category:"psu",npp:"DGW",qty:30,min_qty:10,updated_at:"2026-05-22"},
+  {id:25,sku:"MAG-A750GL-PCIE5",product_name:"MAG A750GL PCIE5",category:"psu",npp:"DGW",qty:25,min_qty:8,updated_at:"2026-05-22"},
+  {id:23,sku:"MAG-A850G-PCIE5",product_name:"MAG A850G PCIE5",category:"psu",npp:"DGW",qty:22,min_qty:8,updated_at:"2026-05-22"},
+  {id:24,sku:"MAG-A850G-PCIE5",product_name:"MAG A850G PCIE5",category:"psu",npp:"SPC",qty:18,min_qty:8,updated_at:"2026-05-22"},
+  {id:30,sku:"SPATIUM-M370-1TB",product_name:"M370 1TB",category:"ssd",npp:"DGW",qty:60,min_qty:15,updated_at:"2026-05-22"},
+  {id:27,sku:"SPATIUM-M480-PRO-1TB",product_name:"M480 PRO 1TB",category:"ssd",npp:"DGW",qty:50,min_qty:15,updated_at:"2026-05-22"},
+  {id:29,sku:"SPATIUM-M480-PRO-1TB",product_name:"M480 PRO 1TB",category:"ssd",npp:"KTC",qty:30,min_qty:15,updated_at:"2026-05-22"},
+  {id:28,sku:"SPATIUM-M480-PRO-1TB",product_name:"M480 PRO 1TB",category:"ssd",npp:"SPC",qty:40,min_qty:15,updated_at:"2026-05-22"},
+  {id:1,sku:"RTX-5090-SUPRIM-X-32G",product_name:"RTX 5090 SUPRIM X",category:"vga",npp:"DGW",qty:2,min_qty:1,updated_at:"2026-05-22"},
+  {id:5,sku:"RTX5060TI-GAMINGXTRIO-16G",product_name:"RTX 5060 Ti GAMING X",category:"vga",npp:"DGW",qty:18,min_qty:5,updated_at:"2026-05-22"},
+  {id:7,sku:"RTX5060TI-GAMINGXTRIO-16G",product_name:"RTX 5060 Ti GAMING X",category:"vga",npp:"KTC",qty:8,min_qty:5,updated_at:"2026-05-22"},
+  {id:6,sku:"RTX5060TI-GAMINGXTRIO-16G",product_name:"RTX 5060 Ti GAMING X",category:"vga",npp:"SPC",qty:12,min_qty:5,updated_at:"2026-05-22"},
+  {id:2,sku:"RTX5080-GAMINGXTRIO-16G",product_name:"RTX 5080 GAMING X TRIO",category:"vga",npp:"DGW",qty:5,min_qty:3,updated_at:"2026-05-22"},
+  {id:4,sku:"RTX5080-GAMINGXTRIO-16G",product_name:"RTX 5080 GAMING X TRIO",category:"vga",npp:"MH",qty:4,min_qty:3,updated_at:"2026-05-22"},
+  {id:3,sku:"RTX5080-GAMINGXTRIO-16G",product_name:"RTX 5080 GAMING X TRIO",category:"vga",npp:"SPC",qty:3,min_qty:3,updated_at:"2026-05-22"},
+  {id:8,sku:"RX9070-GAMINGXTRIO-16G",product_name:"RX 9070 GAMING X TRIO",category:"vga",npp:"DGW",qty:10,min_qty:5,updated_at:"2026-05-22"},
+  {id:9,sku:"RX9070-GAMINGXTRIO-16G",product_name:"RX 9070 GAMING X TRIO",category:"vga",npp:"SPC",qty:7,min_qty:5,updated_at:"2026-05-22"}
+];
+const DB_TARGETS = [
+  {id:9,rep:"Tú",category:"mainboard",month:"2026-05",target_qty:3000,actual_qty:820,note:"Đang chạy — tháng 05 tuần 3"},
+  {id:10,rep:"Tú",category:"vga",month:"2026-05",target_qty:500,actual_qty:140,note:"Đang chạy"},
+  {id:11,rep:"Tú",category:"lcd",month:"2026-05",target_qty:2000,actual_qty:610,note:"Đang chạy"},
+  {id:12,rep:"Tú",category:"psu",month:"2026-05",target_qty:1000,actual_qty:310,note:"Đang chạy"},
+  {id:5,rep:"Tú",category:"mainboard",month:"2026-04",target_qty:3000,actual_qty:2890,note:"Thiếu ~110u, tồn KTC hết giữa tháng"},
+  {id:6,rep:"Tú",category:"vga",month:"2026-04",target_qty:500,actual_qty:512,note:"Vượt nhờ push 5060Ti"},
+  {id:7,rep:"Tú",category:"lcd",month:"2026-04",target_qty:2000,actual_qty:2200,note:"Vượt nhờ MAG 274QRF-QD sale"},
+  {id:8,rep:"Tú",category:"psu",month:"2026-04",target_qty:1000,actual_qty:980,note:"Gần đạt"},
+  {id:1,rep:"Tú",category:"mainboard",month:"2026-03",target_qty:3000,actual_qty:3120,note:"Vượt target nhờ B860 chạy tốt"},
+  {id:2,rep:"Tú",category:"vga",month:"2026-03",target_qty:500,actual_qty:487,note:"Thiếu tồn 5090"},
+  {id:3,rep:"Tú",category:"lcd",month:"2026-03",target_qty:2000,actual_qty:1980,note:"Gần đạt"},
+  {id:4,rep:"Tú",category:"psu",month:"2026-03",target_qty:1000,actual_qty:1050,note:"Vượt nhờ bundle A850G+5060Ti"}
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const LS = {
+  get: k => JSON.parse(localStorage.getItem('msi_admin_'+k) || 'null'),
+  set: (k,v) => localStorage.setItem('msi_admin_'+k, JSON.stringify(v))
+};
+
+function initState() {
+  if (!LS.get('staff')) LS.set('staff', [
+    {id:1, name:"Nguyễn Văn Tú",  role:"Sales Rep",     phone:"0906840384", email:"tu.nv@msi.com.vn",   area:"TP.HCM / Toàn quốc", status:"active"},
+    {id:2, name:"Trần Thị Mai",    role:"Sales Manager", phone:"0912345678", email:"mai.tt@msi.com.vn",  area:"Quản lý team",       status:"active"},
+    {id:3, name:"Lê Văn Hùng",    role:"Sales Rep",     phone:"0923456789", email:"hung.lv@msi.com.vn", area:"Miền Bắc",           status:"active"},
+    {id:4, name:"Phạm Thị Linh",  role:"Sales Rep",     phone:"0934567890", email:"linh.pt@msi.com.vn", area:"Miền Trung",         status:"active"},
+    {id:5, name:"Đỗ Minh Đức",    role:"KAM",           phone:"0945678901", email:"duc.dm@msi.com.vn",  area:"Key Accounts",       status:"leave"}
+  ]);
+  if (!LS.get('customers')) {
+    const follows = ['active','active','follow','active','follow','new','new','active','active','follow'];
+    LS.set('customers', DB_CUSTOMERS.map((c,i) => ({...c, follow: follows[i]})));
+  }
+  if (!LS.get('inventory')) LS.set('inventory', DB_INVENTORY);
+  if (!LS.get('orders'))    LS.set('orders',    DB_ORDERS);
+}
+
+const fmtVND = n => n.toLocaleString('vi-VN') + 'đ';
+const fmtM   = n => (n/1e6).toFixed(1).replace('.0','') + ' tr';
+
+// ═══════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════
+const PASS_HASH = 'ba88cae2c19e5620523b5a7e0f640d19a656580fb32b32df197e9f7f4350ce1d';
+async function sha256(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function doLogin() {
+  const v = document.getElementById('pw-input').value;
+  const h = await sha256(v);
+  if (h === PASS_HASH) {
+    sessionStorage.setItem('msi_admin_auth','1');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    initState();
+    renderAll();
+    loadResendConfig();
+  } else {
+    document.getElementById('login-err').textContent = 'Mật khẩu không đúng. Thử lại.';
+    document.getElementById('pw-input').focus();
+  }
+}
+function doLogout() {
+  sessionStorage.removeItem('msi_admin_auth');
+  location.reload();
+}
+document.getElementById('pw-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+if (sessionStorage.getItem('msi_admin_auth') === '1') {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  initState(); setTimeout(renderAll, 0); loadResendConfig();
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); });
+});
+
+// ═══════════════════════════════════════════
+// STAFF
+// ═══════════════════════════════════════════
+function renderStaff() {
+  const staff = LS.get('staff') || [];
+  const q = document.getElementById('staff-search').value.toLowerCase();
+  const rf = document.getElementById('staff-role-filter').value;
+  const rows = staff.filter(s =>
+    (!q || s.name.toLowerCase().includes(q) || s.phone.includes(q) || s.area.toLowerCase().includes(q)) &&
+    (!rf || s.role === rf)
+  );
+  const roles = {};
+  staff.forEach(s => { roles[s.role] = (roles[s.role]||0)+1; });
+  document.getElementById('staff-stats').innerHTML = `
+    <div class="stat-card"><div class="val">${staff.length}</div><div class="lbl">Tổng NV</div></div>
+    <div class="stat-card"><div class="val">${staff.filter(s=>s.status==='active').length}</div><div class="lbl">Đang làm</div></div>
+    <div class="stat-card"><div class="val">${staff.filter(s=>s.role==='Sales Rep').length}</div><div class="lbl">Sales Rep</div></div>
+    <div class="stat-card"><div class="val">${staff.filter(s=>s.role==='Sales Manager'||s.role==='KAM').length}</div><div class="lbl">Manager/KAM</div></div>
+  `;
+  const tb = document.getElementById('staff-tbody');
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fas fa-users-slash"></i>Không có nhân viên nào</div></td></tr>`; return; }
+  tb.innerHTML = rows.map((s,i) => `
+    <tr>
+      <td style="color:var(--text-muted)">${i+1}</td>
+      <td><strong>${s.name}</strong></td>
+      <td><span class="badge ${s.role==='Sales Manager'||s.role==='KAM'?'badge-confirmed':'badge-active'}">${s.role}</span></td>
+      <td><a href="tel:${s.phone}" style="color:var(--navy-soft)">${s.phone}</a></td>
+      <td>${s.area}</td>
+      <td style="color:var(--text-muted);font-size:0.82rem">${s.email||'—'}</td>
+      <td>${s.status==='active'?'<span class="badge badge-active">Đang làm</span>':s.status==='leave'?'<span class="badge badge-follow">Nghỉ phép</span>':'<span class="badge badge-inactive">Đã nghỉ</span>'}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-sm btn-ghost" onclick="editStaff(${s.id})"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-sm btn-danger" onclick="deleteStaff(${s.id})"><i class="fas fa-trash"></i></button>
+      </div></td>
+    </tr>`).join('');
+}
+function openStaffModal(id) {
+  document.getElementById('staff-modal-title').textContent = id ? 'Sửa nhân viên' : 'Thêm nhân viên';
+  document.getElementById('sf-id').value = id||'';
+  if (id) {
+    const s = (LS.get('staff')||[]).find(x=>x.id===id);
+    if (s) { document.getElementById('sf-name').value=s.name; document.getElementById('sf-role').value=s.role; document.getElementById('sf-phone').value=s.phone; document.getElementById('sf-email').value=s.email||''; document.getElementById('sf-area').value=s.area; document.getElementById('sf-status').value=s.status; }
+  } else { ['sf-name','sf-phone','sf-email','sf-area'].forEach(x=>document.getElementById(x).value=''); document.getElementById('sf-role').value='Sales Rep'; document.getElementById('sf-status').value='active'; }
+  openModal('staff-modal');
+}
+function editStaff(id) { openStaffModal(id); }
+async function saveStaff() {
+  const staff = LS.get('staff') || [];
+  const id = parseInt(document.getElementById('sf-id').value)||0;
+  const obj = { id: id||Date.now(), name:document.getElementById('sf-name').value.trim(), role:document.getElementById('sf-role').value, phone:document.getElementById('sf-phone').value.trim(), email:document.getElementById('sf-email').value.trim(), area:document.getElementById('sf-area').value.trim(), status:document.getElementById('sf-status').value };
+  if (!obj.name||!obj.phone) { alert('Vui lòng nhập đầy đủ họ tên và SĐT'); return; }
+  const isNew = !id;
+  if (id) { const i=staff.findIndex(s=>s.id===id); if(i>=0) staff[i]=obj; } else staff.push(obj);
+  LS.set('staff', staff); closeModal('staff-modal'); renderStaff();
+  if (isNew && obj.email) {
+    showToast('Đang gửi email chào mừng...');
+    const r = await emailWelcome(obj);
+    showToast(r.ok ? '✅ Đã gửi email chào mừng đến ' + obj.email : '⚠️ Lỗi gửi email: ' + r.err);
+    if (obj.email.includes('+test')) {
+      showToast('🧪 Test mode — gửi cả 3 email...');
+      const orders = LS.get('orders') || DB_ORDERS;
+      if (orders.length) await emailOrderNotify(orders[0], obj);
+      await emailReportRemind(obj);
+      showToast('🧪 Test xong! Kiểm tra hộp thư ' + obj.email);
+    }
+  }
+}
+function deleteStaff(id) {
+  if (!confirm('Xóa nhân viên này?')) return;
+  LS.set('staff', (LS.get('staff')||[]).filter(s=>s.id!==id)); renderStaff();
+}
+
+// ═══════════════════════════════════════════
+// CUSTOMERS
+// ═══════════════════════════════════════════
+const followLabel = {active:'Đang hoạt động',follow:'Cần follow up',new:'Mới',inactive:'Ngừng'};
+function renderCustomers() {
+  const custs = LS.get('customers') || [];
+  const q = document.getElementById('cust-search').value.toLowerCase();
+  const nf = document.getElementById('cust-npp-filter').value;
+  const ff = document.getElementById('cust-follow-filter').value;
+  const rows = custs.filter(c =>
+    (!q || c.store_name.toLowerCase().includes(q) || c.phone.includes(q) || c.city.toLowerCase().includes(q) || c.contact.toLowerCase().includes(q)) &&
+    (!nf || c.npp===nf) && (!ff || c.follow===ff)
+  );
+  const tiers = custs.reduce((a,c)=>{a[c.tier]=(a[c.tier]||0)+1;return a},{});
+  document.getElementById('cust-stats').innerHTML = `
+    <div class="stat-card"><div class="val">${custs.length}</div><div class="lbl">Tổng đại lý</div></div>
+    <div class="stat-card" style="border-left-color:#856404"><div class="val">${tiers.gold||0}</div><div class="lbl">Gold</div></div>
+    <div class="stat-card" style="border-left-color:#495057"><div class="val">${tiers.silver||0}</div><div class="lbl">Silver</div></div>
+    <div class="stat-card" style="border-left-color:var(--danger)"><div class="val">${custs.filter(c=>c.follow==='follow').length}</div><div class="lbl">Cần follow</div></div>
+  `;
+  const tb = document.getElementById('cust-tbody');
+  if (!rows.length) { tb.innerHTML=`<tr><td colspan="10"><div class="empty-state"><i class="fas fa-store-slash"></i>Không có đại lý nào</div></td></tr>`; return; }
+  tb.innerHTML = rows.map((c,i) => `
+    <tr>
+      <td style="color:var(--text-muted)">${i+1}</td>
+      <td><strong>${c.store_name}</strong><br><span style="font-size:0.76rem;color:var(--text-muted)">${c.address}</span></td>
+      <td>${c.contact}</td>
+      <td><a href="tel:${c.phone}" style="color:var(--navy-soft)">${c.phone}</a></td>
+      <td>${c.city}</td>
+      <td><strong>${c.npp}</strong></td>
+      <td><span class="badge badge-${c.tier}">${c.tier.toUpperCase()}</span></td>
+      <td><span class="follow-dot ${c.follow||'active'}"></span>${followLabel[c.follow||'active']}</td>
+      <td>${c.rep}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-sm btn-ghost" onclick="editCustomer(${c.id})"><i class="fas fa-edit"></i></button>
+        <select class="filter-sel" style="padding:4px 8px;font-size:0.75rem" onchange="updateFollow(${c.id},this.value)">
+          <option value="active" ${(c.follow||'active')==='active'?'selected':''}>Active</option>
+          <option value="follow" ${c.follow==='follow'?'selected':''}>Follow up</option>
+          <option value="new" ${c.follow==='new'?'selected':''}>Mới</option>
+          <option value="inactive" ${c.follow==='inactive'?'selected':''}>Ngừng</option>
+        </select>
+      </div></td>
+    </tr>`).join('');
+}
+function updateFollow(id, val) {
+  const custs = LS.get('customers') || [];
+  const i = custs.findIndex(c=>c.id===id);
+  if (i>=0) { custs[i].follow=val; LS.set('customers',custs); renderCustomers(); }
+}
+function openCustomerModal(id) {
+  document.getElementById('cust-modal-title').textContent = id ? 'Sửa đại lý' : 'Thêm đại lý';
+  document.getElementById('cm-id').value = id||'';
+  if (id) {
+    const c = (LS.get('customers')||[]).find(x=>x.id===id);
+    if(c){document.getElementById('cm-name').value=c.store_name;document.getElementById('cm-contact').value=c.contact;document.getElementById('cm-phone').value=c.phone;document.getElementById('cm-address').value=c.address;document.getElementById('cm-city').value=c.city;document.getElementById('cm-npp').value=c.npp;document.getElementById('cm-tier').value=c.tier;document.getElementById('cm-follow').value=c.follow||'active';document.getElementById('cm-rep').value=c.rep;}
+  } else { ['cm-name','cm-contact','cm-phone','cm-address','cm-city'].forEach(x=>document.getElementById(x).value=''); document.getElementById('cm-npp').value='DGW'; document.getElementById('cm-tier').value='silver'; document.getElementById('cm-follow').value='new'; document.getElementById('cm-rep').value='Tú'; }
+  openModal('cust-modal');
+}
+function editCustomer(id) { openCustomerModal(id); }
+function saveCustomer() {
+  const custs = LS.get('customers')||[];
+  const id = parseInt(document.getElementById('cm-id').value)||0;
+  const obj = { id:id||Date.now(), store_name:document.getElementById('cm-name').value.trim(), contact:document.getElementById('cm-contact').value.trim(), phone:document.getElementById('cm-phone').value.trim(), address:document.getElementById('cm-address').value.trim(), city:document.getElementById('cm-city').value.trim(), npp:document.getElementById('cm-npp').value, tier:document.getElementById('cm-tier').value, follow:document.getElementById('cm-follow').value, rep:document.getElementById('cm-rep').value.trim(), created_at:new Date().toISOString().slice(0,10) };
+  if(!obj.store_name) { alert('Vui lòng nhập tên cửa hàng'); return; }
+  if(id){ const i=custs.findIndex(c=>c.id===id); if(i>=0) custs[i]=obj; } else custs.push(obj);
+  LS.set('customers',custs); closeModal('cust-modal'); renderCustomers();
+}
+
+// ═══════════════════════════════════════════
+// ORDERS
+// ═══════════════════════════════════════════
+const statusBadge = {new:'badge-new',pending:'badge-pending',confirmed:'badge-confirmed',shipped:'badge-shipped',done:'badge-done',cancelled:'badge-cancelled'};
+const statusLabel = {new:'Mới',pending:'Pending',confirmed:'Confirmed',shipped:'Shipped',done:'Hoàn thành',cancelled:'Đã hủy'};
+function renderOrders() {
+  const orders = LS.get('orders') || DB_ORDERS;
+  const q  = document.getElementById('order-search').value.toLowerCase();
+  const mf = document.getElementById('order-month-filter').value;
+  const nf = document.getElementById('order-npp-filter').value;
+  const sf = document.getElementById('order-status-filter').value;
+  const rows = orders.filter(o =>
+    (!q  || o.store_name.toLowerCase().includes(q) || o.product_name.toLowerCase().includes(q) || o.sku.toLowerCase().includes(q)) &&
+    (!mf || o.order_date.startsWith(mf)) &&
+    (!nf || o.npp===nf) && (!sf || o.status===sf)
+  );
+  const total = rows.reduce((s,o)=>s+(o.qty*o.unit_price),0);
+  document.getElementById('order-stats').innerHTML = `
+    <div class="stat-card"><div class="val">${rows.length}</div><div class="lbl">Số đơn</div></div>
+    <div class="stat-card" style="border-left-color:var(--success)"><div class="val">${fmtM(total)||'—'}</div><div class="lbl">Tổng giá trị</div></div>
+    <div class="stat-card" style="border-left-color:var(--info)"><div class="val">${rows.filter(o=>o.status==='new').length}</div><div class="lbl">Mới</div></div>
+    <div class="stat-card" style="border-left-color:var(--warning)"><div class="val">${rows.filter(o=>o.status==='pending').length}</div><div class="lbl">Pending</div></div>
+  `;
+  const tb = document.getElementById('order-tbody');
+  if (!rows.length) { tb.innerHTML=`<tr><td colspan="10"><div class="empty-state"><i class="fas fa-inbox"></i>Không có đơn hàng nào</div></td></tr>`; return; }
+  tb.innerHTML = rows.map(o => `
+    <tr>
+      <td style="color:var(--text-muted);font-size:0.8rem">#${o.id}</td>
+      <td><strong style="font-size:0.85rem">${o.store_name}</strong></td>
+      <td style="font-size:0.82rem">${o.product_name}</td>
+      <td style="text-align:center;font-weight:700">${o.qty}</td>
+      <td style="font-size:0.82rem">${o.unit_price?fmtVND(o.unit_price):'—'}</td>
+      <td style="font-weight:700;color:var(--navy-soft)">${o.unit_price?fmtM(o.qty*o.unit_price):'—'}</td>
+      <td><strong>${o.npp}</strong></td>
+      <td style="font-size:0.82rem;color:var(--text-muted)">${o.order_date}</td>
+      <td><span class="badge ${statusBadge[o.status]||'badge-new'}">${statusLabel[o.status]||o.status}</span></td>
+      <td style="font-size:0.78rem;color:var(--text-muted)">${o.note||'—'}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// INVENTORY
+// ═══════════════════════════════════════════
+const catLabel = {vga:'VGA',mainboard:'Mainboard',lcd:'Màn hình',psu:'Nguồn',ssd:'SSD',cooling:'Tản nhiệt',chassis:'Case'};
+function renderInventory() {
+  const inv  = LS.get('inventory') || DB_INVENTORY;
+  const q    = document.getElementById('inv-search').value.toLowerCase();
+  const nf   = document.getElementById('inv-npp-filter').value;
+  const cf   = document.getElementById('inv-cat-filter').value;
+  const sf   = document.getElementById('inv-stock-filter').value;
+  const rows = inv.filter(r =>
+    (!q  || r.product_name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q)) &&
+    (!nf || r.npp===nf) && (!cf || r.category===cf) &&
+    (!sf || (sf==='low'&&r.qty<r.min_qty) || (sf==='ok'&&r.qty>=r.min_qty))
+  );
+  const lowCount = inv.filter(r=>r.qty<r.min_qty).length;
+  const totalItems = inv.reduce((s,r)=>s+r.qty,0);
+  document.getElementById('inv-stats').innerHTML = `
+    <div class="stat-card"><div class="val">${inv.length}</div><div class="lbl">Dòng tồn kho</div></div>
+    <div class="stat-card" style="border-left-color:var(--success)"><div class="val">${totalItems}</div><div class="lbl">Tổng số lượng</div></div>
+    <div class="stat-card" style="border-left-color:var(--danger)"><div class="val">${lowCount}</div><div class="lbl">Tồn thấp ⚠️</div></div>
+    <div class="stat-card" style="border-left-color:var(--warning)"><div class="val">${[...new Set(inv.map(r=>r.npp))].length}</div><div class="lbl">NPP theo dõi</div></div>
+  `;
+  const tb = document.getElementById('inv-tbody');
+  if (!rows.length) { tb.innerHTML=`<tr><td colspan="8"><div class="empty-state"><i class="fas fa-box-open"></i>Không có dữ liệu tồn kho</div></td></tr>`; return; }
+  tb.innerHTML = rows.map(r => {
+    const lvl = r.qty < r.min_qty ? 'low' : r.qty < r.min_qty*2 ? 'warn' : 'ok';
+    const pct  = Math.min(100, Math.round(r.qty/Math.max(r.min_qty*3,1)*100));
+    return `<tr>
+      <td style="font-size:0.78rem;color:var(--text-muted);font-family:monospace">${r.sku}</td>
+      <td><strong style="font-size:0.875rem">${r.product_name}</strong></td>
+      <td><span class="badge badge-${r.category}">${catLabel[r.category]||r.category}</span></td>
+      <td><strong>${r.npp}</strong></td>
+      <td>
+        <div class="qty-wrap">
+          <span class="qty-num ${lvl}">${r.qty}</span>
+          <div style="flex:1">
+            <div class="prog-wrap"><div class="prog-bar ${lvl}" style="width:${pct}%"></div></div>
+          </div>
+          ${lvl==='low'?'<span title="Tồn thấp" style="color:var(--danger)">⚠️</span>':''}
+        </div>
+      </td>
+      <td style="color:var(--text-muted)">${r.min_qty}</td>
+      <td style="font-size:0.8rem;color:var(--text-muted)">${r.updated_at}</td>
+      <td>
+        <button class="qty-edit-btn" onclick="openQtyModal(${r.id})"><i class="fas fa-pen"></i> Sửa</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function openQtyModal(id) {
+  const inv = LS.get('inventory') || DB_INVENTORY;
+  const r = inv.find(x=>x.id===id);
+  if (!r) return;
+  document.getElementById('qm-id').value = id;
+  document.getElementById('qm-qty').value = r.qty;
+  document.getElementById('qm-info').innerHTML = `<strong>${r.product_name}</strong><br>NPP: ${r.npp} &nbsp;|&nbsp; Hiện tại: <strong>${r.qty}</strong> &nbsp;|&nbsp; Min: ${r.min_qty}`;
+  openModal('qty-modal');
+}
+function saveQty() {
+  const id  = parseInt(document.getElementById('qm-id').value);
+  const qty = parseInt(document.getElementById('qm-qty').value);
+  if (isNaN(qty)||qty<0) { alert('Số lượng không hợp lệ'); return; }
+  const inv = LS.get('inventory') || DB_INVENTORY;
+  const i = inv.findIndex(r=>r.id===id);
+  if (i>=0) { inv[i].qty=qty; inv[i].updated_at=new Date().toISOString().slice(0,10); }
+  LS.set('inventory', inv); closeModal('qty-modal'); renderInventory();
+}
+
+// ═══════════════════════════════════════════
+// ORDER FORM
+// ═══════════════════════════════════════════
+function openOrderModal() {
+  const custs = LS.get('customers') || [];
+  document.getElementById('om-customer').innerHTML =
+    custs.map(c => `<option value="${c.id}">${c.store_name}</option>`).join('');
+  document.getElementById('om-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('om-qty').value = 1;
+  document.getElementById('om-category').value = 'mainboard';
+  document.getElementById('om-npp').value = 'DGW';
+  document.getElementById('om-note').value = '';
+  openModal('order-modal');
+}
+
+async function saveOrder() {
+  const custId   = parseInt(document.getElementById('om-customer').value);
+  const category = document.getElementById('om-category').value;
+  const npp      = document.getElementById('om-npp').value;
+  const qty      = parseInt(document.getElementById('om-qty').value);
+  const date     = document.getElementById('om-date').value;
+  const note     = document.getElementById('om-note').value.trim();
+
+  if (!qty || qty < 1) { alert('Số lượng phải ≥ 1'); return; }
+  if (!date)           { alert('Vui lòng chọn ngày đặt hàng'); return; }
+
+  const custs    = LS.get('customers') || [];
+  const cust     = custs.find(c => c.id === custId);
+  const catLabel = {mainboard:'Mainboard',vga:'VGA',lcd:'LCD',chassis:'Chassis',psu:'Nguồn',cooling:'Tản nhiệt',ssd:'SSD'};
+  const orders   = LS.get('orders') || DB_ORDERS;
+  const maxId    = orders.reduce((m,o) => Math.max(m, o.id||0), 0);
+  const newOrder = {
+    id:           maxId + 1,
+    customer_id:  custId,
+    sku:          category.toUpperCase() + '-NEW-' + Date.now(),
+    product_name: catLabel[category] || category,
+    qty,
+    unit_price:   0,
+    npp,
+    order_date:   date,
+    status:       'new',
+    note:         note || null,
+    store_name:   cust ? cust.store_name : '—'
+  };
+  orders.unshift(newOrder);
+
+  LS.set('orders', orders);
+  closeModal('order-modal');
+  renderOrders();
+  showToast('Đã thêm đơn hàng mới thành công!');
+
+  if (cust) {
+    const staff = LS.get('staff') || [];
+    const repName = (cust.rep || '').toLowerCase();
+    const rep = staff.find(s => s.email && s.status === 'active' &&
+      (s.name.toLowerCase().includes(repName) || s.name.toLowerCase().split(' ').pop() === repName));
+    if (rep) {
+      emailOrderNotify(newOrder, rep).then(r => {
+        showToast(r.ok ? '📧 Đã thông báo đơn hàng cho ' + rep.name : '⚠️ Lỗi gửi email: ' + r.err);
+      });
+    }
+  }
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => { requestAnimationFrame(() => t.classList.add('show')); });
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2800);
+}
+
+// ═══════════════════════════════════════════
+// RESEND EMAIL
+// ═══════════════════════════════════════════
+let RESEND_KEY = '';
+const EMAIL_FROM = 'MSI System <onboarding@resend.dev>';
+
+async function loadResendConfig() {
+  try {
+    const r = await fetch('../resend_config.txt');
+    if (r.ok) RESEND_KEY = (await r.text()).trim();
+    else console.warn('[Resend] resend_config.txt not found — email disabled');
+  } catch(e) {
+    console.warn('[Resend] Could not load config:', e.message);
+  }
+}
+
+async function sendEmail(to, subject, html) {
+  const cleanTo = to.replace(/\+[^@]*@/, '@'); // strip +tag: Resend sandbox needs exact address, Gmail still routes to same inbox
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + RESEND_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: EMAIL_FROM, to: [cleanTo], subject, html })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'API error ' + r.status);
+    return { ok: true, id: d.id };
+  } catch(e) {
+    console.error('[Resend]', e);
+    return { ok: false, err: e.message };
+  }
+}
+
+function genTempPass() {
+  return 'MSI@' + Math.random().toString(36).slice(2,8).toUpperCase();
+}
+
+function emailWrap(bodyHtml) {
+  return `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#f0f4fa;padding:20px">
+    <div style="background:linear-gradient(135deg,#102a4e 0%,#2a4d7c 100%);border-radius:16px 16px 0 0;padding:28px;text-align:center">
+      <div style="color:#e8b43a;font-size:1.8rem;font-weight:900;letter-spacing:2px">MSI</div>
+      <div style="color:rgba(255,255,255,0.75);font-size:0.85rem;margin-top:4px">Sales Management System</div>
+    </div>
+    <div style="background:#fff;border-radius:0 0 16px 16px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
+      ${bodyHtml}
+      <hr style="border:none;border-top:1px solid #d4e0f0;margin:24px 0">
+      <div style="color:#6b7a8d;font-size:0.8rem;text-align:center">Trân trọng,<br><strong style="color:#102a4e">Hệ thống MSI Sales Management</strong></div>
+    </div>
+  </div>`;
+}
+
+async function emailWelcome(emp) {
+  const pass = genTempPass();
+  const sysUrl = location.origin + '/';
+  const body = `
+    <h2 style="color:#102a4e;margin-top:0">Chào mừng vào nhóm MSI! 🎉</h2>
+    <p>Chào <strong>${emp.name}</strong>,</p>
+    <p>Tài khoản hệ thống quản lý của bạn đã được tạo xong, giờ chính thức có thể bắt đầu rồi nha 🎉</p>
+    <div style="background:#f0f4fa;border-radius:10px;padding:16px;margin:16px 0">
+      <div style="margin:6px 0">🔗 <strong>Link hệ thống:</strong> <a href="${sysUrl}" style="color:#3b6ea5">${sysUrl}</a></div>
+      <div style="margin:6px 0">📧 <strong>Tài khoản:</strong> ${emp.email}</div>
+      <div style="margin:6px 0">🔑 <strong>Mật khẩu tạm:</strong> <code style="background:#e8f0fe;padding:2px 8px;border-radius:4px;font-size:1rem">${pass}</code></div>
+    </div>
+    <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0">
+      ⚠️ Vào rồi nhớ đổi mật khẩu ngay, đừng để mặc định nha.
+    </div>
+    <p><strong>Bắt đầu từ đâu?</strong></p>
+    <ol style="line-height:1.8;color:#1a2a3a">
+      <li>Đăng nhập và đổi mật khẩu</li>
+      <li>Xem phần "Tổng quan" để nắm hệ thống làm gì</li>
+      <li>Kiểm tra mục "Công việc của tôi" — lead có thể đã giao việc cho bạn rồi đó</li>
+    </ol>
+    <p>Có gì chưa rõ thì nhắn thẳng vào nhóm Zalo nội bộ, ai cũng hỗ trợ được hết.</p>
+    <p>Chúc bạn làm việc hiệu quả — và đừng ngại hỏi 😄</p>`;
+  return sendEmail(emp.email, 'Chào mừng vào nhóm MSI — Tài khoản của bạn đã sẵn sàng', emailWrap(body));
+}
+
+async function emailOrderNotify(order, emp) {
+  const sysUrl = location.origin + '/admin/';
+  const body = `
+    <h2 style="color:#102a4e;margin-top:0">Bạn có task mới — Đơn hàng mới 📋</h2>
+    <p>Chào <strong>${emp.name}</strong>,</p>
+    <p>Update nha — bạn vừa được giao 1 công việc mới trong hệ thống:</p>
+    <div style="background:#f0f4fa;border-radius:10px;padding:16px;margin:16px 0">
+      <div style="margin:6px 0">📋 <strong>Tên task:</strong> Đơn hàng từ ${order.store_name}</div>
+      <div style="margin:6px 0">📦 <strong>Sản phẩm:</strong> ${order.product_name} × ${order.qty}</div>
+      <div style="margin:6px 0">🏢 <strong>NPP xuất hàng:</strong> ${order.npp}</div>
+      <div style="margin:6px 0">👤 <strong>Người giao:</strong> Admin</div>
+      <div style="margin:6px 0">⏰ <strong>Deadline:</strong> ${order.order_date}</div>
+      ${order.note ? `<div style="margin:6px 0">📝 <strong>Ghi chú:</strong> ${order.note}</div>` : ''}
+    </div>
+    <p>👉 <a href="${sysUrl}" style="color:#3b6ea5;font-weight:600">Vào hệ thống để xem chi tiết đơn hàng</a></p>
+    <p>Nếu có gì chưa rõ về task này thì confirm lại với Admin sớm — đừng đợi gần deadline mới hỏi 😄</p>`;
+  return sendEmail(emp.email, `Bạn có task mới — Đơn hàng từ ${order.store_name}`, emailWrap(body));
+}
+
+async function emailReportRemind(emp) {
+  const sysUrl = location.origin + '/';
+  const body = `
+    <h2 style="color:#102a4e;margin-top:0">Nhắc nhở — Cập nhật doanh số tuần này 📊</h2>
+    <p>Chào <strong>${emp.name}</strong>,</p>
+    <p>Thứ Sáu rồi — đến giờ update doanh số tuần rồi nha! 📊</p>
+    <p>Bạn vào hệ thống và điền đầy đủ các mục sau trước <strong>17h hôm nay</strong>:</p>
+    <div style="background:#d1fae5;border-radius:10px;padding:16px;margin:16px 0">
+      <div style="margin:6px 0">✅ Sell-in theo từng NPP trong tuần</div>
+      <div style="margin:6px 0">✅ Sell-out theo từng đại lý trong tuần</div>
+      <div style="margin:6px 0">✅ Ghi chú nếu có deal đang chờ xác nhận hoặc lô hàng chưa load được</div>
+    </div>
+    <p>👉 <a href="${sysUrl}" style="color:#3b6ea5;font-weight:600">Vào báo cáo tại đây: ${sysUrl}</a></p>
+    <p>Tuần nào cũng vậy, số liệu đầy đủ thì lead tổng hợp nhanh, cả nhóm đỡ mất thêm thời gian nhắc qua lại 😄</p>
+    <p>Cảm ơn bạn, chúc cuối tuần vui!</p>`;
+  return sendEmail(emp.email, 'Nhắc nhở — Cập nhật doanh số tuần này trước 17h hôm nay', emailWrap(body));
+}
+
+async function sendBulkReportReminder() {
+  const staff = LS.get('staff') || [];
+  const active = staff.filter(s => s.status === 'active' && s.email);
+  if (!active.length) { showToast('Không có nhân viên đang làm việc có email'); return; }
+  const btn = document.getElementById('btn-remind');
+  if (btn) btn.disabled = true;
+  showToast('Đang gửi nhắc báo cáo cho ' + active.length + ' nhân viên...');
+  let ok = 0;
+  for (const emp of active) { const r = await emailReportRemind(emp); if (r.ok) ok++; }
+  if (btn) btn.disabled = false;
+  showToast('✅ Đã gửi nhắc báo cáo: ' + ok + '/' + active.length + ' thành công');
+}
+
+// ═══════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════
+function renderAll() {
+  renderStaff();
+  renderCustomers();
+  renderOrders();
+  renderInventory();
+}
+</script>
+</body>
+</html>
