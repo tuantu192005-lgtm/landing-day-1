@@ -364,6 +364,7 @@
       border: 1px solid #cfe1fb;
       background: #fbfdff;
       color: var(--text);
+      text-align: right;
     }
 
     .status-pass {
@@ -1328,6 +1329,80 @@
       font-size: 0.8rem;
       color: var(--muted);
     }
+
+    /* ══ Sales & KPI — bảng KPI chi tiết + employee picker (bước 3) ══ */
+    .kpi-detail-table .kpi-col-name {
+      width: 220px;
+      min-width: 220px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .kpi-detail-table .kpi-col-num {
+      width: 110px;
+      min-width: 110px;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .msi-kpi-detail-hd {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .msi-kpi-detail-hd h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--navy-strong);
+    }
+
+    .msi-employee-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+
+    .msi-employee-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 16px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-soft);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .msi-employee-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 32px rgba(16, 42, 78, 0.14);
+    }
+
+    .msi-employee-avatar {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--navy-soft), var(--navy-strong));
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+
+    .msi-employee-name {
+      font-weight: 700;
+      color: var(--navy-strong);
+      margin-bottom: 4px;
+    }
+
+    .msi-employee-hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -1488,7 +1563,50 @@
       </section>
 
       <section class="msi-tab-pane" id="tab-sales-kpi">
-        <div class="msi-placeholder"><i class="fas fa-bullseye"></i><p>Sales &amp; KPI — nội dung sẽ được xây ở bước 3.</p></div>
+        <!-- Chỉ admin thấy danh sách nhân viên để chọn; staff vào thẳng KPI của mình -->
+        <div id="kpiEmployeeList" class="hidden">
+          <div class="msi-kpi-detail-hd"><h3>Chọn nhân viên để xem KPI</h3></div>
+          <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
+        </div>
+
+        <div id="kpiDetailView">
+          <div class="msi-kpi-detail-hd">
+            <button type="button" class="btn-secondary hidden" id="kpiDetailBackBtn"><i class="fas fa-arrow-left"></i> Quay lại</button>
+            <h3 id="kpiDetailName">KPI của bạn</h3>
+          </div>
+
+          <div class="msi-panel" style="margin-bottom:20px">
+            <h3>Bảng KPI theo hạng mục</h3>
+            <div class="table-wrapper">
+              <table class="target-table kpi-detail-table">
+                <thead>
+                  <tr>
+                    <th class="kpi-col-name">Hạng mục</th>
+                    <th class="kpi-col-num">Trọng số (D)</th>
+                    <th class="kpi-col-num">Target gốc (F)</th>
+                    <th class="kpi-col-num">Target hiệu lực (E)</th>
+                    <th class="kpi-col-num">Achieved (G)</th>
+                    <th class="kpi-col-num">Hit Rate (H)</th>
+                    <th class="kpi-col-num">Điểm đạt (I)</th>
+                    <th class="kpi-col-num">Điểm mục tiêu (J)</th>
+                  </tr>
+                </thead>
+                <tbody id="kpiDetailTableBody"></tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="7" style="text-align:right; font-weight:700;">Achieve Rate</td>
+                    <td class="kpi-col-num" id="kpiDetailAchieveRate" style="font-weight:700;">—</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <div class="msi-panel" style="max-width:480px">
+            <h3>% Hoàn thành theo hạng mục</h3>
+            <div class="msi-chart-wrap" style="height:320px"><canvas id="kpiDetailDonut"></canvas></div>
+          </div>
+        </div>
       </section>
 
       <section class="msi-tab-pane" id="tab-disty-inventory">
@@ -2463,60 +2581,86 @@
       return `${(ratio * 100).toFixed(1)}%`;
     }
 
-    async function saveStaffTargetField(rowId, column, value) {
+    // ══ TAB SALES & KPI (bước 3) ══════════════════════════════
+    // Cột K (y2023_avg) không hiển thị ra bảng nữa, nhưng vẫn lưu trong
+    // targets và view v_kpi_full vẫn dùng K để tính E = F × K ở backend.
+    let kpiDetailDonutInstance = null;
+    let kpiCurrentEmployeeId = null; // null = đang ở màn chọn nhân viên (chỉ admin)
+
+    async function saveKpiTargetField(rowId, column, value, employeeId) {
       const num = value === '' ? null : Number(value);
       const { error } = await sb.from('targets').update({ [column]: num }).eq('id', rowId);
       if (error) {
-        console.warn('[saveStaffTargetField]', column, error.message);
+        console.warn('[saveKpiTargetField]', column, error.message);
         return;
       }
-      await loadStaffTargets();
+      await loadKpiDetail(employeeId);
     }
 
-    async function loadStaffTargets() {
-      const targetsBody = document.getElementById('staffTargetsBody');
-      const achieveRateCell = document.getElementById('staffTargetsAchieveRate');
-      if (!targetsBody || !currentUser) return;
-      targetsBody.innerHTML = '';
+    function renderKpiDonut(rows) {
+      const canvas = document.getElementById('kpiDetailDonut');
+      if (!canvas) return;
+      const labeled = rows.filter((r) => r.hit_rate_h !== null && r.hit_rate_h !== undefined);
+      const labels = labeled.map((r) => r.category);
+      const data = labeled.map((r) => Math.round((r.hit_rate_h || 0) * 1000) / 10);
+      if (kpiDetailDonutInstance) kpiDetailDonutInstance.destroy();
+      if (!labels.length) return;
+      kpiDetailDonutInstance = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: labels.map((_, i) => MSI_CHART_COLORS[i % MSI_CHART_COLORS.length]) }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}%` } }
+          }
+        }
+      });
+    }
+
+    async function loadKpiDetail(employeeId) {
+      const targetsBody = document.getElementById('kpiDetailTableBody');
+      const achieveRateCell = document.getElementById('kpiDetailAchieveRate');
+      if (!targetsBody || !employeeId) return;
+      targetsBody.innerHTML = '<tr><td colspan="8">Đang tải...</td></tr>';
 
       const { data, error } = await sb
         .from('v_kpi_full')
         .select('*')
-        .eq('assigned_to', currentUser.id)
+        .eq('assigned_to', employeeId)
         .order('category');
 
       if (error) {
-        console.warn('[staffTargets v_kpi_full]', error.message);
-        targetsBody.innerHTML = '<tr><td colspan="9">Lỗi tải dữ liệu KPI.</td></tr>';
+        console.warn('[loadKpiDetail v_kpi_full]', error.message);
+        targetsBody.innerHTML = '<tr><td colspan="8">Lỗi tải dữ liệu KPI.</td></tr>';
         return;
       }
 
       const rows = data || [];
       if (!rows.length) {
-        targetsBody.innerHTML = '<tr><td colspan="9">Chưa có target.</td></tr>';
+        targetsBody.innerHTML = '<tr><td colspan="8">Chưa có target.</td></tr>';
         if (achieveRateCell) achieveRateCell.textContent = '—';
+        renderKpiDonut([]);
         return;
       }
 
-      rows.forEach((r) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r.category}</td>
-          <td><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="item_weight" value="${r.item_weight ?? ''}" /></td>
-          <td><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="target_stretched" value="${r.target_f ?? ''}" /></td>
-          <td><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="y2023_avg" value="${r.y2023_avg ?? ''}" /></td>
-          <td>${fmtKpiNumber(r.target_e)}</td>
-          <td>${fmtKpiNumber(r.achieved_g)}</td>
-          <td>${fmtPercent1(r.hit_rate_h)}</td>
-          <td>${r.final_score_i === null ? '—' : fmtKpiNumber(r.final_score_i)}</td>
-          <td>${r.target_score_j === null ? '—' : fmtKpiNumber(r.target_score_j)}</td>
-        `;
-        targetsBody.appendChild(tr);
-      });
+      targetsBody.innerHTML = rows.map((r) => `
+        <tr>
+          <td class="kpi-col-name">${r.category}</td>
+          <td class="kpi-col-num"><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="item_weight" value="${r.item_weight ?? ''}" /></td>
+          <td class="kpi-col-num"><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="target_stretched" value="${r.target_f ?? ''}" /></td>
+          <td class="kpi-col-num">${fmtKpiNumber(r.target_e)}</td>
+          <td class="kpi-col-num">${fmtKpiNumber(r.achieved_g)}</td>
+          <td class="kpi-col-num">${fmtPercent1(r.hit_rate_h)}</td>
+          <td class="kpi-col-num">${r.final_score_i === null ? '—' : fmtKpiNumber(r.final_score_i)}</td>
+          <td class="kpi-col-num">${r.target_score_j === null ? '—' : fmtKpiNumber(r.target_score_j)}</td>
+        </tr>
+      `).join('');
 
       targetsBody.querySelectorAll('.target-input').forEach((input) => {
         input.addEventListener('blur', (e) => {
-          saveStaffTargetField(e.target.dataset.rowId, e.target.dataset.field, e.target.value);
+          saveKpiTargetField(e.target.dataset.rowId, e.target.dataset.field, e.target.value, employeeId);
         });
       });
 
@@ -2525,25 +2669,62 @@
       if (achieveRateCell) {
         achieveRateCell.textContent = sumJ ? fmtPercent1(sumI / sumJ) : '—';
       }
+
+      renderKpiDonut(rows);
     }
 
-    function renderStaffDashboard() {
-      const reports = getStoredReports();
-      const staffReports = reports.filter((report) => report.email === currentUser.email);
-      const totalSales = staffReports.reduce((sum, report) => sum + report.sales, 0);
-      document.getElementById('staffTeamName').textContent = currentUser.team;
-      document.getElementById('staffTotalSales').textContent = formatCurrency(totalSales);
-      document.getElementById('staffReportsCount').textContent = staffReports.length;
-      loadMyTasks();
-      loadStaffTargets();
+    function openKpiDetail(employeeId) {
+      kpiCurrentEmployeeId = employeeId;
+      const emp = EMPLOYEES.find((e) => e.id === employeeId);
+      const isOwnData = currentUser && currentUser.id === employeeId;
+      document.getElementById('kpiDetailName').textContent = isOwnData ? 'KPI của bạn' : `KPI — ${emp ? emp.name : employeeId}`;
+      document.getElementById('kpiEmployeeList')?.classList.add('hidden');
+      document.getElementById('kpiDetailView')?.classList.remove('hidden');
+      document.getElementById('kpiDetailBackBtn')?.classList.toggle('hidden', currentUser?.role !== 'admin');
+      loadKpiDetail(employeeId);
     }
 
-    function updateDashboard() {
+    function renderKpiEmployeeList() {
+      const grid = document.getElementById('kpiEmployeeGrid');
+      if (!grid) return;
+      grid.innerHTML = EMPLOYEES.map((emp) => `
+        <div class="msi-employee-card" data-emp-id="${emp.id}">
+          <div class="msi-employee-avatar"><i class="fas fa-user"></i></div>
+          <div class="msi-employee-name">${emp.name}</div>
+          <div class="msi-employee-hint">Xem KPI <i class="fas fa-arrow-right"></i></div>
+        </div>
+      `).join('');
+      grid.querySelectorAll('.msi-employee-card').forEach((card) => {
+        card.addEventListener('click', () => openKpiDetail(card.dataset.empId));
+      });
+    }
+
+    function showKpiEmployeeList() {
+      kpiCurrentEmployeeId = null;
+      document.getElementById('kpiDetailView')?.classList.add('hidden');
+      document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
+    }
+
+    function loadSalesKpiTab() {
       if (!currentUser) return;
-      if (currentUser.role === 'admin') renderAdminDashboard();
-      if (currentUser.role === 'lead') renderLeadDashboard();
-      if (currentUser.role === 'staff') renderStaffDashboard();
+      if (currentUser.role !== 'admin') {
+        // Staff vào thẳng KPI của chính họ, không qua màn chọn người.
+        document.getElementById('kpiEmployeeList')?.classList.add('hidden');
+        document.getElementById('kpiDetailView')?.classList.remove('hidden');
+        document.getElementById('kpiDetailBackBtn')?.classList.add('hidden');
+        openKpiDetail(currentUser.id);
+        return;
+      }
+      if (kpiCurrentEmployeeId) {
+        loadKpiDetail(kpiCurrentEmployeeId);
+      } else {
+        renderKpiEmployeeList();
+        document.getElementById('kpiDetailView')?.classList.add('hidden');
+        document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
+      }
     }
+    document.getElementById('kpiDetailBackBtn')?.addEventListener('click', showKpiEmployeeList);
+    tabLoaders['tab-sales-kpi'] = loadSalesKpiTab;
 
     function initEmailJS() {
       try {
