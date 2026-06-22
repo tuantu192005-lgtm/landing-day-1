@@ -980,413 +980,329 @@
       .cb-messages { height: 380px; }
       #chatbot-fab { right: 14px; bottom: 18px; }
     }
+
+    /* ══ MSI App Shell: header menu ngang + bộ lọc + 4 tab ══ */
+    body:has(#mainApp.active) {
+      display: block;
+      padding: 0;
+    }
+
+    .msi-app {
+      width: 100%;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
+    .msi-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      padding: 0 28px;
+      height: 64px;
+      background: linear-gradient(90deg, var(--navy-strong), var(--navy-soft));
+      color: var(--white);
+      box-shadow: 0 6px 18px rgba(16, 42, 78, 0.18);
+    }
+
+    .msi-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .msi-brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--white);
+      padding: 4px;
+    }
+
+    .msi-menu {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+    }
+
+    .msi-menu-btn {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.72);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .msi-menu-btn:hover {
+      color: var(--white);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .msi-menu-btn.active {
+      color: var(--navy-strong);
+      background: var(--white);
+    }
+
+    .msi-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .msi-hamburger {
+      display: none;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: var(--white);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .msi-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      padding: 14px 28px;
+      background: #eef2f8;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .msi-filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .msi-filter-item label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .msi-filter-item select {
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      color: var(--text);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .msi-tab-content {
+      padding: 28px;
+    }
+
+    .msi-tab-pane {
+      display: none;
+    }
+
+    .msi-tab-pane.active {
+      display: block;
+    }
+
+    .msi-placeholder {
+      background: var(--white);
+      border: 1px dashed var(--border);
+      border-radius: 20px;
+      padding: 60px 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .msi-placeholder i {
+      font-size: 2.2rem;
+      margin-bottom: 14px;
+      color: var(--navy-soft);
+      display: block;
+    }
+
+    @media (max-width: 860px) {
+      .msi-menu {
+        position: absolute;
+        top: 64px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        background: var(--navy-strong);
+        padding: 8px;
+        display: none;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+      }
+      .msi-menu.open {
+        display: flex;
+      }
+      .msi-hamburger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .msi-header {
+        padding: 0 12px;
+        gap: 8px;
+      }
+      .msi-header-right {
+        gap: 6px;
+        min-width: 0;
+      }
+      .msi-header-right .user-chip {
+        max-width: 110px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 7px 10px;
+        font-size: 0.75rem;
+      }
+      .msi-header-right .logout-btn {
+        padding: 7px 10px;
+        font-size: 0.75rem;
+      }
+      .msi-filter-bar {
+        padding: 12px 16px;
+        gap: 12px;
+      }
+      .msi-tab-content {
+        padding: 16px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="app-shell">
+  <!-- ══ LOGIN (màn hình riêng, trước khi đăng nhập) ══ -->
+  <div class="app-shell screen active" id="loginScreen">
     <header class="app-header">
       <div class="brand">
         <img src="Logo.png" alt="Logo" />
         <div>
           <h1>Quản lý Nhân viên Bán hàng</h1>
-          <p style="margin:0; opacity:0.85; font-size:0.95rem;">Giao diện giả lập hệ thống doanh nghiệp</p>
+          <p style="margin:0; opacity:0.85; font-size:0.95rem;">Đăng nhập để vào hệ thống</p>
         </div>
       </div>
-      <div class="header-actions">
+    </header>
+    <div class="login-screen">
+      <div class="login-panel">
+        <h2>Đăng nhập</h2>
+        <p>Nhập email và mật khẩu để truy cập Dashboard.</p>
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="emailInput">Email</label>
+            <input type="email" id="emailInput" placeholder="Email của bạn" required />
+          </div>
+          <div class="form-group">
+            <label for="passwordInput">Mật khẩu</label>
+            <input type="password" id="passwordInput" placeholder="Mật khẩu" required />
+          </div>
+          <div class="login-submit">
+            <button type="submit" class="btn-primary">Đăng nhập</button>
+          </div>
+          <div class="login-error" id="loginError"></div>
+        </form>
+      </div>
+      <aside class="info-panel">
+        <h3>Hướng dẫn đăng nhập</h3>
+        <ul>
+          <li><strong>Email</strong> đã được admin cấp</li>
+          <li><strong>Mật khẩu</strong> do admin thiết lập</li>
+        </ul>
+        <div style="margin-top:18px; padding:20px; border-radius:18px; background:#f5f9ff; border:1px solid #dbe8ff;">
+          <strong>Phân quyền</strong>
+          <p style="margin:10px 0 0; color:#5e6f8a; line-height:1.7;">Admin xem toàn bộ team. Nhân viên chỉ xem phần việc của mình.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ══ MAIN APP (sau khi đăng nhập) — header menu ngang + bộ lọc + 4 tab ══ -->
+  <div class="msi-app screen" id="mainApp">
+    <header class="msi-header">
+      <div class="msi-brand">
+        <img src="Logo.png" alt="MSI" />
+        <span>MSI</span>
+      </div>
+      <nav class="msi-menu" id="msiMenu">
+        <button type="button" class="msi-menu-btn active" data-tab="tab-summaries"><i class="fas fa-chart-pie"></i> Summaries Dashboard</button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-sales-kpi"><i class="fas fa-bullseye"></i> Sales &amp; KPI</button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i> Disty Inventory</button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i> Data Source</button>
+      </nav>
+      <div class="msi-header-right">
         <span class="user-chip" id="currentUserChip">Chưa đăng nhập</span>
         <button class="logout-btn hidden" id="logoutButton">Đăng xuất</button>
+        <button type="button" class="msi-hamburger" id="msiHamburger" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
       </div>
     </header>
 
-    <div class="app-body">
-      <aside class="sidebar" id="sidebarPanel">
-        <h2>Điều hướng</h2>
-        <ul class="nav-list" id="navList">
-          <li class="nav-link active" data-screen="loginScreen"><i class="fas fa-sign-in-alt"></i> Đăng nhập</li>
-        </ul>
-        <small>Hệ thống quản lý MSI — dữ liệu thật, đăng nhập bằng tài khoản được cấp.</small>
-      </aside>
-
-      <section class="content">
-        <section class="screen active" id="loginScreen">
-          <div class="login-screen">
-            <div class="login-panel">
-              <h2>Đăng nhập</h2>
-              <p>Nhập email và mật khẩu để truy cập Dashboard.</p>
-              <form id="loginForm">
-                <div class="form-group">
-                  <label for="emailInput">Email</label>
-                  <input type="email" id="emailInput" placeholder="Email của bạn" required />
-                </div>
-                <div class="form-group">
-                  <label for="passwordInput">Mật khẩu</label>
-                  <input type="password" id="passwordInput" placeholder="Mật khẩu" required />
-                </div>
-                <div class="login-submit">
-                  <button type="submit" class="btn-primary">Đăng nhập</button>
-                </div>
-                <div class="login-error" id="loginError"></div>
-              </form>
-            </div>
-            <aside class="info-panel">
-              <h3>Hướng dẫn đăng nhập</h3>
-              <ul>
-                <li><strong>Email</strong> đã được admin cấp</li>
-                <li><strong>Mật khẩu</strong> do admin thiết lập</li>
-              </ul>
-              <div style="margin-top:18px; padding:20px; border-radius:18px; background:#f5f9ff; border:1px solid #dbe8ff;">
-                <strong>Phân quyền</strong>
-                <p style="margin:10px 0 0; color:#5e6f8a; line-height:1.7;">Admin thấy toàn bộ hệ thống. Lead thấy nhóm mình. Nhân viên thấy phần của mình.</p>
-              </div>
-            </aside>
-          </div>
-        </section>
-
-        <section class="screen" id="adminDashboard">
-          <div class="screen-title">
-            <h2>Dashboard Admin</h2>
-            <span class="badge lead">Chuyên viên quản lý</span>
-          </div>
-          <div class="welcome-panel">
-            <div class="welcome-box">
-              <h2>Xin chào, Admin.</h2>
-              <p>Xem tổng quan doanh số toàn bộ nhân viên, bảng thống kê và biểu đồ.</p>
-            </div>
-            <div class="quick-card">
-              <span>Tổng nhân viên</span>
-              <h3 id="adminStaffCount">0</h3>
-            </div>
-          </div>
-
-          <div class="overview-section">
-            <div class="overview-cards">
-              <div class="overview-card">
-                <div class="overview-card-icon"><i class="fas fa-bullseye"></i></div>
-                <div class="overview-card-body">
-                  <strong id="ovTotalTarget">0</strong>
-                  <span>Tổng Target</span>
-                </div>
-              </div>
-              <div class="overview-card">
-                <div class="overview-card-icon"><i class="fas fa-chart-line"></i></div>
-                <div class="overview-card-body">
-                  <strong id="ovTotalAchieved">0</strong>
-                  <span>Tổng Achieved</span>
-                </div>
-              </div>
-              <div class="overview-card">
-                <div class="overview-card-icon"><i class="fas fa-percentage"></i></div>
-                <div class="overview-card-body">
-                  <strong id="ovOverallPercent">0%</strong>
-                  <span>% Hoàn thành chung</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="overview-charts">
-              <div class="panel overview-chart-card">
-                <h3>% Hoàn thành theo nhân viên</h3>
-                <div class="overview-chart-wrap">
-                  <canvas id="overviewBarChart"></canvas>
-                </div>
-              </div>
-              <div class="panel overview-chart-card">
-                <h3>Tỉ trọng đóng góp Achieved</h3>
-                <div class="overview-chart-wrap">
-                  <canvas id="overviewDonutChart"></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Tiến độ nhân viên</h3>
-            <div class="employee-progress-grid" id="employeeProgressGrid"></div>
-          </div>
-
-          <div class="panel">
-            <h3>Giao việc mới</h3>
-            <form id="taskAssignForm">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="taskAssignee">Nhân viên</label>
-                  <select id="taskAssignee" required>
-                    <option value="">Chọn nhân viên</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="taskTitle">Tiêu đề</label>
-                  <input type="text" id="taskTitle" placeholder="Tiêu đề công việc" required />
-                </div>
-                <div class="form-group">
-                  <label for="taskDescription">Mô tả</label>
-                  <input type="text" id="taskDescription" placeholder="Mô tả (không bắt buộc)" />
-                </div>
-                <div class="form-group">
-                  <label for="taskDueDate">Ngày hạn</label>
-                  <input type="date" id="taskDueDate" />
-                </div>
-              </div>
-              <div class="dashboard-actions">
-                <button type="submit" class="btn-primary">Giao việc</button>
-              </div>
-              <div class="login-error" id="taskAssignMessage"></div>
-            </form>
-          </div>
-
-          <div class="report-panel">
-            <div class="panel chart-card">
-              <h3>Biểu đồ doanh số theo nhân viên</h3>
-              <canvas id="adminChart"></canvas>
-            </div>
-            <div class="panel">
-              <h3>Thống kê nhóm</h3>
-              <div class="summary-block" id="adminTeamSummary"></div>
-            </div>
-          </div>
-
-          <!-- Target panels -->
-          <div class="panel">
-            <h3>Target cá nhân theo quý</h3>
-            <div class="table-wrapper">
-              <table class="target-table">
-                <thead>
-                  <tr>
-                    <th>Dòng sản phẩm</th>
-                    <th>Target</th>
-                    <th>Achieved</th>
-                    <th>% Hoàn thành</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody id="personalTargetsBody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Target theo khách hàng</h3>
-            <div class="table-wrapper">
-              <table class="target-table">
-                <thead>
-                  <tr>
-                    <th>Tên khách hàng</th>
-                    <th>Dòng sản phẩm</th>
-                    <th>Target quý</th>
-                    <th>Achieved</th>
-                    <th>% Hoàn thành</th>
-                  </tr>
-                </thead>
-                <tbody id="customerTargetsBody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Bảng doanh số nhân viên</h3>
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nhân viên</th>
-                    <th>Nhóm</th>
-                    <th>Tổng doanh số</th>
-                    <th>Báo cáo gần nhất</th>
-                  </tr>
-                </thead>
-                <tbody id="adminTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="screen" id="employeeDetailScreen">
-          <div class="screen-title">
-            <h2>Chi tiết nhân viên — <span id="employeeDetailName">-</span></h2>
-            <button type="button" class="btn-secondary" id="employeeDetailBackBtn">
-              <i class="fas fa-arrow-left"></i> Quay lại
-            </button>
-          </div>
-
-          <div class="panel">
-            <h3>Target theo dòng sản phẩm</h3>
-            <div class="table-wrapper">
-              <table class="target-table">
-                <thead>
-                  <tr>
-                    <th>Dòng sản phẩm</th>
-                    <th>Target</th>
-                    <th>Achieved</th>
-                    <th>% Hoàn thành</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody id="employeeDetailTargetsBody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Lịch sử báo cáo</h3>
-            <div class="history-list" id="employeeDetailHistory"></div>
-          </div>
-
-          <div class="panel">
-            <h3>Đơn hàng gắn với nhân viên</h3>
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>SKU</th>
-                    <th>Sản phẩm</th>
-                    <th>SL</th>
-                    <th>Đơn giá</th>
-                    <th>NPP</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody id="employeeDetailOrdersBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="screen" id="leadDashboard">
-          <div class="screen-title">
-            <h2>Dashboard Lead</h2>
-            <span class="badge lead">Trưởng nhóm</span>
-          </div>
-          <div class="welcome-panel">
-            <div class="welcome-box">
-              <h2>Xin chào, trưởng nhóm.</h2>
-              <p>Xem và kiểm soát báo cáo doanh số của nhóm bạn với biểu đồ và thông tin chi tiết.</p>
-            </div>
-            <div class="quick-card">
-              <span>Nhóm của bạn</span>
-              <h3 id="leadTeamName">-</h3>
-            </div>
-          </div>
-
-          <div class="stat-grid">
-            <div class="stat-card">
-              <p>Tổng doanh số nhóm</p>
-              <strong id="leadTotalSales">0 ₫</strong>
-            </div>
-            <div class="stat-card">
-              <p>Số nhân viên trong nhóm</p>
-              <strong id="leadTeamCount">0</strong>
-            </div>
-            <div class="stat-card">
-              <p>Số báo cáo nhóm</p>
-              <strong id="leadReportsCount">0</strong>
-            </div>
-          </div>
-
-          <div class="report-panel">
-            <div class="panel chart-card">
-              <h3>Biểu đồ doanh số theo ngày</h3>
-              <canvas id="leadChart"></canvas>
-            </div>
-            <div class="panel">
-              <h3>Thống kê nhân viên trong nhóm</h3>
-              <div class="summary-block" id="leadMemberSummary"></div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Báo cáo chi tiết nhóm</h3>
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nhân viên</th>
-                    <th>Ngày</th>
-                    <th>Doanh số</th>
-                    <th>Ghi chú</th>
-                  </tr>
-                </thead>
-                <tbody id="leadTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="screen" id="staffDashboard">
-          <div class="screen-title">
-            <h2>Dashboard Nhân viên</h2>
-            <span class="badge staff">Nhân viên</span>
-          </div>
-          <div class="welcome-panel">
-            <div class="welcome-box">
-              <h2>Xin chào, nhân viên.</h2>
-              <p>Nhập báo cáo doanh số hàng ngày và quản lý lịch sử báo cáo của bạn.</p>
-            </div>
-            <div class="quick-card">
-              <span>Bạn thuộc nhóm</span>
-              <h3 id="staffTeamName">-</h3>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Dữ liệu Sellout (Excel)</h3>
-            <p style="margin:0 0 18px; color:var(--muted); line-height:1.7;">Import file Excel sellout hàng tuần của bạn (sheet "Data"), hoặc export toàn bộ dữ liệu sellout của chính bạn ra file Excel.</p>
-            <div class="dashboard-actions">
-              <button type="button" class="btn-primary" id="selloutImportBtn">Import dữ liệu tuần</button>
-              <button type="button" class="btn-secondary" id="selloutExportBtn">Export dữ liệu</button>
-              <input type="file" id="selloutImportInput" accept=".xlsx" class="hidden" />
-            </div>
-            <div class="login-error" id="selloutMessage"></div>
-          </div>
-
-          <div class="panel">
-            <h3>Tổng quan cá nhân</h3>
-            <div class="summary-block">
-              <div class="summary-item">
-                <strong id="staffTotalSales">0 ₫</strong>
-                <span>Tổng doanh số hiện tại</span>
-              </div>
-              <div class="summary-item">
-                <strong id="staffReportsCount">0</strong>
-                <span>Số báo cáo đã lưu</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Target theo dòng sản phẩm</h3>
-            <div class="table-wrapper">
-              <table class="target-table">
-                <thead>
-                  <tr>
-                    <th>Hạng mục</th>
-                    <th>D</th>
-                    <th>F</th>
-                    <th>K</th>
-                    <th>E</th>
-                    <th>Achieved (G)</th>
-                    <th>Hit Rate % (H)</th>
-                    <th>Final Score (I)</th>
-                    <th>Target score (J)</th>
-                  </tr>
-                </thead>
-                <tbody id="staffTargetsBody"></tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="8" style="text-align:right; font-weight:700;">Achieve Rate</td>
-                    <td id="staffTargetsAchieveRate" style="font-weight:700;">—</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h3>Nhiệm vụ của tôi</h3>
-            <div class="history-list" id="myTasksList"></div>
-          </div>
-        </section>
-      </section>
+    <div class="msi-filter-bar" id="msiFilterBar">
+      <div class="msi-filter-item">
+        <label for="filterYear">Năm</label>
+        <select id="filterYear"><option value="">Tất cả</option></select>
+      </div>
+      <div class="msi-filter-item">
+        <label for="filterQuarter">Quý</label>
+        <select id="filterQuarter">
+          <option value="">Tất cả</option>
+          <option value="1">Q1</option>
+          <option value="2">Q2</option>
+          <option value="3">Q3</option>
+          <option value="4">Q4</option>
+        </select>
+      </div>
+      <div class="msi-filter-item">
+        <label for="filterNpp">NPP</label>
+        <select id="filterNpp">
+          <option value="">Tất cả</option>
+          <option>DGW</option><option>SPC</option><option>KTC</option>
+          <option>NWH</option><option>MH</option><option>AD</option>
+        </select>
+      </div>
+      <div class="msi-filter-item">
+        <label for="filterLob">LOB</label>
+        <select id="filterLob">
+          <option value="">Tất cả</option>
+          <option>VGA</option><option>MB</option><option>LCD</option><option>PSU</option><option>CASE</option>
+          <option>COOLER</option><option>SSD</option><option>GG</option><option>DESKTOP</option><option>MINIPC</option>
+        </select>
+      </div>
     </div>
+
+    <main class="msi-tab-content">
+      <section class="msi-tab-pane active" id="tab-summaries">
+        <div class="msi-placeholder"><i class="fas fa-chart-pie"></i><p>Summaries Dashboard — nội dung sẽ được xây ở bước 2.</p></div>
+      </section>
+
+      <section class="msi-tab-pane" id="tab-sales-kpi">
+        <div class="msi-placeholder"><i class="fas fa-bullseye"></i><p>Sales &amp; KPI — nội dung sẽ được xây ở bước 3.</p></div>
+      </section>
+
+      <section class="msi-tab-pane" id="tab-disty-inventory">
+        <div class="msi-placeholder"><i class="fas fa-boxes"></i><p>Disty Inventory — nội dung sẽ được xây ở bước 4.</p></div>
+      </section>
+
+      <section class="msi-tab-pane" id="tab-data-source">
+        <div class="msi-placeholder"><i class="fas fa-database"></i><p>Data Source — nội dung sẽ được xây ở bước 5.</p></div>
+      </section>
+    </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1418,8 +1334,6 @@
     const loginError = document.getElementById('loginError');
     const logoutButton = document.getElementById('logoutButton');
     const currentUserChip = document.getElementById('currentUserChip');
-    const sidebarPanel = document.getElementById('sidebarPanel');
-    const navList = document.getElementById('navList');
     const screens = document.querySelectorAll('.screen');
     let currentUser = null;
 
@@ -1451,27 +1365,78 @@
       currentLinks.forEach((link) => link.classList.toggle('active', link.dataset.screen === id));
     }
 
-    function updateSidebar(role) {
-      navList.innerHTML = '';
-      const links = [];
-      if (!role) {
-        links.push({ label: 'Đăng nhập', icon: 'fa-sign-in-alt', screen: 'loginScreen' });
-      } else if (role === 'admin') {
-        links.push({ label: 'Dashboard Admin', icon: 'fa-chart-line', screen: 'adminDashboard' });
-      } else if (role === 'lead') {
-        links.push({ label: 'Dashboard Lead', icon: 'fa-users', screen: 'leadDashboard' });
-      } else if (role === 'staff') {
-        links.push({ label: 'Dashboard Nhân viên', icon: 'fa-clipboard-list', screen: 'staffDashboard' });
-      }
+    // ══ MSI APP SHELL: menu ngang, bộ lọc Năm/Quý/NPP/LOB, 4 tab ══
+    // Bộ lọc + phân quyền dùng chung cho mọi tab — nội dung từng tab sẽ
+    // được xây ở bước 2-5, dùng lại getMsiFilters()/scopeByRole() ở đây.
+    const msiFilters = { year: '', quarter: '', npp: '', lob: '' };
+    let msiAppInitialized = false;
 
-      links.forEach(({ label, icon, screen }) => {
-        const item = document.createElement('li');
-        item.className = 'nav-link';
-        item.dataset.screen = screen;
-        item.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
-        item.addEventListener('click', () => showScreen(screen));
-        navList.appendChild(item);
+    function scopeByRole(query) {
+      if (currentUser && currentUser.role !== 'admin') {
+        return query.eq('assigned_to', currentUser.id);
+      }
+      return query;
+    }
+
+    function getMsiFilters() {
+      return { ...msiFilters };
+    }
+
+    function initMsiTabs() {
+      document.querySelectorAll('.msi-menu-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.msi-menu-btn').forEach((b) => b.classList.remove('active'));
+          document.querySelectorAll('.msi-tab-pane').forEach((p) => p.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.tab)?.classList.add('active');
+          document.getElementById('msiMenu')?.classList.remove('open');
+        });
       });
+      document.getElementById('msiHamburger')?.addEventListener('click', () => {
+        document.getElementById('msiMenu')?.classList.toggle('open');
+      });
+    }
+
+    function initMsiFilterEvents() {
+      ['filterYear', 'filterQuarter', 'filterNpp', 'filterLob'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('change', () => {
+          msiFilters.year    = document.getElementById('filterYear').value;
+          msiFilters.quarter = document.getElementById('filterQuarter').value;
+          msiFilters.npp     = document.getElementById('filterNpp').value;
+          msiFilters.lob     = document.getElementById('filterLob').value;
+          document.dispatchEvent(new CustomEvent('msi:filters-changed', { detail: getMsiFilters() }));
+        });
+      });
+    }
+
+    async function populateYearFilter() {
+      const sel = document.getElementById('filterYear');
+      if (!sel || !currentUser) return;
+      const [{ data: oldest }, { data: newest }] = await Promise.all([
+        scopeByRole(sb.from('sellout_data').select('sale_date').not('sale_date', 'is', null).order('sale_date', { ascending: true }).limit(1)),
+        scopeByRole(sb.from('sellout_data').select('sale_date').not('sale_date', 'is', null).order('sale_date', { ascending: false }).limit(1))
+      ]);
+      const thisYear = new Date().getFullYear();
+      const minYear = oldest?.[0]?.sale_date ? new Date(oldest[0].sale_date).getFullYear() : thisYear;
+      const maxYear = newest?.[0]?.sale_date ? new Date(newest[0].sale_date).getFullYear() : thisYear;
+      const years = [];
+      for (let y = maxYear; y >= minYear; y--) years.push(y);
+      if (!years.length) years.push(thisYear);
+      sel.innerHTML = '<option value="">Tất cả</option>' + years.map((y) => `<option value="${y}">${y}</option>`).join('');
+      msiFilters.year = '';
+    }
+
+    function initMsiApp() {
+      if (!msiAppInitialized) {
+        initMsiTabs();
+        initMsiFilterEvents();
+        msiAppInitialized = true;
+      }
+      document.querySelectorAll('.msi-menu-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.msi-tab-pane').forEach((p) => p.classList.remove('active'));
+      document.querySelector('.msi-menu-btn[data-tab="tab-summaries"]')?.classList.add('active');
+      document.getElementById('tab-summaries')?.classList.add('active');
+      populateYearFilter();
     }
 
     function drawBarChart(canvas, labels, values) {
@@ -1838,7 +1803,7 @@
       showScreen('employeeDetailScreen');
     }
 
-    document.getElementById('employeeDetailBackBtn').addEventListener('click', () => showScreen('adminDashboard'));
+    document.getElementById('employeeDetailBackBtn')?.addEventListener('click', () => showScreen('adminDashboard'));
 
     /* --- Giao nhiệm vụ (tasks) --- */
     async function loadTaskAssigneeOptions() {
@@ -1856,7 +1821,7 @@
       });
     }
 
-    document.getElementById('taskAssignForm').addEventListener('submit', async (event) => {
+    document.getElementById('taskAssignForm')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const msg = document.getElementById('taskAssignMessage');
       msg.style.color = '#b30012';
@@ -2215,12 +2180,8 @@
       loginError.textContent = '';
       currentUserChip.textContent = `${currentUser.name} (${currentUser.email})`;
       logoutButton.classList.remove('hidden');
-      updateSidebar(currentUser.role);
-      const screen = currentUser.role === 'admin' ? 'adminDashboard'
-                   : currentUser.role === 'lead'  ? 'leadDashboard'
-                   : 'staffDashboard';
-      showScreen(screen);
-      updateDashboard();
+      showScreen('mainApp');
+      initMsiApp();
     }
 
     // Khôi phục session khi reload trang
@@ -2245,7 +2206,6 @@
       currentUser = null;
       currentUserChip.textContent = 'Chưa đăng nhập';
       logoutButton.classList.add('hidden');
-      updateSidebar(null);
       showScreen('loginScreen');
     });
 
@@ -2424,7 +2384,6 @@
       });
     }
 
-    updateSidebar(null);
     showScreen('loginScreen');
     initEmailJS();
   </script>
