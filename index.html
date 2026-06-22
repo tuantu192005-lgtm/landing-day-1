@@ -1666,7 +1666,37 @@
       </section>
 
       <section class="msi-tab-pane" id="tab-data-source">
-        <div class="msi-placeholder"><i class="fas fa-database"></i><p>Data Source — nội dung sẽ được xây ở bước 5.</p></div>
+        <div class="msi-panel" style="margin-bottom:20px">
+          <h3>Import / Export dữ liệu Sellout</h3>
+          <div class="form-group hidden" id="dataSourceEmployeeRow" style="max-width:320px">
+            <label for="dataSourceEmployeeSelect">Chọn nhân viên</label>
+            <select id="dataSourceEmployeeSelect"></select>
+          </div>
+          <p class="msi-panel-note">Import file Excel sellout hàng tuần (sheet "Data"), hoặc export toàn bộ dữ liệu sellout ra file Excel.</p>
+          <div class="dashboard-actions">
+            <button type="button" class="btn-primary" id="selloutImportBtn">Import dữ liệu tuần</button>
+            <button type="button" class="btn-secondary" id="selloutExportBtn">Export dữ liệu</button>
+            <input type="file" id="selloutImportInput" accept=".xlsx" class="hidden" />
+          </div>
+          <div class="login-error" id="selloutMessage"></div>
+        </div>
+
+        <div class="msi-panel">
+          <h3>Lịch sử Import</h3>
+          <div class="table-wrapper">
+            <table class="target-table">
+              <thead>
+                <tr>
+                  <th>Ngày import</th>
+                  <th>Người import</th>
+                  <th class="kpi-col-num">Số dòng</th>
+                  <th>Quý</th>
+                </tr>
+              </thead>
+              <tbody id="importHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -2918,6 +2948,106 @@
       }
     });
 
+    // ══ TAB DATA SOURCE (bước 5) ══════════════════════════════
+    // role staff: chỉ import/export data của chính mình (target = currentUser.id).
+    // role admin: chọn nhân viên từ dropdown (dùng lại EMPLOYEES) để import/export thay.
+    function getDataSourceTargetUserId() {
+      if (!currentUser) return null;
+      if (currentUser.role === 'admin') {
+        return document.getElementById('dataSourceEmployeeSelect')?.value || null;
+      }
+      return currentUser.id;
+    }
+
+    function populateDataSourceEmployeeSelect() {
+      const row = document.getElementById('dataSourceEmployeeRow');
+      const sel = document.getElementById('dataSourceEmployeeSelect');
+      if (!row || !sel) return;
+      if (currentUser.role !== 'admin') {
+        row.classList.add('hidden');
+        return;
+      }
+      row.classList.remove('hidden');
+      if (!sel.dataset.filled) {
+        sel.innerHTML = EMPLOYEES.map((emp) => `<option value="${emp.id}">${emp.name}</option>`).join('');
+        sel.dataset.filled = '1';
+        sel.addEventListener('change', () => loadImportHistory());
+      }
+    }
+
+    function fmtImportDate(isoDay) {
+      const [y, m, d] = isoDay.split('-').map(Number);
+      return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+    }
+
+    async function loadImportHistory() {
+      const tbody = document.getElementById('importHistoryBody');
+      if (!tbody) return;
+      const targetId = getDataSourceTargetUserId();
+      if (!targetId) {
+        tbody.innerHTML = '<tr><td colspan="4">Chọn nhân viên để xem lịch sử.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = '<tr><td colspan="4">Đang tải...</td></tr>';
+
+      const { data, error } = await sb
+        .from('sellout_data')
+        .select('sale_date, created_at')
+        .eq('assigned_to', targetId)
+        .order('created_at', { ascending: false })
+        .range(0, 9999);
+
+      if (error) {
+        console.warn('[loadImportHistory]', error.message);
+        tbody.innerHTML = '<tr><td colspan="4">Lỗi tải lịch sử import.</td></tr>';
+        return;
+      }
+
+      const rows = data || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">Chưa có lượt import nào.</div></td></tr>';
+        return;
+      }
+
+      // sellout_data chưa có cột riêng lưu "ai bấm import" / "import lúc nào theo
+      // lượt" — nên gom theo ngày tạo dòng (created_at) làm 1 "lượt import",
+      // và hiển thị "người import" = chủ sở hữu data (assigned_to) vì đó là
+      // thông tin gần nhất đang có. Nếu cần chính xác hơn (ai bấm nút, không
+      // phải data của ai) thì cần thêm cột imported_by — ngoài phạm vi hôm nay.
+      const groups = {};
+      rows.forEach((r) => {
+        const day = (r.created_at || '').slice(0, 10);
+        if (!day) return;
+        if (!groups[day]) groups[day] = { count: 0, quarters: new Set() };
+        groups[day].count += 1;
+        if (r.sale_date) {
+          const d = new Date(r.sale_date);
+          groups[day].quarters.add(`${d.getUTCFullYear()} Q${Math.floor(d.getUTCMonth() / 3) + 1}`);
+        }
+      });
+
+      const emp = EMPLOYEES.find((e) => e.id === targetId);
+      const importerName = emp ? emp.name : (currentUser.id === targetId ? currentUser.name : targetId);
+
+      const days = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+      tbody.innerHTML = days.map((day) => {
+        const g = groups[day];
+        return `<tr>
+          <td>${fmtImportDate(day)}</td>
+          <td>${importerName}</td>
+          <td class="kpi-col-num">${g.count}</td>
+          <td>${[...g.quarters].sort().join(', ') || '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function loadDataSourceTab() {
+      if (!currentUser) return;
+      populateDataSourceEmployeeSelect();
+      loadImportHistory();
+    }
+    tabLoaders['tab-data-source'] = loadDataSourceTab;
+
     /* --- Import / Export Excel sellout_data của chính nhân viên --- */
     function excelSerialToISODate(serial) {
       if (!serial) return null;
@@ -2954,7 +3084,11 @@
       selloutImportInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         event.target.value = '';
-        if (!file || !currentUser) return;
+        const targetUserId = getDataSourceTargetUserId();
+        if (!file || !currentUser || !targetUserId) {
+          if (file && !targetUserId) setSelloutMessage('Vui lòng chọn nhân viên trước khi import.', 'error');
+          return;
+        }
 
         setSelloutMessage('Đang đọc file...', 'info');
         try {
@@ -2976,7 +3110,7 @@
             .map((row) => ({
               sale_date: excelSerialToISODate(row['Date']),
               customer_name: row['Customer Name'] ?? null,
-              assigned_to: currentUser.id,
+              assigned_to: targetUserId,
               lob: row['LOB'] ?? null,
               disty: row['Disty'] ?? null,
               model: row['Model'] ?? null,
@@ -2996,7 +3130,7 @@
           const { data: existingRows, error: existErr } = await sb
             .from('sellout_data')
             .select('sale_date')
-            .eq('assigned_to', currentUser.id)
+            .eq('assigned_to', targetUserId)
             .in('sale_date', datesInFile);
 
           if (existErr) {
@@ -3031,6 +3165,7 @@
           }
 
           setSelloutMessage(`Đã import thành công ${insertedTotal} dòng.`, 'success');
+          loadImportHistory();
         } catch (err) {
           setSelloutMessage('Lỗi đọc file: ' + err.message, 'error');
         }
@@ -3039,13 +3174,17 @@
 
     if (selloutExportBtn) {
       selloutExportBtn.addEventListener('click', async () => {
-        if (!currentUser) return;
+        const targetUserId = getDataSourceTargetUserId();
+        if (!currentUser || !targetUserId) {
+          setSelloutMessage('Vui lòng chọn nhân viên trước khi export.', 'error');
+          return;
+        }
         setSelloutMessage('Đang tải dữ liệu để export...', 'info');
 
         const { data, error } = await sb
           .from('sellout_data')
           .select('*')
-          .eq('assigned_to', currentUser.id)
+          .eq('assigned_to', targetUserId)
           .order('sale_date', { ascending: true });
 
         if (error) {
@@ -3057,6 +3196,7 @@
           return;
         }
 
+        const targetName = EMPLOYEES.find((e) => e.id === targetUserId)?.name || currentUser.name;
         const exportRows = data.map((r) => {
           const [y, m, dd] = r.sale_date.split('-').map(Number);
           const d = new Date(y, m - 1, dd);
@@ -3066,7 +3206,7 @@
             'Week': getISOWeek(d),
             'Year': `Y${d.getFullYear()}`,
             'Customer Name': r.customer_name,
-            'Sales': currentUser.name,
+            'Sales': targetName,
             'LOB': r.lob,
             'Disty': r.disty,
             'Model': r.model,
@@ -3080,7 +3220,7 @@
         const ws = XLSX.utils.json_to_sheet(exportRows);
         const wbOut = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wbOut, ws, 'Data');
-        XLSX.writeFile(wbOut, `sellout_${currentUser.name}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(wbOut, `sellout_${targetName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
         setSelloutMessage(`Đã export ${exportRows.length} dòng.`, 'success');
       });
