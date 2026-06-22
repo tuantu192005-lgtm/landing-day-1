@@ -3061,6 +3061,20 @@
       console.log('[import debug] Các giá trị "Sales" riêng biệt đọc được từ file:', Object.values(distinct));
     }
 
+    // Tìm giá trị cột theo danh sách tên cột có thể có (so khớp không phân
+    // biệt hoa/thường, bỏ khoảng trắng đầu/cuối) — dùng để tự nhận diện cột
+    // Invoice/Số HĐ trong file Excel, vì tên cột có thể không khớp 100%.
+    function findColumnValue(row, candidates) {
+      const keys = Object.keys(row);
+      for (const cand of candidates) {
+        const found = keys.find((k) => k.trim().toLowerCase() === cand.toLowerCase());
+        if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== '') {
+          return row[found];
+        }
+      }
+      return null;
+    }
+
     function getExportTargetUserId() {
       if (!currentUser) return null;
       if (currentUser.role === 'admin') {
@@ -3245,7 +3259,8 @@
               quantity: Number(row['Quantity']) || 0,
               platform: row['Platform'] ?? null,
               details_chipset: row['Details Chipset'] ?? null,
-              form_factor: row['Form Factor'] ?? null
+              form_factor: row['Form Factor'] ?? null,
+              invoice_number: findColumnValue(row, ['Invoice', 'Số HĐ', 'invoice_number'])
             });
           });
 
@@ -3259,37 +3274,63 @@
             return;
           }
 
-          // Check trùng theo đúng cặp assigned_to + sale_date (1 file có thể
-          // chứa nhiều nhân viên, không thể chỉ check theo sale_date đơn lẻ).
-          const empIdsInFile = [...new Set(parsedRows.map((r) => r.assigned_to))];
-          const datesInFile = [...new Set(parsedRows.map((r) => r.sale_date))];
-          const { data: existingRows, error: existErr } = await sb
-            .from('sellout_data')
-            .select('assigned_to, sale_date')
-            .in('assigned_to', empIdsInFile)
-            .in('sale_date', datesInFile);
+          // Dedup NỘI BỘ FILE trước khi insert: 2 dòng cùng (customer_name,
+          // sale_date, lob, disty, model, quantity) trong CHÍNH file này thì
+          // chỉ giữ 1 dòng — đây là nguyên nhân chính gây ghi trùng lần trước
+          // (file Excel tự nó có dòng lặp, code cũ không hề check việc này).
+          const fileDedupKey = (r) => [r.customer_name, r.sale_date, r.lob, r.disty, r.model, r.quantity]
+            .map((v) => (v === null || v === undefined ? '' : String(v).trim())).join('|');
+          const seenInFile = new Set();
+          let duplicateInFileCount = 0;
+          const dedupedRows = [];
+          parsedRows.forEach((r) => {
+            const key = fileDedupKey(r);
+            if (seenInFile.has(key)) { duplicateInFileCount += 1; return; }
+            seenInFile.add(key);
+            dedupedRows.push(r);
+          });
+
+          // Check trùng với DATA ĐÃ CÓ TRONG DB theo đúng đủ 7 trường (assigned_to
+          // + sale_date + customer_name + lob + disty + model + quantity) — không
+          // chỉ assigned_to+sale_date như trước (quá thô, dễ báo trùng nhầm khi
+          // 1 người có nhiều đơn khác nhau cùng ngày).
+          const dbCompareKey = (r) => [r.assigned_to, r.sale_date, r.customer_name, r.lob, r.disty, r.model, r.quantity]
+            .map((v) => (v === null || v === undefined ? '' : String(v).trim())).join('|');
+          const empIdsInFile = [...new Set(dedupedRows.map((r) => r.assigned_to))];
+          const datesInFile = [...new Set(dedupedRows.map((r) => r.sale_date))];
+          const { data: existingRows, error: existErr } = await fetchAllPages((from, to) =>
+            sb.from('sellout_data')
+              .select('assigned_to, sale_date, customer_name, lob, disty, model, quantity')
+              .in('assigned_to', empIdsInFile)
+              .in('sale_date', datesInFile)
+              .range(from, to)
+          );
 
           if (existErr) {
             setSelloutMessage('Lỗi kiểm tra dữ liệu trùng: ' + existErr.message, 'error');
             return;
           }
 
-          const existingKeySet = new Set((existingRows || []).map((r) => `${r.assigned_to}|${r.sale_date}`));
-          const overlapCount = parsedRows.filter((r) => existingKeySet.has(`${r.assigned_to}|${r.sale_date}`)).length;
+          const existingKeySet = new Set((existingRows || []).map(dbCompareKey));
+          const overlapCount = dedupedRows.filter((r) => existingKeySet.has(dbCompareKey(r))).length;
 
           // QUAN TRỌNG: Cancel chỉ bỏ qua đúng các dòng trùng, KHÔNG huỷ toàn
           // bộ import — nếu không, dữ liệu hợp lệ của các nhân viên khác
           // (không trùng) cũng bị mất theo, dù không liên quan gì đến phần trùng.
-          let rowsToInsert = parsedRows;
+          // Vẫn giữ cả 2 lựa chọn (không bỏ nút "nhập kể cả trùng") vì có thể
+          // đây thật ra là 2 đơn hàng khác nhau, không hẳn là lỗi.
+          let rowsToInsert = dedupedRows;
           let skippedDuplicate = 0;
           if (overlapCount > 0) {
             const proceed = window.confirm(
-              `Phát hiện ${overlapCount} dòng trùng (assigned_to + sale_date) với dữ liệu đã có.\n\n` +
-              `OK = Import tất cả, kể cả ${overlapCount} dòng trùng (có thể tạo dữ liệu lặp).\n` +
-              `Cancel = Chỉ bỏ qua ${overlapCount} dòng trùng, vẫn import phần còn lại.`
+              `Phát hiện ${overlapCount} dòng có thể trùng với data đã có ` +
+              `(cùng nhân viên, ngày, khách hàng, LOB, NPP, model, số lượng).\n\n` +
+              `Lưu ý: có thể là 2 đơn hàng khác nhau cùng ngày, cùng mã — không chắc là lỗi.\n\n` +
+              `OK = Nhập tất cả, kể cả ${overlapCount} dòng này (có thể tạo dữ liệu lặp nếu đúng là trùng thật).\n` +
+              `Cancel = Bỏ qua ${overlapCount} dòng này, chỉ nhập phần còn lại.`
             );
             if (!proceed) {
-              rowsToInsert = parsedRows.filter((r) => !existingKeySet.has(`${r.assigned_to}|${r.sale_date}`));
+              rowsToInsert = dedupedRows.filter((r) => !existingKeySet.has(dbCompareKey(r)));
               skippedDuplicate = overlapCount;
             }
           }
@@ -3299,17 +3340,6 @@
             return;
           }
 
-          // ── TẠM KHOÁ IMPORT (đang debug lỗi ghi double dữ liệu) ──
-          // KHÔNG insert gì cả cho tới khi xác định xong nguyên nhân và được
-          // duyệt cách sửa. Đoạn insert thật được giữ lại dạng comment ở dưới
-          // để khôi phục nguyên trạng sau khi fix xong.
-          setSelloutMessage(
-            'Import đang TẠM KHOÁ để xử lý sự cố dữ liệu bị ghi trùng (double). ' +
-            'Vui lòng không import lúc này — sẽ mở lại sau khi xác định và sửa xong nguyên nhân.',
-            'error'
-          );
-          return;
-          /*
           setSelloutMessage('Đang import...', 'info');
           const BATCH = 500;
           let insertedTotal = 0;
@@ -3322,9 +3352,9 @@
             }
             insertedTotal += batch.length;
           }
-          */
 
           let msg = `Đã import thành công ${insertedTotal} dòng.`;
+          if (duplicateInFileCount) msg += ` Đã loại ${duplicateInFileCount} dòng trùng nội bộ trong file.`;
           if (skippedDuplicate) msg += ` Đã bỏ qua ${skippedDuplicate} dòng trùng dữ liệu cũ.`;
           if (skippedUnmapped) {
             msg += ` ${skippedUnmapped} dòng bỏ qua vì không nhận ra tên nhân viên: ${[...unmappedNames].join(', ')}.`;
