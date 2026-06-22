@@ -1229,6 +1229,18 @@
       color: var(--navy-strong);
     }
 
+    .msi-compare-line {
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-top: 2px;
+      min-height: 1em;
+    }
+
+    .msi-compare-line .up   { color: #1c9a5b; }
+    .msi-compare-line .down { color: #c0392b; }
+    .msi-compare-line .flat,
+    .msi-compare-line .gray { color: var(--muted); font-weight: 500; }
+
     .msi-panel {
       background: var(--white);
       border: 1px solid var(--border);
@@ -1503,13 +1515,19 @@
         <select id="filterYear"><option value="">Tất cả</option></select>
       </div>
       <div class="msi-filter-item">
-        <label for="filterQuarter">Quý</label>
-        <select id="filterQuarter">
-          <option value="">Tất cả</option>
-          <option value="1">Q1</option>
-          <option value="2">Q2</option>
-          <option value="3">Q3</option>
-          <option value="4">Q4</option>
+        <label for="filterPeriod">Kỳ báo cáo</label>
+        <select id="filterPeriod">
+          <option value="this_week">Tuần này</option>
+          <option value="last_week">Tuần trước</option>
+          <option value="this_month">Tháng này</option>
+          <option value="last_month">Tháng trước</option>
+          <option value="q1">Q1</option>
+          <option value="q2">Q2</option>
+          <option value="q3">Q3</option>
+          <option value="q4">Q4</option>
+          <option value="h1">H1</option>
+          <option value="h2">H2</option>
+          <option value="full_year" selected>Cả năm</option>
         </select>
       </div>
       <div class="msi-filter-item">
@@ -1540,44 +1558,48 @@
         <div id="summariesContent">
           <div class="msi-kpi-grid">
             <div class="msi-kpi-card">
-              <span class="msi-kpi-lbl">Sell-out (QTD)</span>
+              <span class="msi-kpi-lbl">Sell-out</span>
               <strong class="msi-kpi-val" id="kpiSellOut">—</strong>
+              <div class="msi-compare-line" id="kpiSellOutCompare"></div>
             </div>
             <div class="msi-kpi-card">
-              <span class="msi-kpi-lbl">Target (QTD)</span>
+              <span class="msi-kpi-lbl">Target</span>
               <strong class="msi-kpi-val" id="kpiTarget">—</strong>
+              <div class="msi-compare-line" id="kpiTargetCompare"></div>
             </div>
             <div class="msi-kpi-card">
               <span class="msi-kpi-lbl">% Achievement</span>
               <strong class="msi-kpi-val" id="kpiAchievement">—</strong>
+              <div class="msi-compare-line" id="kpiAchievementCompare"></div>
             </div>
             <div class="msi-kpi-card">
               <span class="msi-kpi-lbl">Top LOB</span>
               <strong class="msi-kpi-val" id="kpiTopLob">—</strong>
+              <div class="msi-compare-line" id="kpiTopLobCompare"></div>
             </div>
           </div>
 
           <div class="msi-chart-row">
             <div class="msi-panel msi-chart-panel">
-              <h3>Sell-Out theo tháng</h3>
-              <p class="msi-panel-note">Sell-out thật theo tháng trong quý — mỗi line là 1 LOB. Chưa có Sell-in nên không vẽ line SI.</p>
+              <h3>Sell-Out theo LOB</h3>
+              <p class="msi-panel-note" id="summariesMonthChartNote">Sell-out thật theo thời gian trong kỳ — mỗi line là 1 LOB. Chưa có Sell-in nên không vẽ line SI.</p>
               <div class="msi-chart-wrap"><canvas id="summariesMonthChart"></canvas></div>
             </div>
             <div class="msi-panel msi-chart-panel">
-              <h3>Sell-Out theo tuần</h3>
-              <p class="msi-panel-note">Tuần tính theo ISO week của sale_date — mỗi cột màu theo NPP.</p>
+              <h3>Sell-Out theo NPP</h3>
+              <p class="msi-panel-note" id="summariesWeekChartNote">Mỗi cột màu theo NPP.</p>
               <div class="msi-chart-wrap"><canvas id="summariesWeekChart"></canvas></div>
             </div>
           </div>
 
           <div class="msi-progress-row" id="summariesProgressRow">
             <div class="msi-panel msi-progress-card" id="progressCardTeam">
-              <h3 id="progressTeamTitle">Quarter Target Progress — Toàn team</h3>
+              <h3 id="progressTeamTitle">Target Progress — Toàn team</h3>
               <div class="msi-progress-track"><div class="msi-progress-fill" id="progressTeamFill"></div></div>
               <div class="msi-progress-nums" id="progressTeamNums">—</div>
             </div>
             <div class="msi-panel msi-progress-card hidden" id="progressCardSelf">
-              <h3>Quarter Target Progress — Cá nhân (bạn)</h3>
+              <h3>Target Progress — Cá nhân (bạn)</h3>
               <div class="msi-progress-track"><div class="msi-progress-fill" id="progressSelfFill"></div></div>
               <div class="msi-progress-nums" id="progressSelfNums">—</div>
             </div>
@@ -1782,7 +1804,7 @@
     // ══ MSI APP SHELL: menu ngang, bộ lọc Năm/Quý/NPP/LOB, 4 tab ══
     // Bộ lọc + phân quyền dùng chung cho mọi tab — nội dung từng tab sẽ
     // được xây ở bước 2-5, dùng lại getMsiFilters()/scopeByRole() ở đây.
-    const msiFilters = { year: '', quarter: '', npp: '', lob: '' };
+    const msiFilters = { year: '', period: 'full_year', npp: '', lob: '' };
     let msiAppInitialized = false;
     const tabLoaders = {}; // gắn ở bước 2-5: { 'tab-summaries': loadSummariesDashboard, ... }
 
@@ -1837,12 +1859,12 @@
     }
 
     function initMsiFilterEvents() {
-      ['filterYear', 'filterQuarter', 'filterNpp', 'filterLob'].forEach((id) => {
+      ['filterYear', 'filterPeriod', 'filterNpp', 'filterLob'].forEach((id) => {
         document.getElementById(id)?.addEventListener('change', () => {
-          msiFilters.year    = document.getElementById('filterYear').value;
-          msiFilters.quarter = document.getElementById('filterQuarter').value;
-          msiFilters.npp     = document.getElementById('filterNpp').value;
-          msiFilters.lob     = document.getElementById('filterLob').value;
+          msiFilters.year   = document.getElementById('filterYear').value;
+          msiFilters.period = document.getElementById('filterPeriod').value;
+          msiFilters.npp    = document.getElementById('filterNpp').value;
+          msiFilters.lob    = document.getElementById('filterLob').value;
           document.dispatchEvent(new CustomEvent('msi:filters-changed', { detail: getMsiFilters() }));
           reloadActiveTab();
         });
@@ -1880,22 +1902,16 @@
       tabLoaders['tab-summaries']?.();
     }
 
-    // ══ TAB SUMMARIES DASHBOARD (bước 2) ══════════════════════
-    // "QTD" mặc định = quý hiện tại theo ngày thực; nếu người dùng chọn
-    // Năm/Quý trên bộ lọc thì dùng đúng giá trị đó thay cho mặc định.
+    // ══ TAB SUMMARIES DASHBOARD ══════════════════════════════
+    // Kỳ báo cáo linh hoạt (tuần/tháng/quý/nửa năm/cả năm) thay cho Năm+Quý
+    // cố định trước đây. Tuần/tháng luôn tính theo ngày thực hôm nay (không
+    // phụ thuộc dropdown Năm) — đúng nghĩa "tuần này"/"tháng này".
     let summariesMonthChartInstance = null;
     let summariesWeekChartInstance = null;
     const MSI_CHART_COLORS = ['#102a4e', '#2a4d7c', '#5b86b5', '#9db9dd', '#e8b43a', '#7c4a1e', '#0c4a6e', '#831843', '#14532d', '#4c1d95'];
 
     function getCurrentQuarterNumber(date = new Date()) {
       return Math.floor(date.getMonth() / 3) + 1;
-    }
-
-    function getEffectiveYearQuarter() {
-      const now = new Date();
-      const year = parseInt(msiFilters.year, 10) || now.getFullYear();
-      const quarter = parseInt(msiFilters.quarter, 10) || getCurrentQuarterNumber(now);
-      return { year, quarter };
     }
 
     function getQuarterDateRange(year, quarter) {
@@ -1905,8 +1921,136 @@
       return { startISO: start.toISOString().slice(0, 10), endISO: end.toISOString().slice(0, 10) };
     }
 
-    function buildSummariesSelloutQuery(year, quarter) {
-      const { startISO, endISO } = getQuarterDateRange(year, quarter);
+    function toISODateUTC(date) {
+      return date.toISOString().slice(0, 10);
+    }
+
+    function addDaysUTC(date, days) {
+      const d = new Date(date);
+      d.setUTCDate(d.getUTCDate() + days);
+      return d;
+    }
+
+    function addMonthsUTC(date, months) {
+      return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+    }
+
+    function startOfISOWeekUTC(date) {
+      const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+      const dayNum = (d.getUTCDay() + 6) % 7; // Mon=0..Sun=6
+      d.setUTCDate(d.getUTCDate() - dayNum);
+      return d;
+    }
+
+    const REPORT_PERIOD_LABELS = {
+      this_week: 'Tuần này', last_week: 'Tuần trước',
+      this_month: 'Tháng này', last_month: 'Tháng trước',
+      q1: 'Q1', q2: 'Q2', q3: 'Q3', q4: 'Q4',
+      h1: 'H1', h2: 'H2', full_year: 'Cả năm'
+    };
+    const PREVIOUS_PERIOD_LABELS = {
+      this_week: 'tuần trước', last_week: 'tuần trước nữa',
+      this_month: 'tháng trước', last_month: 'tháng trước nữa',
+      q1: 'Q4 năm trước', q2: 'Q1', q3: 'Q2', q4: 'Q3',
+      h1: 'H2 năm trước', h2: 'H1', full_year: 'năm trước'
+    };
+
+    function getPeriodDisplayLabel(periodType, year) {
+      if (/^q[1-4]$/.test(periodType)) return `${periodType.toUpperCase()}/${year}`;
+      if (periodType === 'h1' || periodType === 'h2') return `${periodType.toUpperCase()}/${year}`;
+      if (periodType === 'full_year') return `năm ${year}`;
+      return REPORT_PERIOD_LABELS[periodType] || 'kỳ này';
+    }
+
+    // year chỉ dùng cho q1-q4/h1/h2/full_year; tuần/tháng luôn lấy theo ngày
+    // thực hôm nay.
+    function getReportPeriodRange(periodType, year) {
+      const now = new Date();
+      const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+
+      switch (periodType) {
+        case 'this_week': {
+          const start = startOfISOWeekUTC(today);
+          return { start, end: addDaysUTC(start, 7), axisType: 'day-of-week' };
+        }
+        case 'last_week': {
+          const thisStart = startOfISOWeekUTC(today);
+          return { start: addDaysUTC(thisStart, -7), end: thisStart, axisType: 'day-of-week' };
+        }
+        case 'this_month': {
+          const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+          return { start, end: addMonthsUTC(start, 1), axisType: 'day-of-month' };
+        }
+        case 'last_month': {
+          const thisStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+          return { start: addMonthsUTC(thisStart, -1), end: thisStart, axisType: 'day-of-month' };
+        }
+        case 'q1': case 'q2': case 'q3': case 'q4': {
+          const qNum = parseInt(periodType.slice(1), 10);
+          const { startISO, endISO } = getQuarterDateRange(year, qNum);
+          return { start: new Date(`${startISO}T00:00:00Z`), end: new Date(`${endISO}T00:00:00Z`), axisType: 'month' };
+        }
+        case 'h1':
+          return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year, 6, 1)), axisType: 'month' };
+        case 'h2':
+          return { start: new Date(Date.UTC(year, 6, 1)), end: new Date(Date.UTC(year + 1, 0, 1)), axisType: 'month' };
+        case 'full_year':
+        default:
+          return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)), axisType: 'month' };
+      }
+    }
+
+    function getPreviousPeriodRange(periodType, year) {
+      switch (periodType) {
+        case 'this_week': return getReportPeriodRange('last_week', year);
+        case 'last_week': {
+          const cur = getReportPeriodRange('last_week', year);
+          return { start: addDaysUTC(cur.start, -7), end: cur.start, axisType: cur.axisType };
+        }
+        case 'this_month': return getReportPeriodRange('last_month', year);
+        case 'last_month': {
+          const cur = getReportPeriodRange('last_month', year);
+          return { start: addMonthsUTC(cur.start, -1), end: cur.start, axisType: cur.axisType };
+        }
+        case 'q1': return getReportPeriodRange('q4', year - 1);
+        case 'q2': return getReportPeriodRange('q1', year);
+        case 'q3': return getReportPeriodRange('q2', year);
+        case 'q4': return getReportPeriodRange('q3', year);
+        case 'h1': return getReportPeriodRange('h2', year - 1);
+        case 'h2': return getReportPeriodRange('h1', year);
+        case 'full_year':
+        default: return getReportPeriodRange('full_year', year - 1);
+      }
+    }
+
+    // Quy về danh sách quarter "YYYY QN" giao với [start,end) — targets/
+    // v_kpi_achieved vốn chỉ lưu theo quý, nên mọi loại kỳ báo cáo (kể cả
+    // tuần/tháng/H1/H2/cả năm không khớp đúng 1 quý) đều quy về tập quý này.
+    function getOverlappingQuarterStrings(start, end) {
+      const set = new Set();
+      let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+      while (cursor < end) {
+        const y = cursor.getUTCFullYear();
+        const q = Math.floor(cursor.getUTCMonth() / 3) + 1;
+        set.add(`${y} Q${q}`);
+        cursor = addMonthsUTC(cursor, 1);
+      }
+      return [...set];
+    }
+
+    // Sales & KPI tab (bảng D-J) cần ĐÚNG 1 quý cụ thể. Nếu kỳ báo cáo hiện
+    // tại là q1-q4 thì dùng luôn; còn lại (tuần/tháng/H1/H2/cả năm) lấy quý
+    // chứa ngày hôm nay làm fallback hợp lý (giữ hành vi mặc định cũ).
+    function getEffectiveSingleQuarter() {
+      const year = parseInt(msiFilters.year, 10) || new Date().getFullYear();
+      const period = msiFilters.period || 'full_year';
+      if (/^q[1-4]$/.test(period)) {
+        return { year, quarter: parseInt(period.slice(1), 10) };
+      }
+      return { year, quarter: getCurrentQuarterNumber() };
+    }
+
+    function buildSelloutRangeQuery(startISO, endISO) {
       return fetchAllPages((from, to) => {
         let q = sb.from('sellout_data')
           .select('sale_date, lob, disty, quantity')
@@ -1925,28 +2069,85 @@
       return Math.round(n || 0).toLocaleString('vi-VN');
     }
 
-    function renderSummariesKpiCards({ sellOutQty, targetQty, achievementPct, topLob }) {
-      document.getElementById('kpiSellOut').textContent = fmtQtyMsi(sellOutQty);
-      document.getElementById('kpiTarget').textContent = fmtQtyMsi(targetQty);
-      document.getElementById('kpiAchievement').textContent = achievementPct === null ? '—' : `${achievementPct.toFixed(1)}%`;
-      document.getElementById('kpiTopLob').textContent = topLob;
+    // Dòng nhỏ "▲ +12.3% so với tuần trước" dưới mỗi số chính của KPI card.
+    function renderCompareLine(elId, current, previous, hasPreviousData, previousLabel) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!hasPreviousData || current === null || previous === null || previous === undefined) {
+        el.innerHTML = '<span class="gray">Không có dữ liệu kỳ trước để so sánh</span>';
+        return;
+      }
+      if (previous === 0) {
+        el.innerHTML = current === 0
+          ? '<span class="flat">— Không đổi so với ' + previousLabel + '</span>'
+          : '<span class="up">▲ Mới so với ' + previousLabel + ' (kỳ trước = 0)</span>';
+        return;
+      }
+      const pct = ((current - previous) / previous) * 100;
+      const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
+      const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '—';
+      const sign = pct > 0 ? '+' : '';
+      el.innerHTML = `<span class="${cls}">${arrow} ${sign}${pct.toFixed(1)}% so với ${previousLabel}</span>`;
     }
 
-    function renderSummariesMonthChart(byMonth, year, quarter) {
+    function renderTopLobCompareLine(elId, current, previous, hasPreviousData, previousLabel) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!hasPreviousData || !previous || previous === '—') {
+        el.innerHTML = '<span class="gray">Không có dữ liệu kỳ trước để so sánh</span>';
+        return;
+      }
+      el.innerHTML = current === previous
+        ? `<span class="flat">— Không đổi so với ${previousLabel}</span>`
+        : `<span class="flat">— Khác ${previousLabel} (trước: ${previous})</span>`;
+    }
+
+    function renderSummariesKpiCards(current, previous, previousLabel) {
+      document.getElementById('kpiSellOut').textContent = fmtQtyMsi(current.sellOutQty);
+      document.getElementById('kpiTarget').textContent = fmtQtyMsi(current.targetQty);
+      document.getElementById('kpiAchievement').textContent = current.achievementPct === null ? '—' : `${current.achievementPct.toFixed(1)}%`;
+      document.getElementById('kpiTopLob').textContent = current.topLob;
+
+      renderCompareLine('kpiSellOutCompare', current.sellOutQty, previous.sellOutQty, previous.hasAnyData, previousLabel);
+      renderCompareLine('kpiTargetCompare', current.targetQty, previous.targetQty, previous.hasAnyData, previousLabel);
+      renderCompareLine('kpiAchievementCompare', current.achievementPct, previous.achievementPct, previous.hasAnyData, previousLabel);
+      renderTopLobCompareLine('kpiTopLobCompare', current.topLob, previous.topLob, previous.hasAnyData, previousLabel);
+    }
+
+    // Gom dữ liệu theo "bucket" thời gian phù hợp độ chi tiết của kỳ đang
+    // chọn: ngày-trong-tuần (T2-CN), ngày-trong-tháng, hoặc tháng.
+    function buildAxisBuckets(axisType, start, end) {
+      const keys = [];
+      if (axisType === 'month') {
+        let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+        while (cursor < end) {
+          keys.push(toISODateUTC(cursor).slice(0, 7));
+          cursor = addMonthsUTC(cursor, 1);
+        }
+        return { keys, labels: keys.map((k) => `Tháng ${parseInt(k.slice(5), 10)}`) };
+      }
+      const dowLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+      let cursor = new Date(start);
+      while (cursor < end) {
+        keys.push(toISODateUTC(cursor));
+        cursor = addDaysUTC(cursor, 1);
+      }
+      const labels = axisType === 'day-of-week'
+        ? keys.map((k) => dowLabels[(new Date(`${k}T00:00:00Z`).getUTCDay() + 6) % 7])
+        : keys.map((k) => String(parseInt(k.slice(8), 10)));
+      return { keys, labels };
+    }
+
+    function renderSummariesMonthChart(byBucket, axisType, start, end) {
       const canvas = document.getElementById('summariesMonthChart');
       if (!canvas) return;
-      const startMonth = (quarter - 1) * 3;
-      const monthKeys = [0, 1, 2].map((i) => {
-        const m = startMonth + i;
-        return `${year}-${String(m + 1).padStart(2, '0')}`;
-      });
-      const labels = monthKeys.map((k) => `Tháng ${parseInt(k.slice(5), 10)}`);
+      const { keys, labels } = buildAxisBuckets(axisType, start, end);
       const lobSet = new Set();
-      monthKeys.forEach((k) => Object.keys(byMonth[k] || {}).forEach((lob) => lobSet.add(lob)));
+      keys.forEach((k) => Object.keys(byBucket[k] || {}).forEach((lob) => lobSet.add(lob)));
       const lobs = [...lobSet].sort();
       const datasets = lobs.map((lob, i) => ({
         label: lob,
-        data: monthKeys.map((k) => (byMonth[k] || {})[lob] || 0),
+        data: keys.map((k) => (byBucket[k] || {})[lob] || 0),
         borderColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
         backgroundColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
         tension: 0.25,
@@ -1960,17 +2161,16 @@
       });
     }
 
-    function renderSummariesWeekChart(byWeek) {
+    function renderSummariesWeekChart(byBucket, axisType, start, end) {
       const canvas = document.getElementById('summariesWeekChart');
       if (!canvas) return;
-      const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
-      const labels = weeks.map((w) => `Tuần ${w}`);
+      const { keys, labels } = buildAxisBuckets(axisType, start, end);
       const nppSet = new Set();
-      weeks.forEach((w) => Object.keys(byWeek[w] || {}).forEach((npp) => nppSet.add(npp)));
+      keys.forEach((k) => Object.keys(byBucket[k] || {}).forEach((npp) => nppSet.add(npp)));
       const npps = [...nppSet].sort();
       const datasets = npps.map((npp, i) => ({
         label: npp,
-        data: weeks.map((w) => (byWeek[w] || {})[npp] || 0),
+        data: keys.map((k) => (byBucket[k] || {})[npp] || 0),
         backgroundColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length]
       }));
       if (summariesWeekChartInstance) summariesWeekChartInstance.destroy();
@@ -1997,30 +2197,43 @@
       nums.textContent = `${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)} (${pct.toFixed(1)}%)`;
     }
 
-    async function renderSummariesProgress(year, quarter, quarterStr) {
+    async function renderSummariesProgress(quarterStrings) {
       const isAdmin = currentUser && currentUser.role === 'admin';
       document.getElementById('progressTeamTitle').textContent = isAdmin
-        ? 'Quarter Target Progress — Toàn team'
-        : 'Quarter Target Progress';
+        ? 'Target Progress — Toàn team'
+        : 'Target Progress';
       document.getElementById('progressCardSelf')?.classList.toggle('hidden', !isAdmin);
 
+      if (!quarterStrings.length) {
+        renderProgressCard('progressTeamFill', 'progressTeamNums', 0, 0);
+        if (isAdmin) renderProgressCard('progressSelfFill', 'progressSelfNums', 0, 0);
+        return;
+      }
+
+      const yearQuarterPairs = quarterStrings.map((qs) => {
+        const [y, qLabel] = qs.split(' ');
+        return { year: parseInt(y, 10), quarter: parseInt(qLabel.slice(1), 10) };
+      });
+      const matchesQuarter = (r) => yearQuarterPairs.some((p) => p.year === r.year && p.quarter === r.quarter);
+
       const queries = [
-        scopeByRole(sb.from('v_kpi_achieved').select('achieved_qty').eq('year', year).eq('quarter', quarter)),
-        scopeByRole(sb.from('targets').select('target_qty').eq('quarter', quarterStr))
+        scopeByRole(sb.from('v_kpi_achieved').select('achieved_qty, year, quarter')),
+        scopeByRole(sb.from('targets').select('target_qty, quarter').in('quarter', quarterStrings))
       ];
       if (isAdmin) {
         queries.push(
-          sb.from('v_kpi_achieved').select('achieved_qty').eq('year', year).eq('quarter', quarter).eq('assigned_to', currentUser.id),
-          sb.from('targets').select('target_qty').eq('quarter', quarterStr).eq('assigned_to', currentUser.id)
+          sb.from('v_kpi_achieved').select('achieved_qty, year, quarter').eq('assigned_to', currentUser.id),
+          sb.from('targets').select('target_qty, quarter').in('quarter', quarterStrings).eq('assigned_to', currentUser.id)
         );
       }
       const results = await Promise.all(queries);
-      const teamAchieved = (results[0].data || []).reduce((s, r) => s + (r.achieved_qty || 0), 0);
+
+      const teamAchieved = (results[0].data || []).filter(matchesQuarter).reduce((s, r) => s + (r.achieved_qty || 0), 0);
       const teamTarget = (results[1].data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
       renderProgressCard('progressTeamFill', 'progressTeamNums', teamAchieved, teamTarget);
 
       if (isAdmin) {
-        const selfAchieved = (results[2].data || []).reduce((s, r) => s + (r.achieved_qty || 0), 0);
+        const selfAchieved = (results[2].data || []).filter(matchesQuarter).reduce((s, r) => s + (r.achieved_qty || 0), 0);
         const selfTarget = (results[3].data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
         renderProgressCard('progressSelfFill', 'progressSelfNums', selfAchieved, selfTarget);
       }
@@ -2041,45 +2254,33 @@
       }).join('');
     }
 
-    async function loadSummariesDashboard() {
-      if (!currentUser) return;
-      const { year, quarter } = getEffectiveYearQuarter();
-      const quarterStr = `${year} Q${quarter}`;
+    // Tính sellOutQty/targetQty/achievementPct/topLob/breakdown cho 1 khoảng
+    // [start,end) cụ thể — dùng chung cho cả kỳ hiện tại và kỳ trước (so sánh).
+    async function computeSummariesMetrics(start, end) {
+      const startISO = toISODateUTC(start);
+      const endISO = toISODateUTC(end);
+      const quarterStrings = getOverlappingQuarterStrings(start, end);
 
       const [{ data: rows, error: rowsErr }, { data: targetRows, error: targetErr }] = await Promise.all([
-        buildSummariesSelloutQuery(year, quarter),
-        scopeByRole(sb.from('targets').select('target_qty').eq('quarter', quarterStr))
+        buildSelloutRangeQuery(startISO, endISO),
+        quarterStrings.length
+          ? scopeByRole(sb.from('targets').select('target_qty').in('quarter', quarterStrings))
+          : Promise.resolve({ data: [], error: null })
       ]);
       if (rowsErr) console.warn('[summaries sellout]', rowsErr.message);
       if (targetErr) console.warn('[summaries targets]', targetErr.message);
 
       const data = rows || [];
       const targetQty = (targetRows || []).reduce((s, t) => s + (t.target_qty || 0), 0);
-
-      // Không có dòng sellout nào VÀ không có target nào cho đúng năm+quý đang
-      // chọn => dừng hẳn ở đây, hiện empty state. KHÔNG fallback/hiện lại số
-      // liệu của kỳ trước đó (vì các hàm render bên dưới sẽ không được gọi).
-      const emptyState = document.getElementById('summariesEmptyState');
-      const content = document.getElementById('summariesContent');
-      if (!data.length && targetQty === 0) {
-        if (emptyState) {
-          document.getElementById('summariesEmptyMsg').textContent =
-            `Không có dữ liệu cho Q${quarter}/${year}. Hãy chọn kỳ khác hoặc import dữ liệu cho kỳ này.`;
-          emptyState.classList.remove('hidden');
-        }
-        content?.classList.add('hidden');
-        return;
-      }
-      emptyState?.classList.add('hidden');
-      content?.classList.remove('hidden');
-
       const sellOutQty = data.reduce((s, r) => s + (r.quantity || 0), 0);
       const achievementPct = targetQty > 0 ? (sellOutQty / targetQty) * 100 : null;
 
       const byLob = {};
       const byNpp = {};
-      const byMonth = {};
-      const byWeek = {};
+      const byBucketMonth = {};
+      const byBucketMonthNpp = {};
+      const byBucketDay = {};
+      const byBucketDayNpp = {};
 
       data.forEach((r) => {
         const qty = r.quantity || 0;
@@ -2088,24 +2289,80 @@
         byLob[lob] = (byLob[lob] || 0) + qty;
         byNpp[npp] = (byNpp[npp] || 0) + qty;
         if (r.sale_date) {
-          const d = new Date(r.sale_date);
-          const monthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-          byMonth[monthKey] = byMonth[monthKey] || {};
-          byMonth[monthKey][lob] = (byMonth[monthKey][lob] || 0) + qty;
-          const week = getISOWeek(d);
-          byWeek[week] = byWeek[week] || {};
-          byWeek[week][npp] = (byWeek[week][npp] || 0) + qty;
+          const monthKey = r.sale_date.slice(0, 7);
+          byBucketMonth[monthKey] = byBucketMonth[monthKey] || {};
+          byBucketMonth[monthKey][lob] = (byBucketMonth[monthKey][lob] || 0) + qty;
+          byBucketMonthNpp[monthKey] = byBucketMonthNpp[monthKey] || {};
+          byBucketMonthNpp[monthKey][npp] = (byBucketMonthNpp[monthKey][npp] || 0) + qty;
+          byBucketDay[r.sale_date] = byBucketDay[r.sale_date] || {};
+          byBucketDay[r.sale_date][lob] = (byBucketDay[r.sale_date][lob] || 0) + qty;
+          byBucketDayNpp[r.sale_date] = byBucketDayNpp[r.sale_date] || {};
+          byBucketDayNpp[r.sale_date][npp] = (byBucketDayNpp[r.sale_date][npp] || 0) + qty;
         }
       });
 
       const topLob = Object.entries(byLob).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
 
-      renderSummariesKpiCards({ sellOutQty, targetQty, achievementPct, topLob });
-      renderSummariesMonthChart(byMonth, year, quarter);
-      renderSummariesWeekChart(byWeek);
-      await renderSummariesProgress(year, quarter, quarterStr);
-      renderBreakdownTable('breakdownNpp', byNpp, sellOutQty);
-      renderBreakdownTable('breakdownLob', byLob, sellOutQty);
+      return {
+        sellOutQty, targetQty, achievementPct, topLob,
+        byLob, byNpp, byBucketMonth, byBucketMonthNpp, byBucketDay, byBucketDayNpp,
+        quarterStrings, hasAnyData: data.length > 0 || targetQty > 0
+      };
+    }
+
+    async function loadSummariesDashboard() {
+      if (!currentUser) return;
+      const year = parseInt(msiFilters.year, 10) || new Date().getFullYear();
+      const periodType = msiFilters.period || 'full_year';
+      const { start, end, axisType } = getReportPeriodRange(periodType, year);
+      const prevRange = getPreviousPeriodRange(periodType, year);
+      const previousLabel = PREVIOUS_PERIOD_LABELS[periodType] || 'kỳ trước';
+
+      const [current, previous] = await Promise.all([
+        computeSummariesMetrics(start, end),
+        computeSummariesMetrics(prevRange.start, prevRange.end)
+      ]);
+
+      // Không có dữ liệu (sellout VÀ target) cho đúng kỳ đang chọn => dừng
+      // hẳn, hiện empty state. KHÔNG fallback/hiện lại số liệu kỳ khác.
+      const emptyState = document.getElementById('summariesEmptyState');
+      const content = document.getElementById('summariesContent');
+      if (!current.hasAnyData) {
+        if (emptyState) {
+          document.getElementById('summariesEmptyMsg').textContent =
+            `Không có dữ liệu cho ${getPeriodDisplayLabel(periodType, year)}. Hãy chọn kỳ khác hoặc import dữ liệu cho kỳ này.`;
+          emptyState.classList.remove('hidden');
+        }
+        content?.classList.add('hidden');
+        return;
+      }
+      emptyState?.classList.add('hidden');
+      content?.classList.remove('hidden');
+
+      renderSummariesKpiCards(current, previous, previousLabel);
+
+      const monthNote = document.getElementById('summariesMonthChartNote');
+      const weekNote = document.getElementById('summariesWeekChartNote');
+      if (axisType === 'day-of-week') {
+        if (monthNote) monthNote.textContent = 'Sell-out theo ngày trong tuần (Thứ 2 → CN) — mỗi line là 1 LOB.';
+        if (weekNote) weekNote.textContent = 'Theo ngày trong tuần — mỗi cột màu theo NPP.';
+        renderSummariesMonthChart(current.byBucketDay, axisType, start, end);
+        renderSummariesWeekChart(current.byBucketDayNpp, axisType, start, end);
+      } else if (axisType === 'day-of-month') {
+        if (monthNote) monthNote.textContent = 'Sell-out theo ngày trong tháng — mỗi line là 1 LOB.';
+        if (weekNote) weekNote.textContent = 'Theo ngày trong tháng — mỗi cột màu theo NPP.';
+        renderSummariesMonthChart(current.byBucketDay, axisType, start, end);
+        renderSummariesWeekChart(current.byBucketDayNpp, axisType, start, end);
+      } else {
+        if (monthNote) monthNote.textContent = 'Sell-out theo tháng — mỗi line là 1 LOB. Chưa có Sell-in nên không vẽ line SI.';
+        if (weekNote) weekNote.textContent = 'Theo tháng — mỗi cột màu theo NPP.';
+        renderSummariesMonthChart(current.byBucketMonth, axisType, start, end);
+        renderSummariesWeekChart(current.byBucketMonthNpp, axisType, start, end);
+      }
+
+      await renderSummariesProgress(current.quarterStrings);
+      renderBreakdownTable('breakdownNpp', current.byNpp, current.sellOutQty);
+      renderBreakdownTable('breakdownLob', current.byLob, current.sellOutQty);
     }
     tabLoaders['tab-summaries'] = loadSummariesDashboard;
 
@@ -2802,7 +3059,7 @@
       if (!targetsBody || !employeeId) return;
       targetsBody.innerHTML = '<tr><td colspan="8">Đang tải...</td></tr>';
 
-      const { year, quarter } = getEffectiveYearQuarter();
+      const { year, quarter } = getEffectiveSingleQuarter();
       const quarterStr = `${year} Q${quarter}`;
 
       const { data, error } = await sb
