@@ -1532,59 +1532,66 @@
 
     <main class="msi-tab-content">
       <section class="msi-tab-pane active" id="tab-summaries">
-        <div class="msi-kpi-grid">
-          <div class="msi-kpi-card">
-            <span class="msi-kpi-lbl">Sell-out (QTD)</span>
-            <strong class="msi-kpi-val" id="kpiSellOut">—</strong>
-          </div>
-          <div class="msi-kpi-card">
-            <span class="msi-kpi-lbl">Target (QTD)</span>
-            <strong class="msi-kpi-val" id="kpiTarget">—</strong>
-          </div>
-          <div class="msi-kpi-card">
-            <span class="msi-kpi-lbl">% Achievement</span>
-            <strong class="msi-kpi-val" id="kpiAchievement">—</strong>
-          </div>
-          <div class="msi-kpi-card">
-            <span class="msi-kpi-lbl">Top LOB</span>
-            <strong class="msi-kpi-val" id="kpiTopLob">—</strong>
-          </div>
+        <div class="msi-placeholder hidden" id="summariesEmptyState">
+          <i class="fas fa-inbox"></i>
+          <p id="summariesEmptyMsg">Không có dữ liệu cho kỳ này.</p>
         </div>
 
-        <div class="msi-chart-row">
-          <div class="msi-panel msi-chart-panel">
-            <h3>Sell-Out theo tháng</h3>
-            <p class="msi-panel-note">Sell-out thật theo tháng trong quý — mỗi line là 1 LOB. Chưa có Sell-in nên không vẽ line SI.</p>
-            <div class="msi-chart-wrap"><canvas id="summariesMonthChart"></canvas></div>
+        <div id="summariesContent">
+          <div class="msi-kpi-grid">
+            <div class="msi-kpi-card">
+              <span class="msi-kpi-lbl">Sell-out (QTD)</span>
+              <strong class="msi-kpi-val" id="kpiSellOut">—</strong>
+            </div>
+            <div class="msi-kpi-card">
+              <span class="msi-kpi-lbl">Target (QTD)</span>
+              <strong class="msi-kpi-val" id="kpiTarget">—</strong>
+            </div>
+            <div class="msi-kpi-card">
+              <span class="msi-kpi-lbl">% Achievement</span>
+              <strong class="msi-kpi-val" id="kpiAchievement">—</strong>
+            </div>
+            <div class="msi-kpi-card">
+              <span class="msi-kpi-lbl">Top LOB</span>
+              <strong class="msi-kpi-val" id="kpiTopLob">—</strong>
+            </div>
           </div>
-          <div class="msi-panel msi-chart-panel">
-            <h3>Sell-Out theo tuần</h3>
-            <p class="msi-panel-note">Tuần tính theo ISO week của sale_date — mỗi cột màu theo NPP.</p>
-            <div class="msi-chart-wrap"><canvas id="summariesWeekChart"></canvas></div>
-          </div>
-        </div>
 
-        <div class="msi-progress-row" id="summariesProgressRow">
-          <div class="msi-panel msi-progress-card" id="progressCardTeam">
-            <h3 id="progressTeamTitle">Quarter Target Progress — Toàn team</h3>
-            <div class="msi-progress-track"><div class="msi-progress-fill" id="progressTeamFill"></div></div>
-            <div class="msi-progress-nums" id="progressTeamNums">—</div>
+          <div class="msi-chart-row">
+            <div class="msi-panel msi-chart-panel">
+              <h3>Sell-Out theo tháng</h3>
+              <p class="msi-panel-note">Sell-out thật theo tháng trong quý — mỗi line là 1 LOB. Chưa có Sell-in nên không vẽ line SI.</p>
+              <div class="msi-chart-wrap"><canvas id="summariesMonthChart"></canvas></div>
+            </div>
+            <div class="msi-panel msi-chart-panel">
+              <h3>Sell-Out theo tuần</h3>
+              <p class="msi-panel-note">Tuần tính theo ISO week của sale_date — mỗi cột màu theo NPP.</p>
+              <div class="msi-chart-wrap"><canvas id="summariesWeekChart"></canvas></div>
+            </div>
           </div>
-          <div class="msi-panel msi-progress-card hidden" id="progressCardSelf">
-            <h3>Quarter Target Progress — Cá nhân (bạn)</h3>
-            <div class="msi-progress-track"><div class="msi-progress-fill" id="progressSelfFill"></div></div>
-            <div class="msi-progress-nums" id="progressSelfNums">—</div>
-          </div>
-        </div>
 
-        <div class="msi-table-row">
-          <div class="msi-panel">
-            <h3>Sell-Out theo NPP</h3>
-            <div class="msi-breakdown-table" id="breakdownNpp"></div>
+          <div class="msi-progress-row" id="summariesProgressRow">
+            <div class="msi-panel msi-progress-card" id="progressCardTeam">
+              <h3 id="progressTeamTitle">Quarter Target Progress — Toàn team</h3>
+              <div class="msi-progress-track"><div class="msi-progress-fill" id="progressTeamFill"></div></div>
+              <div class="msi-progress-nums" id="progressTeamNums">—</div>
+            </div>
+            <div class="msi-panel msi-progress-card hidden" id="progressCardSelf">
+              <h3>Quarter Target Progress — Cá nhân (bạn)</h3>
+              <div class="msi-progress-track"><div class="msi-progress-fill" id="progressSelfFill"></div></div>
+              <div class="msi-progress-nums" id="progressSelfNums">—</div>
+            </div>
           </div>
-          <div class="msi-panel">
-            <h3>Sell-Out theo LOB</h3>
-            <div class="msi-breakdown-table" id="breakdownLob"></div>
+
+          <div class="msi-table-row">
+            <div class="msi-panel">
+              <h3>Sell-Out theo NPP</h3>
+              <div class="msi-breakdown-table" id="breakdownNpp"></div>
+            </div>
+            <div class="msi-panel">
+              <h3>Sell-Out theo LOB</h3>
+              <div class="msi-breakdown-table" id="breakdownLob"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -2015,6 +2022,24 @@
 
       const data = rows || [];
       const targetQty = (targetRows || []).reduce((s, t) => s + (t.target_qty || 0), 0);
+
+      // Không có dòng sellout nào VÀ không có target nào cho đúng năm+quý đang
+      // chọn => dừng hẳn ở đây, hiện empty state. KHÔNG fallback/hiện lại số
+      // liệu của kỳ trước đó (vì các hàm render bên dưới sẽ không được gọi).
+      const emptyState = document.getElementById('summariesEmptyState');
+      const content = document.getElementById('summariesContent');
+      if (!data.length && targetQty === 0) {
+        if (emptyState) {
+          document.getElementById('summariesEmptyMsg').textContent =
+            `Không có dữ liệu cho Q${quarter}/${year}. Hãy chọn kỳ khác hoặc import dữ liệu cho kỳ này.`;
+          emptyState.classList.remove('hidden');
+        }
+        content?.classList.add('hidden');
+        return;
+      }
+      emptyState?.classList.add('hidden');
+      content?.classList.remove('hidden');
+
       const sellOutQty = data.reduce((s, r) => s + (r.quantity || 0), 0);
       const achievementPct = targetQty > 0 ? (sellOutQty / targetQty) * 100 : null;
 
