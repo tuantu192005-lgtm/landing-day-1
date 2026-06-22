@@ -1616,9 +1616,9 @@
                 <thead>
                   <tr>
                     <th class="kpi-col-name">Hạng mục</th>
-                    <th class="kpi-col-num">Trọng số (D)</th>
-                    <th class="kpi-col-num">Target gốc (F)</th>
-                    <th class="kpi-col-num">Target hiệu lực (E)</th>
+                    <th class="kpi-col-num">Trọng số</th>
+                    <th class="kpi-col-num">Target gốc</th>
+                    <th class="kpi-col-num">Target hiệu lực</th>
                     <th class="kpi-col-num">Achieved (G)</th>
                     <th class="kpi-col-num">Hit Rate (H)</th>
                     <th class="kpi-col-num">Điểm đạt (I)</th>
@@ -3274,69 +3274,50 @@
             return;
           }
 
-          // Dedup NỘI BỘ FILE trước khi insert: 2 dòng cùng (customer_name,
-          // sale_date, lob, disty, model, quantity) trong CHÍNH file này thì
-          // chỉ giữ 1 dòng — đây là nguyên nhân chính gây ghi trùng lần trước
-          // (file Excel tự nó có dòng lặp, code cũ không hề check việc này).
-          const fileDedupKey = (r) => [r.customer_name, r.sale_date, r.lob, r.disty, r.model, r.quantity]
-            .map((v) => (v === null || v === undefined ? '' : String(v).trim())).join('|');
-          const seenInFile = new Set();
-          let duplicateInFileCount = 0;
-          const dedupedRows = [];
-          parsedRows.forEach((r) => {
-            const key = fileDedupKey(r);
-            if (seenInFile.has(key)) { duplicateInFileCount += 1; return; }
-            seenInFile.add(key);
-            dedupedRows.push(r);
-          });
-
-          // Check trùng với DATA ĐÃ CÓ TRONG DB theo đúng đủ 7 trường (assigned_to
-          // + sale_date + customer_name + lob + disty + model + quantity) — không
-          // chỉ assigned_to+sale_date như trước (quá thô, dễ báo trùng nhầm khi
-          // 1 người có nhiều đơn khác nhau cùng ngày).
-          const dbCompareKey = (r) => [r.assigned_to, r.sale_date, r.customer_name, r.lob, r.disty, r.model, r.quantity]
-            .map((v) => (v === null || v === undefined ? '' : String(v).trim())).join('|');
-          const empIdsInFile = [...new Set(dedupedRows.map((r) => r.assigned_to))];
-          const datesInFile = [...new Set(dedupedRows.map((r) => r.sale_date))];
+          // Dedup theo NGÀY (không theo nội dung dòng): nếu (assigned_to,
+          // sale_date) đã có sẵn trong DB, bỏ qua TOÀN BỘ dòng trong file của
+          // đúng người đó vào đúng ngày đó — không xét customer/model/SL, vì
+          // dedup theo nội dung dòng từng xoá nhầm đơn hàng thật (2 đơn khác
+          // nhau vẫn có thể trùng mã+SL cùng ngày).
+          const empIdsInFile = [...new Set(parsedRows.map((r) => r.assigned_to))];
+          const datesInFile = [...new Set(parsedRows.map((r) => r.sale_date))];
           const { data: existingRows, error: existErr } = await fetchAllPages((from, to) =>
             sb.from('sellout_data')
-              .select('assigned_to, sale_date, customer_name, lob, disty, model, quantity')
+              .select('assigned_to, sale_date')
               .in('assigned_to', empIdsInFile)
               .in('sale_date', datesInFile)
               .range(from, to)
           );
 
           if (existErr) {
-            setSelloutMessage('Lỗi kiểm tra dữ liệu trùng: ' + existErr.message, 'error');
+            setSelloutMessage('Lỗi kiểm tra ngày đã có dữ liệu: ' + existErr.message, 'error');
             return;
           }
 
-          const existingKeySet = new Set((existingRows || []).map(dbCompareKey));
-          const overlapCount = dedupedRows.filter((r) => existingKeySet.has(dbCompareKey(r))).length;
+          const existingDateKeySet = new Set((existingRows || []).map((r) => `${r.assigned_to}|${r.sale_date}`));
+          const rowsToInsert = parsedRows.filter((r) => !existingDateKeySet.has(`${r.assigned_to}|${r.sale_date}`));
+          const skippedRows = parsedRows.filter((r) => existingDateKeySet.has(`${r.assigned_to}|${r.sale_date}`));
 
-          // QUAN TRỌNG: Cancel chỉ bỏ qua đúng các dòng trùng, KHÔNG huỷ toàn
-          // bộ import — nếu không, dữ liệu hợp lệ của các nhân viên khác
-          // (không trùng) cũng bị mất theo, dù không liên quan gì đến phần trùng.
-          // Vẫn giữ cả 2 lựa chọn (không bỏ nút "nhập kể cả trùng") vì có thể
-          // đây thật ra là 2 đơn hàng khác nhau, không hẳn là lỗi.
-          let rowsToInsert = dedupedRows;
-          let skippedDuplicate = 0;
-          if (overlapCount > 0) {
+          // Chỉ còn 1 lựa chọn: import ngày mới, bỏ qua ngày đã có — không
+          // còn nút "nhập kể cả trùng". Confirm chỉ để xác nhận tiếp tục.
+          if (skippedRows.length > 0) {
+            const skippedDates = [...new Set(skippedRows.map((r) => r.sale_date))].sort();
+            const fmtDM = (iso) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
+            const rangeLabel = skippedDates.length === 1
+              ? fmtDM(skippedDates[0])
+              : `${fmtDM(skippedDates[0])} - ${fmtDM(skippedDates[skippedDates.length - 1])}`;
             const proceed = window.confirm(
-              `Phát hiện ${overlapCount} dòng có thể trùng với data đã có ` +
-              `(cùng nhân viên, ngày, khách hàng, LOB, NPP, model, số lượng).\n\n` +
-              `Lưu ý: có thể là 2 đơn hàng khác nhau cùng ngày, cùng mã — không chắc là lỗi.\n\n` +
-              `OK = Nhập tất cả, kể cả ${overlapCount} dòng này (có thể tạo dữ liệu lặp nếu đúng là trùng thật).\n` +
-              `Cancel = Bỏ qua ${overlapCount} dòng này, chỉ nhập phần còn lại.`
+              `Phát hiện ${skippedDates.length} ngày đã có data (${rangeLabel}). ` +
+              `Sẽ chỉ import ${rowsToInsert.length} dòng từ các ngày mới. Tiếp tục?`
             );
             if (!proceed) {
-              rowsToInsert = dedupedRows.filter((r) => !existingKeySet.has(dbCompareKey(r)));
-              skippedDuplicate = overlapCount;
+              setSelloutMessage('Đã huỷ import.', 'info');
+              return;
             }
           }
 
           if (!rowsToInsert.length) {
-            setSelloutMessage('Tất cả dòng đều trùng dữ liệu đã có — không có gì để import.', 'info');
+            setSelloutMessage('Tất cả ngày trong file đều đã có dữ liệu — không có gì để import.', 'info');
             return;
           }
 
@@ -3354,8 +3335,7 @@
           }
 
           let msg = `Đã import thành công ${insertedTotal} dòng.`;
-          if (duplicateInFileCount) msg += ` Đã loại ${duplicateInFileCount} dòng trùng nội bộ trong file.`;
-          if (skippedDuplicate) msg += ` Đã bỏ qua ${skippedDuplicate} dòng trùng dữ liệu cũ.`;
+          if (skippedRows.length) msg += ` Đã bỏ qua ${skippedRows.length} dòng thuộc các ngày đã có data.`;
           if (skippedUnmapped) {
             msg += ` ${skippedUnmapped} dòng bỏ qua vì không nhận ra tên nhân viên: ${[...unmappedNames].join(', ')}.`;
           }
