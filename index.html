@@ -2759,16 +2759,57 @@
       });
     }
 
+    // Tạo target mới cho 1 nhân viên bằng cách copy cấu trúc (category,
+    // item_weight, y2023_avg, parent_category) từ target của Tú trong CÙNG
+    // quý, nhưng target_qty/target_stretched = 0 — Admin điền số thật sau.
+    async function createTargetTemplateForEmployee(employeeId, quarterStr) {
+      const tuId = EMPLOYEES.find((e) => normalizeNameForMatch(e.name) === 'tu')?.id;
+      if (!tuId) { alert('Không tìm thấy Tú trong danh sách nhân viên để copy mẫu.'); return; }
+
+      const { data: tuRows, error } = await sb
+        .from('targets')
+        .select('category, item_weight, y2023_avg, parent_category')
+        .eq('assigned_to', tuId)
+        .eq('quarter', quarterStr);
+
+      if (error) { alert('Lỗi tải mẫu target của Tú: ' + error.message); return; }
+      if (!tuRows || !tuRows.length) {
+        alert(`Tú cũng chưa có target cho quý ${quarterStr} — không có mẫu để copy.`);
+        return;
+      }
+
+      const newRows = tuRows.map((r) => ({
+        assigned_to: employeeId,
+        quarter: quarterStr,
+        category: r.category,
+        item_weight: r.item_weight,
+        y2023_avg: r.y2023_avg,
+        parent_category: r.parent_category,
+        target_qty: 0,
+        target_stretched: 0,
+        actual_qty: 0
+      }));
+
+      const { error: insErr } = await sb.from('targets').insert(newRows);
+      if (insErr) { alert('Lỗi tạo target mới: ' + insErr.message); return; }
+
+      await loadKpiDetail(employeeId);
+    }
+
     async function loadKpiDetail(employeeId) {
       const targetsBody = document.getElementById('kpiDetailTableBody');
       const achieveRateCell = document.getElementById('kpiDetailAchieveRate');
       if (!targetsBody || !employeeId) return;
       targetsBody.innerHTML = '<tr><td colspan="8">Đang tải...</td></tr>';
 
+      const { year, quarter } = getEffectiveYearQuarter();
+      const quarterStr = `${year} Q${quarter}`;
+
       const { data, error } = await sb
         .from('v_kpi_full')
         .select('*')
         .eq('assigned_to', employeeId)
+        .eq('quarter', quarterStr)
         .order('category');
 
       if (error) {
@@ -2779,7 +2820,19 @@
 
       const rows = data || [];
       if (!rows.length) {
-        targetsBody.innerHTML = '<tr><td colspan="8">Chưa có target.</td></tr>';
+        const tuId = EMPLOYEES.find((e) => normalizeNameForMatch(e.name) === 'tu')?.id;
+        const canCreate = currentUser?.role === 'admin' && employeeId !== tuId;
+        targetsBody.innerHTML = `<tr><td colspan="8">
+          <div class="empty-state">
+            <p>Chưa có target cho quý ${quarter}/${year}.</p>
+            ${canCreate ? '<button type="button" class="btn-primary" id="createTargetTemplateBtn">Tạo target mới cho quý này</button>' : ''}
+          </div>
+        </td></tr>`;
+        if (canCreate) {
+          document.getElementById('createTargetTemplateBtn')?.addEventListener('click', () => {
+            createTargetTemplateForEmployee(employeeId, quarterStr);
+          });
+        }
         if (achieveRateCell) achieveRateCell.textContent = '—';
         renderKpiDonut([]);
         return;
