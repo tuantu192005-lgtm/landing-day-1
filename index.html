@@ -1673,22 +1673,33 @@
       </section>
 
       <section class="msi-tab-pane" id="tab-data-source">
-        <div class="msi-panel" style="margin-bottom:20px">
-          <h3>Import / Export dữ liệu Sellout</h3>
-          <div class="form-group hidden" id="dataSourceEmployeeRow" style="max-width:320px">
-            <label for="dataSourceEmployeeSelect">Chọn nhân viên</label>
-            <select id="dataSourceEmployeeSelect"></select>
-          </div>
-          <p class="msi-panel-note">Import file Excel sellout hàng tuần (sheet "Data"), hoặc export toàn bộ dữ liệu sellout ra file Excel.</p>
+        <div class="msi-panel" style="margin-bottom:20px" id="dataSourceImportSection">
+          <h3>Import dữ liệu Sellout (Admin)</h3>
+          <p class="msi-panel-note">
+            Import file Excel sellout hàng tuần (sheet "Data"). Cột <strong>"Sales"</strong> trong file ghi tên
+            viết tắt nhân viên (Tu, Lap, Linh, Tam) — hệ thống tự gán đúng người theo tên này cho từng dòng,
+            không cần chọn người trước. Dòng nào không nhận ra tên sẽ bị bỏ qua và báo lại sau khi import.
+          </p>
           <div class="dashboard-actions">
             <button type="button" class="btn-primary" id="selloutImportBtn">Import dữ liệu tuần</button>
-            <button type="button" class="btn-secondary" id="selloutExportBtn">Export dữ liệu</button>
             <input type="file" id="selloutImportInput" accept=".xlsx" class="hidden" />
+          </div>
+        </div>
+
+        <div class="msi-panel" style="margin-bottom:20px">
+          <h3>Export dữ liệu Sellout</h3>
+          <div class="form-group hidden" id="dataSourceEmployeeRow" style="max-width:320px">
+            <label for="dataSourceEmployeeSelect">Chọn nhân viên để export</label>
+            <select id="dataSourceEmployeeSelect"></select>
+          </div>
+          <p class="msi-panel-note">Export toàn bộ dữ liệu sellout ra file Excel.</p>
+          <div class="dashboard-actions">
+            <button type="button" class="btn-secondary" id="selloutExportBtn">Export dữ liệu</button>
           </div>
           <div class="login-error" id="selloutMessage"></div>
         </div>
 
-        <div class="msi-panel">
+        <div class="msi-panel" id="importHistorySection">
           <h3>Lịch sử Import</h3>
           <div class="table-wrapper">
             <table class="target-table">
@@ -2973,10 +2984,26 @@
       }
     });
 
-    // ══ TAB DATA SOURCE (bước 5) ══════════════════════════════
-    // role staff: chỉ import/export data của chính mình (target = currentUser.id).
-    // role admin: chọn nhân viên từ dropdown (dùng lại EMPLOYEES) để import/export thay.
-    function getDataSourceTargetUserId() {
+    // ══ TAB DATA SOURCE (bước 5 + sửa lại logic import) ════════
+    // Import: CHỈ admin thấy nút, mỗi dòng tự gán assigned_to theo cột
+    // "Sales" trong file (map qua EMPLOYEES) — không còn dropdown chọn
+    // người trước khi import, vì 1 file có thể chứa nhiều nhân viên.
+    // Export: vẫn cần biết export cho ai — staff luôn là chính họ,
+    // admin chọn qua dropdown (chỉ dùng cho export, không liên quan import nữa).
+    function normalizeNameForMatch(s) {
+      return String(s || '')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/đ/gi, 'd')
+        .trim().toLowerCase();
+    }
+    const EMPLOYEE_NAME_LOOKUP = {};
+    EMPLOYEES.forEach((emp) => { EMPLOYEE_NAME_LOOKUP[normalizeNameForMatch(emp.name)] = emp.id; });
+
+    function getEmployeeIdByName(rawName) {
+      return EMPLOYEE_NAME_LOOKUP[normalizeNameForMatch(rawName)] || null;
+    }
+
+    function getExportTargetUserId() {
       if (!currentUser) return null;
       if (currentUser.role === 'admin') {
         return document.getElementById('dataSourceEmployeeSelect')?.value || null;
@@ -2996,7 +3023,6 @@
       if (!sel.dataset.filled) {
         sel.innerHTML = EMPLOYEES.map((emp) => `<option value="${emp.id}">${emp.name}</option>`).join('');
         sel.dataset.filled = '1';
-        sel.addEventListener('change', () => loadImportHistory());
       }
     }
 
@@ -3007,18 +3033,14 @@
 
     async function loadImportHistory() {
       const tbody = document.getElementById('importHistoryBody');
-      if (!tbody) return;
-      const targetId = getDataSourceTargetUserId();
-      if (!targetId) {
-        tbody.innerHTML = '<tr><td colspan="4">Chọn nhân viên để xem lịch sử.</td></tr>';
-        return;
-      }
+      if (!tbody || !currentUser || currentUser.role !== 'admin') return;
       tbody.innerHTML = '<tr><td colspan="4">Đang tải...</td></tr>';
 
+      // Admin xem lịch sử của CẢ TEAM (không lọc theo 1 người) vì 1 lượt
+      // import có thể trải trên nhiều nhân viên cùng lúc.
       const { data, error } = await sb
         .from('sellout_data')
-        .select('sale_date, created_at')
-        .eq('assigned_to', targetId)
+        .select('sale_date, created_at, assigned_to')
         .order('created_at', { ascending: false })
         .range(0, 9999);
 
@@ -3034,31 +3056,31 @@
         return;
       }
 
-      // sellout_data chưa có cột riêng lưu "ai bấm import" / "import lúc nào theo
-      // lượt" — nên gom theo ngày tạo dòng (created_at) làm 1 "lượt import",
-      // và hiển thị "người import" = chủ sở hữu data (assigned_to) vì đó là
-      // thông tin gần nhất đang có. Nếu cần chính xác hơn (ai bấm nút, không
-      // phải data của ai) thì cần thêm cột imported_by — ngoài phạm vi hôm nay.
+      // sellout_data chưa có cột riêng lưu "ai bấm import" / mốc thời gian
+      // theo từng lượt — nên gom theo (ngày tạo dòng, assigned_to) làm 1
+      // "lượt import" của 1 người trong ngày đó. Nếu cần chính xác hơn (ai
+      // bấm nút, không phải data của ai) thì cần thêm cột imported_by —
+      // ngoài phạm vi hôm nay.
       const groups = {};
       rows.forEach((r) => {
         const day = (r.created_at || '').slice(0, 10);
         if (!day) return;
-        if (!groups[day]) groups[day] = { count: 0, quarters: new Set() };
-        groups[day].count += 1;
+        const key = `${day}|${r.assigned_to}`;
+        if (!groups[key]) groups[key] = { day, assignedTo: r.assigned_to, count: 0, quarters: new Set() };
+        groups[key].count += 1;
         if (r.sale_date) {
           const d = new Date(r.sale_date);
-          groups[day].quarters.add(`${d.getUTCFullYear()} Q${Math.floor(d.getUTCMonth() / 3) + 1}`);
+          groups[key].quarters.add(`${d.getUTCFullYear()} Q${Math.floor(d.getUTCMonth() / 3) + 1}`);
         }
       });
 
-      const emp = EMPLOYEES.find((e) => e.id === targetId);
-      const importerName = emp ? emp.name : (currentUser.id === targetId ? currentUser.name : targetId);
-
-      const days = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-      tbody.innerHTML = days.map((day) => {
-        const g = groups[day];
+      const keys = Object.keys(groups).sort((a, b) => groups[b].day.localeCompare(groups[a].day));
+      tbody.innerHTML = keys.map((key) => {
+        const g = groups[key];
+        const emp = EMPLOYEES.find((e) => e.id === g.assignedTo);
+        const importerName = emp ? emp.name : (currentUser.id === g.assignedTo ? currentUser.name : g.assignedTo);
         return `<tr>
-          <td>${fmtImportDate(day)}</td>
+          <td>${fmtImportDate(g.day)}</td>
           <td>${importerName}</td>
           <td class="kpi-col-num">${g.count}</td>
           <td>${[...g.quarters].sort().join(', ') || '—'}</td>
@@ -3068,8 +3090,11 @@
 
     function loadDataSourceTab() {
       if (!currentUser) return;
+      const isAdmin = currentUser.role === 'admin';
+      document.getElementById('dataSourceImportSection')?.classList.toggle('hidden', !isAdmin);
+      document.getElementById('importHistorySection')?.classList.toggle('hidden', !isAdmin);
       populateDataSourceEmployeeSelect();
-      loadImportHistory();
+      if (isAdmin) loadImportHistory();
     }
     tabLoaders['tab-data-source'] = loadDataSourceTab;
 
@@ -3109,11 +3134,7 @@
       selloutImportInput.addEventListener('change', async (event) => {
         const file = event.target.files[0];
         event.target.value = '';
-        const targetUserId = getDataSourceTargetUserId();
-        if (!file || !currentUser || !targetUserId) {
-          if (file && !targetUserId) setSelloutMessage('Vui lòng chọn nhân viên trước khi import.', 'error');
-          return;
-        }
+        if (!file || !currentUser || currentUser.role !== 'admin') return;
 
         setSelloutMessage('Đang đọc file...', 'info');
         try {
@@ -3131,11 +3152,27 @@
             return;
           }
 
-          const parsedRows = rows
-            .map((row) => ({
-              sale_date: excelSerialToISODate(row['Date']),
+          // Mỗi dòng tự gán assigned_to theo tên trong cột "Sales" (map qua
+          // EMPLOYEES) — KHÔNG gán hết cho 1 người cố định. Dòng thiếu Date
+          // hoặc không nhận ra tên nhân viên sẽ bị bỏ qua và báo lại riêng.
+          const parsedRows = [];
+          let skippedNoDate = 0;
+          const unmappedNames = new Set();
+          let skippedUnmapped = 0;
+
+          rows.forEach((row) => {
+            const saleDate = excelSerialToISODate(row['Date']);
+            if (!saleDate) { skippedNoDate += 1; return; }
+            const empId = getEmployeeIdByName(row['Sales']);
+            if (!empId) {
+              skippedUnmapped += 1;
+              unmappedNames.add(String(row['Sales'] ?? '').trim() || '(trống)');
+              return;
+            }
+            parsedRows.push({
+              sale_date: saleDate,
               customer_name: row['Customer Name'] ?? null,
-              assigned_to: targetUserId,
+              assigned_to: empId,
               lob: row['LOB'] ?? null,
               disty: row['Disty'] ?? null,
               model: row['Model'] ?? null,
@@ -3143,19 +3180,27 @@
               platform: row['Platform'] ?? null,
               details_chipset: row['Details Chipset'] ?? null,
               form_factor: row['Form Factor'] ?? null
-            }))
-            .filter((r) => r.sale_date);
+            });
+          });
 
           if (!parsedRows.length) {
-            setSelloutMessage('Không đọc được dòng dữ liệu hợp lệ nào (thiếu cột Date?).', 'error');
+            setSelloutMessage(
+              skippedUnmapped
+                ? `Không có dòng nào import được — ${skippedUnmapped} dòng bỏ qua vì không nhận ra tên nhân viên: ${[...unmappedNames].join(', ')}.`
+                : 'Không đọc được dòng dữ liệu hợp lệ nào (thiếu cột Date?).',
+              'error'
+            );
             return;
           }
 
+          // Check trùng theo đúng cặp assigned_to + sale_date (1 file có thể
+          // chứa nhiều nhân viên, không thể chỉ check theo sale_date đơn lẻ).
+          const empIdsInFile = [...new Set(parsedRows.map((r) => r.assigned_to))];
           const datesInFile = [...new Set(parsedRows.map((r) => r.sale_date))];
           const { data: existingRows, error: existErr } = await sb
             .from('sellout_data')
-            .select('sale_date')
-            .eq('assigned_to', targetUserId)
+            .select('assigned_to, sale_date')
+            .in('assigned_to', empIdsInFile)
             .in('sale_date', datesInFile);
 
           if (existErr) {
@@ -3163,12 +3208,12 @@
             return;
           }
 
-          const existingDatesSet = new Set((existingRows || []).map((r) => r.sale_date));
-          const overlapCount = parsedRows.filter((r) => existingDatesSet.has(r.sale_date)).length;
+          const existingKeySet = new Set((existingRows || []).map((r) => `${r.assigned_to}|${r.sale_date}`));
+          const overlapCount = parsedRows.filter((r) => existingKeySet.has(`${r.assigned_to}|${r.sale_date}`)).length;
 
           if (overlapCount > 0) {
             const proceed = window.confirm(
-              `Phát hiện ${overlapCount} dòng có ngày trùng dữ liệu đã có, vẫn tiếp tục cộng thêm hay huỷ?`
+              `Phát hiện ${overlapCount} dòng có ngày trùng dữ liệu đã có (theo từng nhân viên), vẫn tiếp tục cộng thêm hay huỷ?`
             );
             if (!proceed) {
               setSelloutMessage('Đã huỷ import.', 'info');
@@ -3189,7 +3234,11 @@
             insertedTotal += batch.length;
           }
 
-          setSelloutMessage(`Đã import thành công ${insertedTotal} dòng.`, 'success');
+          let msg = `Đã import thành công ${insertedTotal} dòng.`;
+          if (skippedUnmapped) {
+            msg += ` ${skippedUnmapped} dòng bỏ qua vì không nhận ra tên nhân viên: ${[...unmappedNames].join(', ')}.`;
+          }
+          setSelloutMessage(msg, 'success');
           loadImportHistory();
         } catch (err) {
           setSelloutMessage('Lỗi đọc file: ' + err.message, 'error');
@@ -3199,7 +3248,7 @@
 
     if (selloutExportBtn) {
       selloutExportBtn.addEventListener('click', async () => {
-        const targetUserId = getDataSourceTargetUserId();
+        const targetUserId = getExportTargetUserId();
         if (!currentUser || !targetUserId) {
           setSelloutMessage('Vui lòng chọn nhân viên trước khi export.', 'error');
           return;
