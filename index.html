@@ -1185,6 +1185,148 @@
       .msi-tab-content {
         padding: 16px;
       }
+      .msi-kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      .msi-chart-row,
+      .msi-progress-row,
+      .msi-table-row {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
+    /* ══ Summaries Dashboard (bước 2) ══ */
+    .msi-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .msi-kpi-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .msi-kpi-lbl {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .msi-kpi-val {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--navy-strong);
+    }
+
+    .msi-panel {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .msi-panel h3 {
+      margin: 0 0 6px;
+      font-size: 1.02rem;
+      color: var(--navy-strong);
+    }
+
+    .msi-panel-note {
+      margin: 0 0 12px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .msi-chart-row,
+    .msi-progress-row,
+    .msi-table-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .msi-chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    .msi-chart-wrap canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .msi-progress-track {
+      width: 100%;
+      height: 14px;
+      border-radius: 999px;
+      background: var(--bg);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .msi-progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--navy-soft);
+      transition: width 0.4s;
+    }
+
+    .msi-progress-fill.over  { background: #1c9a5b; }
+    .msi-progress-fill.warn  { background: #e0a800; }
+    .msi-progress-fill.low   { background: #c0392b; }
+
+    .msi-progress-nums {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .msi-breakdown-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .msi-breakdown-name {
+      width: 86px;
+      flex-shrink: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .msi-breakdown-track {
+      flex: 1;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .msi-breakdown-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--navy-soft);
+    }
+
+    .msi-breakdown-pct {
+      width: 80px;
+      flex-shrink: 0;
+      text-align: right;
+      font-size: 0.8rem;
+      color: var(--muted);
     }
   </style>
 </head>
@@ -1288,7 +1430,61 @@
 
     <main class="msi-tab-content">
       <section class="msi-tab-pane active" id="tab-summaries">
-        <div class="msi-placeholder"><i class="fas fa-chart-pie"></i><p>Summaries Dashboard — nội dung sẽ được xây ở bước 2.</p></div>
+        <div class="msi-kpi-grid">
+          <div class="msi-kpi-card">
+            <span class="msi-kpi-lbl">Sell-out (QTD)</span>
+            <strong class="msi-kpi-val" id="kpiSellOut">—</strong>
+          </div>
+          <div class="msi-kpi-card">
+            <span class="msi-kpi-lbl">Target (QTD)</span>
+            <strong class="msi-kpi-val" id="kpiTarget">—</strong>
+          </div>
+          <div class="msi-kpi-card">
+            <span class="msi-kpi-lbl">% Achievement</span>
+            <strong class="msi-kpi-val" id="kpiAchievement">—</strong>
+          </div>
+          <div class="msi-kpi-card">
+            <span class="msi-kpi-lbl">Top LOB</span>
+            <strong class="msi-kpi-val" id="kpiTopLob">—</strong>
+          </div>
+        </div>
+
+        <div class="msi-chart-row">
+          <div class="msi-panel msi-chart-panel">
+            <h3>Sell-Out theo tháng</h3>
+            <p class="msi-panel-note">Sell-out thật theo tháng trong quý — mỗi line là 1 LOB. Chưa có Sell-in nên không vẽ line SI.</p>
+            <div class="msi-chart-wrap"><canvas id="summariesMonthChart"></canvas></div>
+          </div>
+          <div class="msi-panel msi-chart-panel">
+            <h3>Sell-Out theo tuần</h3>
+            <p class="msi-panel-note">Tuần tính theo ISO week của sale_date — mỗi cột màu theo NPP.</p>
+            <div class="msi-chart-wrap"><canvas id="summariesWeekChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="msi-progress-row" id="summariesProgressRow">
+          <div class="msi-panel msi-progress-card" id="progressCardTeam">
+            <h3 id="progressTeamTitle">Quarter Target Progress — Toàn team</h3>
+            <div class="msi-progress-track"><div class="msi-progress-fill" id="progressTeamFill"></div></div>
+            <div class="msi-progress-nums" id="progressTeamNums">—</div>
+          </div>
+          <div class="msi-panel msi-progress-card hidden" id="progressCardSelf">
+            <h3>Quarter Target Progress — Cá nhân (bạn)</h3>
+            <div class="msi-progress-track"><div class="msi-progress-fill" id="progressSelfFill"></div></div>
+            <div class="msi-progress-nums" id="progressSelfNums">—</div>
+          </div>
+        </div>
+
+        <div class="msi-table-row">
+          <div class="msi-panel">
+            <h3>Sell-Out theo NPP</h3>
+            <div class="msi-breakdown-table" id="breakdownNpp"></div>
+          </div>
+          <div class="msi-panel">
+            <h3>Sell-Out theo LOB</h3>
+            <div class="msi-breakdown-table" id="breakdownLob"></div>
+          </div>
+        </div>
       </section>
 
       <section class="msi-tab-pane" id="tab-sales-kpi">
@@ -1370,6 +1566,12 @@
     // được xây ở bước 2-5, dùng lại getMsiFilters()/scopeByRole() ở đây.
     const msiFilters = { year: '', quarter: '', npp: '', lob: '' };
     let msiAppInitialized = false;
+    const tabLoaders = {}; // gắn ở bước 2-5: { 'tab-summaries': loadSummariesDashboard, ... }
+
+    function reloadActiveTab() {
+      const activePane = document.querySelector('.msi-tab-pane.active');
+      if (activePane) tabLoaders[activePane.id]?.();
+    }
 
     function scopeByRole(query) {
       if (currentUser && currentUser.role !== 'admin') {
@@ -1390,6 +1592,7 @@
           btn.classList.add('active');
           document.getElementById(btn.dataset.tab)?.classList.add('active');
           document.getElementById('msiMenu')?.classList.remove('open');
+          tabLoaders[btn.dataset.tab]?.();
         });
       });
       document.getElementById('msiHamburger')?.addEventListener('click', () => {
@@ -1405,6 +1608,7 @@
           msiFilters.npp     = document.getElementById('filterNpp').value;
           msiFilters.lob     = document.getElementById('filterLob').value;
           document.dispatchEvent(new CustomEvent('msi:filters-changed', { detail: getMsiFilters() }));
+          reloadActiveTab();
         });
       });
     }
@@ -1437,7 +1641,215 @@
       document.querySelector('.msi-menu-btn[data-tab="tab-summaries"]')?.classList.add('active');
       document.getElementById('tab-summaries')?.classList.add('active');
       populateYearFilter();
+      tabLoaders['tab-summaries']?.();
     }
+
+    // ══ TAB SUMMARIES DASHBOARD (bước 2) ══════════════════════
+    // "QTD" mặc định = quý hiện tại theo ngày thực; nếu người dùng chọn
+    // Năm/Quý trên bộ lọc thì dùng đúng giá trị đó thay cho mặc định.
+    let summariesMonthChartInstance = null;
+    let summariesWeekChartInstance = null;
+    const MSI_CHART_COLORS = ['#102a4e', '#2a4d7c', '#5b86b5', '#9db9dd', '#e8b43a', '#7c4a1e', '#0c4a6e', '#831843', '#14532d', '#4c1d95'];
+
+    function getCurrentQuarterNumber(date = new Date()) {
+      return Math.floor(date.getMonth() / 3) + 1;
+    }
+
+    function getEffectiveYearQuarter() {
+      const now = new Date();
+      const year = parseInt(msiFilters.year, 10) || now.getFullYear();
+      const quarter = parseInt(msiFilters.quarter, 10) || getCurrentQuarterNumber(now);
+      return { year, quarter };
+    }
+
+    function getQuarterDateRange(year, quarter) {
+      const startMonth = (quarter - 1) * 3;
+      const start = new Date(Date.UTC(year, startMonth, 1));
+      const end = new Date(Date.UTC(year, startMonth + 3, 1));
+      return { startISO: start.toISOString().slice(0, 10), endISO: end.toISOString().slice(0, 10) };
+    }
+
+    function buildSummariesSelloutQuery(year, quarter) {
+      const { startISO, endISO } = getQuarterDateRange(year, quarter);
+      let q = sb.from('sellout_data')
+        .select('sale_date, lob, disty, quantity')
+        .gte('sale_date', startISO).lt('sale_date', endISO)
+        .range(0, 9999);
+      q = scopeByRole(q);
+      if (msiFilters.npp) q = q.eq('disty', msiFilters.npp);
+      if (msiFilters.lob) q = q.eq('lob', msiFilters.lob);
+      return q;
+    }
+
+    function fmtQtyMsi(n) {
+      return Math.round(n || 0).toLocaleString('vi-VN');
+    }
+
+    function renderSummariesKpiCards({ sellOutQty, targetQty, achievementPct, topLob }) {
+      document.getElementById('kpiSellOut').textContent = fmtQtyMsi(sellOutQty);
+      document.getElementById('kpiTarget').textContent = fmtQtyMsi(targetQty);
+      document.getElementById('kpiAchievement').textContent = achievementPct === null ? '—' : `${achievementPct.toFixed(1)}%`;
+      document.getElementById('kpiTopLob').textContent = topLob;
+    }
+
+    function renderSummariesMonthChart(byMonth, year, quarter) {
+      const canvas = document.getElementById('summariesMonthChart');
+      if (!canvas) return;
+      const startMonth = (quarter - 1) * 3;
+      const monthKeys = [0, 1, 2].map((i) => {
+        const m = startMonth + i;
+        return `${year}-${String(m + 1).padStart(2, '0')}`;
+      });
+      const labels = monthKeys.map((k) => `Tháng ${parseInt(k.slice(5), 10)}`);
+      const lobSet = new Set();
+      monthKeys.forEach((k) => Object.keys(byMonth[k] || {}).forEach((lob) => lobSet.add(lob)));
+      const lobs = [...lobSet].sort();
+      const datasets = lobs.map((lob, i) => ({
+        label: lob,
+        data: monthKeys.map((k) => (byMonth[k] || {})[lob] || 0),
+        borderColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
+        backgroundColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
+        tension: 0.25,
+        fill: false
+      }));
+      if (summariesMonthChartInstance) summariesMonthChartInstance.destroy();
+      summariesMonthChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    function renderSummariesWeekChart(byWeek) {
+      const canvas = document.getElementById('summariesWeekChart');
+      if (!canvas) return;
+      const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
+      const labels = weeks.map((w) => `Tuần ${w}`);
+      const nppSet = new Set();
+      weeks.forEach((w) => Object.keys(byWeek[w] || {}).forEach((npp) => nppSet.add(npp)));
+      const npps = [...nppSet].sort();
+      const datasets = npps.map((npp, i) => ({
+        label: npp,
+        data: weeks.map((w) => (byWeek[w] || {})[npp] || 0),
+        backgroundColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length]
+      }));
+      if (summariesWeekChartInstance) summariesWeekChartInstance.destroy();
+      summariesWeekChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    function progressFillClass(pct) {
+      if (pct >= 80) return 'over';
+      if (pct >= 50) return 'warn';
+      return 'low';
+    }
+
+    function renderProgressCard(fillId, numsId, achieved, target) {
+      const fill = document.getElementById(fillId);
+      const nums = document.getElementById(numsId);
+      if (!fill || !nums) return;
+      const pct = target > 0 ? (achieved / target) * 100 : 0;
+      fill.style.width = `${Math.min(100, pct)}%`;
+      fill.className = `msi-progress-fill ${progressFillClass(pct)}`;
+      nums.textContent = `${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)} (${pct.toFixed(1)}%)`;
+    }
+
+    async function renderSummariesProgress(year, quarter, quarterStr) {
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      document.getElementById('progressTeamTitle').textContent = isAdmin
+        ? 'Quarter Target Progress — Toàn team'
+        : 'Quarter Target Progress';
+      document.getElementById('progressCardSelf')?.classList.toggle('hidden', !isAdmin);
+
+      const queries = [
+        scopeByRole(sb.from('v_kpi_achieved').select('achieved_qty').eq('year', year).eq('quarter', quarter)),
+        scopeByRole(sb.from('targets').select('target_qty').eq('quarter', quarterStr))
+      ];
+      if (isAdmin) {
+        queries.push(
+          sb.from('v_kpi_achieved').select('achieved_qty').eq('year', year).eq('quarter', quarter).eq('assigned_to', currentUser.id),
+          sb.from('targets').select('target_qty').eq('quarter', quarterStr).eq('assigned_to', currentUser.id)
+        );
+      }
+      const results = await Promise.all(queries);
+      const teamAchieved = (results[0].data || []).reduce((s, r) => s + (r.achieved_qty || 0), 0);
+      const teamTarget = (results[1].data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+      renderProgressCard('progressTeamFill', 'progressTeamNums', teamAchieved, teamTarget);
+
+      if (isAdmin) {
+        const selfAchieved = (results[2].data || []).reduce((s, r) => s + (r.achieved_qty || 0), 0);
+        const selfTarget = (results[3].data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+        renderProgressCard('progressSelfFill', 'progressSelfNums', selfAchieved, selfTarget);
+      }
+    }
+
+    function renderBreakdownTable(containerId, byKey, totalQty) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      const rows = Object.entries(byKey).sort((a, b) => b[1] - a[1]);
+      if (!rows.length) { el.innerHTML = '<div class="empty-state">Không có dữ liệu</div>'; return; }
+      el.innerHTML = rows.map(([name, qty]) => {
+        const pct = totalQty > 0 ? (qty / totalQty) * 100 : 0;
+        return `<div class="msi-breakdown-row">
+          <span class="msi-breakdown-name">${name}</span>
+          <div class="msi-breakdown-track"><div class="msi-breakdown-fill" style="width:${pct.toFixed(1)}%"></div></div>
+          <span class="msi-breakdown-pct">${fmtQtyMsi(qty)} (${pct.toFixed(1)}%)</span>
+        </div>`;
+      }).join('');
+    }
+
+    async function loadSummariesDashboard() {
+      if (!currentUser) return;
+      const { year, quarter } = getEffectiveYearQuarter();
+      const quarterStr = `${year} Q${quarter}`;
+
+      const [{ data: rows, error: rowsErr }, { data: targetRows, error: targetErr }] = await Promise.all([
+        buildSummariesSelloutQuery(year, quarter),
+        scopeByRole(sb.from('targets').select('target_qty').eq('quarter', quarterStr))
+      ]);
+      if (rowsErr) console.warn('[summaries sellout]', rowsErr.message);
+      if (targetErr) console.warn('[summaries targets]', targetErr.message);
+
+      const data = rows || [];
+      const targetQty = (targetRows || []).reduce((s, t) => s + (t.target_qty || 0), 0);
+      const sellOutQty = data.reduce((s, r) => s + (r.quantity || 0), 0);
+      const achievementPct = targetQty > 0 ? (sellOutQty / targetQty) * 100 : null;
+
+      const byLob = {};
+      const byNpp = {};
+      const byMonth = {};
+      const byWeek = {};
+
+      data.forEach((r) => {
+        const qty = r.quantity || 0;
+        const lob = r.lob || '—';
+        const npp = r.disty || '—';
+        byLob[lob] = (byLob[lob] || 0) + qty;
+        byNpp[npp] = (byNpp[npp] || 0) + qty;
+        if (r.sale_date) {
+          const d = new Date(r.sale_date);
+          const monthKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+          byMonth[monthKey] = byMonth[monthKey] || {};
+          byMonth[monthKey][lob] = (byMonth[monthKey][lob] || 0) + qty;
+          const week = getISOWeek(d);
+          byWeek[week] = byWeek[week] || {};
+          byWeek[week][npp] = (byWeek[week][npp] || 0) + qty;
+        }
+      });
+
+      const topLob = Object.entries(byLob).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+
+      renderSummariesKpiCards({ sellOutQty, targetQty, achievementPct, topLob });
+      renderSummariesMonthChart(byMonth, year, quarter);
+      renderSummariesWeekChart(byWeek);
+      await renderSummariesProgress(year, quarter, quarterStr);
+      renderBreakdownTable('breakdownNpp', byNpp, sellOutQty);
+      renderBreakdownTable('breakdownLob', byLob, sellOutQty);
+    }
+    tabLoaders['tab-summaries'] = loadSummariesDashboard;
 
     function drawBarChart(canvas, labels, values) {
       const ctx = canvas.getContext('2d');
