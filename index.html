@@ -3299,6 +3299,17 @@
             return;
           }
 
+          // ── TẠM KHOÁ IMPORT (đang debug lỗi ghi double dữ liệu) ──
+          // KHÔNG insert gì cả cho tới khi xác định xong nguyên nhân và được
+          // duyệt cách sửa. Đoạn insert thật được giữ lại dạng comment ở dưới
+          // để khôi phục nguyên trạng sau khi fix xong.
+          setSelloutMessage(
+            'Import đang TẠM KHOÁ để xử lý sự cố dữ liệu bị ghi trùng (double). ' +
+            'Vui lòng không import lúc này — sẽ mở lại sau khi xác định và sửa xong nguyên nhân.',
+            'error'
+          );
+          return;
+          /*
           setSelloutMessage('Đang import...', 'info');
           const BATCH = 500;
           let insertedTotal = 0;
@@ -3311,6 +3322,7 @@
             }
             insertedTotal += batch.length;
           }
+          */
 
           let msg = `Đã import thành công ${insertedTotal} dòng.`;
           if (skippedDuplicate) msg += ` Đã bỏ qua ${skippedDuplicate} dòng trùng dữ liệu cũ.`;
