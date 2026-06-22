@@ -1403,6 +1403,33 @@
       font-size: 0.78rem;
       color: var(--muted);
     }
+
+    /* ══ Disty Inventory (bước 4) ══ */
+    .inv-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .inv-status.out { color: #c0392b; }
+    .inv-status.low { color: #b8860b; }
+    .inv-status.ok  { color: #1c9a5b; }
+
+    .inv-legend-low,
+    .inv-legend-over {
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+
+    .inv-legend-low  { background: #fdecea; color: #c0392b; }
+    .inv-legend-over { background: #fff3e0; color: #b8860b; }
+
+    .inventory-table tr.inv-row-low  { background: #fdecea; }
+    .inventory-table tr.inv-row-over { background: #fff3e0; }
   </style>
 </head>
 <body>
@@ -1610,7 +1637,32 @@
       </section>
 
       <section class="msi-tab-pane" id="tab-disty-inventory">
-        <div class="msi-placeholder"><i class="fas fa-boxes"></i><p>Disty Inventory — nội dung sẽ được xây ở bước 4.</p></div>
+        <div class="msi-panel">
+          <h3>Tồn kho theo NPP</h3>
+          <p class="msi-panel-note">
+            <span class="inv-status out">🔴 Hết</span> ·
+            <span class="inv-status low">🟡 Sắp hết</span> ·
+            <span class="inv-status ok">🟢 Còn</span> ·
+            dòng nền <span class="inv-legend-low">đỏ</span> = tồn ≤ safety stock,
+            nền <span class="inv-legend-over">cam</span> = tồn > 3× safety stock.
+          </p>
+          <div class="table-wrapper">
+            <table class="target-table inventory-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Tên</th>
+                  <th>Category</th>
+                  <th>Kho/NPP</th>
+                  <th class="kpi-col-num">Tồn kho</th>
+                  <th class="kpi-col-num">Safety Stock</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <section class="msi-tab-pane" id="tab-data-source">
@@ -2725,6 +2777,63 @@
     }
     document.getElementById('kpiDetailBackBtn')?.addEventListener('click', showKpiEmployeeList);
     tabLoaders['tab-sales-kpi'] = loadSalesKpiTab;
+
+    // ══ TAB DISTY INVENTORY (bước 4) ══════════════════════════
+    // inventory không có cột assigned_to (tồn kho theo NPP, không theo
+    // nhân viên) nên không áp dụng scopeByRole — chỉ lọc theo NPP/LOB.
+    // LOB ở bộ lọc chung (VGA/MB/LCD/PSU/CASE/COOLER/SSD/GG/DESKTOP/MINIPC)
+    // không khớp 1:1 với products.category (vga/mainboard/lcd/psu/chassis/
+    // cooling/ssd) — map những LOB có category tương ứng, còn lại
+    // (GG/DESKTOP/MINIPC) hiện chưa có tồn kho theo dõi nên trả về rỗng.
+    const LOB_TO_CATEGORY = {
+      VGA: 'vga', MB: 'mainboard', LCD: 'lcd', PSU: 'psu',
+      CASE: 'chassis', COOLER: 'cooling', SSD: 'ssd'
+    };
+
+    async function loadInventoryTab() {
+      const tbody = document.getElementById('inventoryTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7">Đang tải...</td></tr>';
+
+      let query = sb.from('inventory').select('stock_on_hand, safety_stock, warehouse, products(sku, name, category)');
+      if (msiFilters.npp) query = query.eq('warehouse', msiFilters.npp);
+
+      const { data, error } = await query.order('stock_on_hand', { ascending: false });
+      if (error) {
+        console.warn('[loadInventoryTab]', error.message);
+        tbody.innerHTML = '<tr><td colspan="7">Lỗi tải dữ liệu tồn kho.</td></tr>';
+        return;
+      }
+
+      let rows = data || [];
+      if (msiFilters.lob) {
+        const cat = LOB_TO_CATEGORY[msiFilters.lob];
+        rows = cat ? rows.filter((r) => r.products?.category?.toLowerCase() === cat) : [];
+      }
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Không có dữ liệu tồn kho phù hợp.</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map((r) => {
+        const qty = r.stock_on_hand ?? 0;
+        const min = r.safety_stock ?? 0;
+        const statusClass = qty === 0 ? 'out' : qty <= min ? 'low' : 'ok';
+        const statusLabel = qty === 0 ? '🔴 Hết' : qty <= min ? '🟡 Sắp hết' : '🟢 Còn';
+        const rowClass = qty <= min ? 'inv-row-low' : (min > 0 && qty > min * 3) ? 'inv-row-over' : '';
+        return `<tr class="${rowClass}">
+          <td>${r.products?.sku ?? '—'}</td>
+          <td>${r.products?.name ?? '—'}</td>
+          <td>${r.products?.category ?? '—'}</td>
+          <td>${r.warehouse ?? '—'}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(qty)}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(min)}</td>
+          <td><span class="inv-status ${statusClass}">${statusLabel}</span></td>
+        </tr>`;
+      }).join('');
+    }
+    tabLoaders['tab-disty-inventory'] = loadInventoryTab;
 
     function initEmailJS() {
       try {
