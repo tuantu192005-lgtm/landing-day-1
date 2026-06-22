@@ -35,8 +35,27 @@ function rowKey(r) {
     .map((v) => (v === null || v === undefined ? '' : String(v).trim())).join('|');
 }
 
+// Supabase/PostgREST giới hạn cứng 1000 dòng/request (db-max-rows) bất kể
+// .range() xin nhiều hơn — phải phân trang lặp lại để lấy đủ toàn bộ dữ liệu.
+const PAGE_SIZE = 1000;
+async function fetchAllPages(queryFactory) {
+  let all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryFactory(from, from + PAGE_SIZE - 1);
+    if (error) return { data: all, error };
+    const rows = data || [];
+    all = all.concat(rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
+
 console.log('1) Phân bố sellout_data hiện tại theo assigned_to:');
-const { data: allRows, error: allErr } = await sb.from('sellout_data').select('assigned_to').range(0, 19999);
+const { data: allRows, error: allErr } = await fetchAllPages((from, to) =>
+  sb.from('sellout_data').select('assigned_to').order('id', { ascending: true }).range(from, to)
+);
 if (allErr) { console.error('Lỗi:', allErr.message); process.exit(1); }
 const countByEmp = {};
 (allRows || []).forEach((r) => { countByEmp[r.assigned_to] = (countByEmp[r.assigned_to] || 0) + 1; });
@@ -73,11 +92,13 @@ for (const file of files) {
   });
 
   const dates = [...new Set(expected.map((e) => e.sale_date))];
-  const { data: dbRows, error } = await sb
-    .from('sellout_data')
-    .select('sale_date, customer_name, lob, disty, model, quantity, platform, details_chipset, form_factor, assigned_to')
-    .in('sale_date', dates)
-    .range(0, 19999);
+  const { data: dbRows, error } = await fetchAllPages((from, to) =>
+    sb.from('sellout_data')
+      .select('sale_date, customer_name, lob, disty, model, quantity, platform, details_chipset, form_factor, assigned_to')
+      .in('sale_date', dates)
+      .order('id', { ascending: true })
+      .range(from, to)
+  );
   if (error) { console.error('   Lỗi query DB:', error.message); continue; }
 
   const dbByKey = {};

@@ -1798,6 +1798,24 @@
       return query;
     }
 
+    // Supabase/PostgREST giới hạn cứng tối đa 1000 dòng/request (db-max-rows),
+    // bất kể .range() xin nhiều hơn — phải tự phân trang lặp lại để lấy đủ
+    // toàn bộ dữ liệu cho các bảng lớn (sellout_data), tránh đếm thiếu.
+    const SUPABASE_PAGE_SIZE = 1000;
+    async function fetchAllPages(queryFactory) {
+      let allRows = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await queryFactory(from, from + SUPABASE_PAGE_SIZE - 1);
+        if (error) return { data: allRows, error };
+        const rows = data || [];
+        allRows = allRows.concat(rows);
+        if (rows.length < SUPABASE_PAGE_SIZE) break;
+        from += SUPABASE_PAGE_SIZE;
+      }
+      return { data: allRows, error: null };
+    }
+
     function getMsiFilters() {
       return { ...msiFilters };
     }
@@ -1889,14 +1907,18 @@
 
     function buildSummariesSelloutQuery(year, quarter) {
       const { startISO, endISO } = getQuarterDateRange(year, quarter);
-      let q = sb.from('sellout_data')
-        .select('sale_date, lob, disty, quantity')
-        .gte('sale_date', startISO).lt('sale_date', endISO)
-        .range(0, 9999);
-      q = scopeByRole(q);
-      if (msiFilters.npp) q = q.eq('disty', msiFilters.npp);
-      if (msiFilters.lob) q = q.eq('lob', msiFilters.lob);
-      return q;
+      return fetchAllPages((from, to) => {
+        let q = sb.from('sellout_data')
+          .select('sale_date, lob, disty, quantity')
+          .gte('sale_date', startISO).lt('sale_date', endISO)
+          .order('sale_date', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to);
+        q = scopeByRole(q);
+        if (msiFilters.npp) q = q.eq('disty', msiFilters.npp);
+        if (msiFilters.lob) q = q.eq('lob', msiFilters.lob);
+        return q;
+      });
     }
 
     function fmtQtyMsi(n) {
@@ -3073,12 +3095,15 @@
       tbody.innerHTML = '<tr><td colspan="4">Đang tải...</td></tr>';
 
       // Admin xem lịch sử của CẢ TEAM (không lọc theo 1 người) vì 1 lượt
-      // import có thể trải trên nhiều nhân viên cùng lúc.
-      const { data, error } = await sb
-        .from('sellout_data')
-        .select('sale_date, created_at, assigned_to')
-        .order('created_at', { ascending: false })
-        .range(0, 9999);
+      // import có thể trải trên nhiều nhân viên cùng lúc. Dùng fetchAllPages
+      // vì sellout_data có thể có hàng ngàn dòng, vượt giới hạn 1000/request.
+      const { data, error } = await fetchAllPages((from, to) =>
+        sb.from('sellout_data')
+          .select('sale_date, created_at, assigned_to')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, to)
+      );
 
       if (error) {
         console.warn('[loadImportHistory]', error.message);
