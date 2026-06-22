@@ -2991,9 +2991,12 @@
     // Export: vẫn cần biết export cho ai — staff luôn là chính họ,
     // admin chọn qua dropdown (chỉ dùng cho export, không liên quan import nữa).
     function normalizeNameForMatch(s) {
-      return String(s || '')
+      return String(s ?? '')
+        // khoảng trắng "ẩn" hay dính khi copy từ Excel/Word (NBSP, zero-width...)
+        .replace(/[ ​‌‍﻿]/g, ' ')
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
         .replace(/đ/gi, 'd')
+        .replace(/\s+/g, ' ')
         .trim().toLowerCase();
     }
     const EMPLOYEE_NAME_LOOKUP = {};
@@ -3001,6 +3004,39 @@
 
     function getEmployeeIdByName(rawName) {
       return EMPLOYEE_NAME_LOOKUP[normalizeNameForMatch(rawName)] || null;
+    }
+
+    // Excel hay merge các dòng cùng 1 người ở cột "Sales" để nhìn cho gọn —
+    // khi đọc bằng SheetJS, chỉ dòng đầu của khối merge có giá trị, các dòng
+    // sau đọc ra rỗng. Forward-fill để dòng nào cũng có giá trị Sales đúng.
+    function forwardFillColumn(rows, col) {
+      let last = null;
+      return rows.map((row) => {
+        const v = row[col];
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          last = v;
+          return row;
+        }
+        return last !== null ? { ...row, [col]: last } : row;
+      });
+    }
+
+    // Debug: in ra bảng map tên nhân viên + map thực tế của từng giá trị Sales
+    // riêng biệt trong file, để soi ngay khi import bị lệch người.
+    function debugLogEmployeeMapping(rawRows) {
+      console.log('[import debug] EMPLOYEES sau chuẩn hoá:',
+        EMPLOYEES.map((e) => ({ name: e.name, normalized: normalizeNameForMatch(e.name), id: e.id })));
+      const distinct = {};
+      rawRows.forEach((row) => {
+        const raw = row['Sales'];
+        const key = JSON.stringify(raw);
+        if (!distinct[key]) {
+          const norm = normalizeNameForMatch(raw);
+          distinct[key] = { raw, normalized: norm, mappedId: EMPLOYEE_NAME_LOOKUP[norm] || null, count: 0 };
+        }
+        distinct[key].count += 1;
+      });
+      console.log('[import debug] Các giá trị "Sales" riêng biệt đọc được từ file:', Object.values(distinct));
     }
 
     function getExportTargetUserId() {
@@ -3146,11 +3182,16 @@
             return;
           }
 
-          const rows = XLSX.utils.sheet_to_json(sheet, { raw: true });
-          if (!rows.length) {
+          const rawRows = XLSX.utils.sheet_to_json(sheet, { raw: true });
+          if (!rawRows.length) {
             setSelloutMessage('File không có dữ liệu.', 'error');
             return;
           }
+
+          // Forward-fill cột "Sales" (Excel merge cell chỉ lưu giá trị ở dòng
+          // đầu khối merge, SheetJS đọc các dòng sau ra rỗng).
+          const rows = forwardFillColumn(rawRows, 'Sales');
+          debugLogEmployeeMapping(rows);
 
           // Mỗi dòng tự gán assigned_to theo tên trong cột "Sales" (map qua
           // EMPLOYEES) — KHÔNG gán hết cho 1 người cố định. Dòng thiếu Date
@@ -3211,21 +3252,33 @@
           const existingKeySet = new Set((existingRows || []).map((r) => `${r.assigned_to}|${r.sale_date}`));
           const overlapCount = parsedRows.filter((r) => existingKeySet.has(`${r.assigned_to}|${r.sale_date}`)).length;
 
+          // QUAN TRỌNG: Cancel chỉ bỏ qua đúng các dòng trùng, KHÔNG huỷ toàn
+          // bộ import — nếu không, dữ liệu hợp lệ của các nhân viên khác
+          // (không trùng) cũng bị mất theo, dù không liên quan gì đến phần trùng.
+          let rowsToInsert = parsedRows;
+          let skippedDuplicate = 0;
           if (overlapCount > 0) {
             const proceed = window.confirm(
-              `Phát hiện ${overlapCount} dòng có ngày trùng dữ liệu đã có (theo từng nhân viên), vẫn tiếp tục cộng thêm hay huỷ?`
+              `Phát hiện ${overlapCount} dòng trùng (assigned_to + sale_date) với dữ liệu đã có.\n\n` +
+              `OK = Import tất cả, kể cả ${overlapCount} dòng trùng (có thể tạo dữ liệu lặp).\n` +
+              `Cancel = Chỉ bỏ qua ${overlapCount} dòng trùng, vẫn import phần còn lại.`
             );
             if (!proceed) {
-              setSelloutMessage('Đã huỷ import.', 'info');
-              return;
+              rowsToInsert = parsedRows.filter((r) => !existingKeySet.has(`${r.assigned_to}|${r.sale_date}`));
+              skippedDuplicate = overlapCount;
             }
+          }
+
+          if (!rowsToInsert.length) {
+            setSelloutMessage('Tất cả dòng đều trùng dữ liệu đã có — không có gì để import.', 'info');
+            return;
           }
 
           setSelloutMessage('Đang import...', 'info');
           const BATCH = 500;
           let insertedTotal = 0;
-          for (let i = 0; i < parsedRows.length; i += BATCH) {
-            const batch = parsedRows.slice(i, i + BATCH);
+          for (let i = 0; i < rowsToInsert.length; i += BATCH) {
+            const batch = rowsToInsert.slice(i, i + BATCH);
             const { error: insErr } = await sb.from('sellout_data').insert(batch);
             if (insErr) {
               setSelloutMessage(`Lỗi khi import (đã thêm ${insertedTotal} dòng trước khi lỗi): ${insErr.message}`, 'error');
@@ -3235,6 +3288,7 @@
           }
 
           let msg = `Đã import thành công ${insertedTotal} dòng.`;
+          if (skippedDuplicate) msg += ` Đã bỏ qua ${skippedDuplicate} dòng trùng dữ liệu cũ.`;
           if (skippedUnmapped) {
             msg += ` ${skippedUnmapped} dòng bỏ qua vì không nhận ra tên nhân viên: ${[...unmappedNames].join(', ')}.`;
           }
