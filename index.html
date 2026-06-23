@@ -1446,6 +1446,48 @@
     .staff-alloc-remaining.zero { color: #1c9a5b; font-weight: 700; }
     .staff-alloc-remaining.pos  { color: var(--muted); }
 
+    /* Bảng "Phân bổ Target" — cố định width từng nhóm cột để gọn lại,
+       overflow-x:auto (đã có sẵn ở .table-wrapper) lo phần cuộn ngang.
+       table-layout:fixed + width:auto (đè width:100% của .target-table)
+       để width các cột THỰC SỰ cố định, không bị giãn ra trên màn rộng. */
+    .staff-alloc-table {
+      table-layout: fixed;
+      width: auto;
+      min-width: 0;
+    }
+
+    .staff-alloc-table .kpi-col-name {
+      width: 180px;
+      min-width: 180px;
+      max-width: 180px;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .staff-alloc-table .staff-col-readonly {
+      width: 100px;
+      min-width: 100px;
+    }
+
+    .staff-alloc-table td.staff-col-readonly,
+    .staff-alloc-table td.annual-readonly,
+    .staff-alloc-table td.staff-alloc-total,
+    .staff-alloc-table td.staff-alloc-remaining {
+      background: #f0f3f7;
+    }
+
+    .staff-alloc-table .staff-col-input {
+      width: 90px;
+      min-width: 90px;
+    }
+
+    .staff-alloc-table .staff-alloc-input {
+      width: 100%;
+      text-align: right;
+    }
+
     .msi-toast {
       position: fixed;
       bottom: 24px;
@@ -1753,17 +1795,17 @@
           </div>
           <div class="msi-panel">
             <div class="table-wrapper">
-              <table class="target-table kpi-detail-table">
+              <table class="target-table kpi-detail-table staff-alloc-table">
                 <thead>
                   <tr>
                     <th class="kpi-col-name">Hạng mục</th>
-                    <th class="kpi-col-num">Target Năm</th>
-                    <th class="kpi-col-num">Tú</th>
-                    <th class="kpi-col-num">Lập</th>
-                    <th class="kpi-col-num">Linh</th>
-                    <th class="kpi-col-num">Tâm</th>
-                    <th class="kpi-col-num">Tổng phân bổ</th>
-                    <th class="kpi-col-num">Còn lại</th>
+                    <th class="kpi-col-num staff-col-readonly">Target Năm</th>
+                    <th class="kpi-col-num staff-col-input">Tú</th>
+                    <th class="kpi-col-num staff-col-input">Lập</th>
+                    <th class="kpi-col-num staff-col-input">Linh</th>
+                    <th class="kpi-col-num staff-col-input">Tâm</th>
+                    <th class="kpi-col-num staff-col-readonly">Tổng phân bổ</th>
+                    <th class="kpi-col-num staff-col-readonly">Còn lại</th>
                   </tr>
                 </thead>
                 <tbody id="staffAllocationTableBody"></tbody>
@@ -3624,7 +3666,7 @@
         const hasAnnual = annualVal !== undefined;
         const inputsHtml = EMPLOYEES.map((emp) => {
           const val = staffByKey[`${cat}|${emp.id}`];
-          return `<td class="kpi-col-num"><input type="number" step="1" class="staff-alloc-input" data-category="${cat}" data-emp="${emp.id}" value="${val ?? ''}" /></td>`;
+          return `<td class="kpi-col-num staff-col-input"><input type="number" step="1" class="staff-alloc-input" data-category="${cat}" data-emp="${emp.id}" value="${val ?? ''}" /></td>`;
         }).join('');
         const total = EMPLOYEES.reduce((s, emp) => s + (staffByKey[`${cat}|${emp.id}`] || 0), 0);
         const remaining = hasAnnual ? annualVal - total : null;
