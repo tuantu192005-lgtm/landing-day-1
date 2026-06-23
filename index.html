@@ -1721,19 +1721,6 @@
             </div>
           </div>
 
-          <div class="msi-progress-row" id="summariesProgressRow">
-            <div class="msi-panel msi-progress-card" id="progressCardTeam">
-              <h3 id="progressTeamTitle">Target Progress — Toàn team</h3>
-              <div class="msi-progress-track"><div class="msi-progress-fill" id="progressTeamFill"></div></div>
-              <div class="msi-progress-nums" id="progressTeamNums">—</div>
-            </div>
-            <div class="msi-panel msi-progress-card hidden" id="progressCardSelf">
-              <h3>Target Progress — Cá nhân (bạn)</h3>
-              <div class="msi-progress-track"><div class="msi-progress-fill" id="progressSelfFill"></div></div>
-              <div class="msi-progress-nums" id="progressSelfNums">—</div>
-            </div>
-          </div>
-
           <div class="msi-table-row">
             <div class="msi-panel">
               <h3>Sell-Out theo NPP</h3>
@@ -1742,6 +1729,23 @@
             <div class="msi-panel">
               <h3>Sell-Out theo LOB</h3>
               <div class="msi-breakdown-table" id="breakdownLob"></div>
+            </div>
+          </div>
+
+          <div class="msi-panel" style="margin-top:16px">
+            <h3>Top 10 Đại lý — Sell-out cao nhất</h3>
+            <div class="table-wrapper">
+              <table class="target-table kpi-detail-table">
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Tên đại lý</th>
+                    <th class="kpi-col-num">Số lượng</th>
+                    <th>% tổng</th>
+                  </tr>
+                </thead>
+                <tbody id="top10DealersBody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -2154,6 +2158,36 @@
       return date.toISOString().slice(0, 10);
     }
 
+    function getQuarterDayBoundsUTC(year, quarter) {
+      const { startISO, endISO } = getQuarterDateRange(year, quarter);
+      return { start: new Date(`${startISO}T00:00:00Z`), end: new Date(`${endISO}T00:00:00Z`) };
+    }
+
+    function daysBetweenUTC(a, b) {
+      return Math.max(0, Math.round((b - a) / 86400000));
+    }
+
+    // Bộ lọc LOB trên thanh filter chính dùng giá trị TRỰC TIẾP từ
+    // sellout_data.lob (VGA/MB/PSU/CASE/COOLER/SSD/GG/DESKTOP/MINIPC/
+    // "G Monitor"/"Pro Monitor"), còn bảng targets chỉ lưu category
+    // (CND-MB, GNP-VGA (...)...) — cần ánh xạ LOB -> (các) category tương
+    // ứng để lọc target đúng theo LOB đang chọn. "Others" gom 2 category
+    // không có LOB sellout riêng (Networking, CND-GDT).
+    const LOB_TO_TARGET_CATEGORIES = {
+      VGA: ['GNP-VGA ( GT )', 'GNP-VGA ( GTX + RTX )'],
+      MB: ['CND-MB', 'CND-MB (B Chipset)', 'CND-MB (X,Z Chipset)'],
+      PSU: ['CND-PSU'],
+      CASE: ['CND-Chassis'],
+      COOLER: ['CND-Liquid Cooler'],
+      SSD: ['SSD'],
+      GG: ['GNP-Gaming Gears'],
+      'G Monitor': ['CND-GMNT', 'CND-GMNT ( QHD )'],
+      'Pro Monitor': ['CND-PRO MNT'],
+      DESKTOP: ['CND-PRO ( Cubi, DT & AIO )'],
+      MINIPC: ['CND-PRO ( Cubi, DT & AIO )'],
+      Others: ['Networking', 'CND-GDT']
+    };
+
     function addDaysUTC(date, days) {
       const d = new Date(date);
       d.setUTCDate(d.getUTCDate() + days);
@@ -2289,7 +2323,7 @@
     function buildSelloutRangeQuery(startISO, endISO) {
       return fetchAllPages((from, to) => {
         let q = sb.from('sellout_data')
-          .select('sale_date, lob, disty, quantity')
+          .select('sale_date, lob, disty, quantity, customer_name')
           .gte('sale_date', startISO).lt('sale_date', endISO)
           .order('sale_date', { ascending: true })
           .order('id', { ascending: true })
@@ -2338,6 +2372,22 @@
         : `<span class="flat">— Khác ${previousLabel} (trước: ${previous})</span>`;
     }
 
+    // % Achievement so sánh kỳ trước phải là CHÊNH LỆCH ĐIỂM % (current -
+    // previous), không phải % thay đổi tương đối như Sell-out/Target.
+    function renderAchievementCompareLine(elId, current, previous, hasPreviousData, previousLabel) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!hasPreviousData || current === null || previous === null || previous === undefined) {
+        el.innerHTML = '<span class="gray">Không có dữ liệu kỳ trước để so sánh</span>';
+        return;
+      }
+      const diff = current - previous;
+      const cls = diff > 0.05 ? 'up' : diff < -0.05 ? 'down' : 'flat';
+      const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '—';
+      const sign = diff > 0 ? '+' : '';
+      el.innerHTML = `<span class="${cls}">${arrow} ${sign}${diff.toFixed(1)} điểm % so với ${previousLabel}</span>`;
+    }
+
     function renderSummariesKpiCards(current, previous, previousLabel) {
       document.getElementById('kpiSellOut').textContent = fmtQtyMsi(current.sellOutQty);
       document.getElementById('kpiTarget').textContent = fmtQtyMsi(current.targetQty);
@@ -2346,7 +2396,7 @@
 
       renderCompareLine('kpiSellOutCompare', current.sellOutQty, previous.sellOutQty, previous.hasAnyData, previousLabel);
       renderCompareLine('kpiTargetCompare', current.targetQty, previous.targetQty, previous.hasAnyData, previousLabel);
-      renderCompareLine('kpiAchievementCompare', current.achievementPct, previous.achievementPct, previous.hasAnyData, previousLabel);
+      renderAchievementCompareLine('kpiAchievementCompare', current.achievementPct, previous.achievementPct, previous.hasAnyData, previousLabel);
       renderTopLobCompareLine('kpiTopLobCompare', current.topLob, previous.topLob, previous.hasAnyData, previousLabel);
     }
 
@@ -2417,63 +2467,6 @@
       });
     }
 
-    function progressFillClass(pct) {
-      if (pct >= 80) return 'over';
-      if (pct >= 50) return 'warn';
-      return 'low';
-    }
-
-    function renderProgressCard(fillId, numsId, achieved, target) {
-      const fill = document.getElementById(fillId);
-      const nums = document.getElementById(numsId);
-      if (!fill || !nums) return;
-      const pct = target > 0 ? (achieved / target) * 100 : 0;
-      fill.style.width = `${Math.min(100, pct)}%`;
-      fill.className = `msi-progress-fill ${progressFillClass(pct)}`;
-      nums.textContent = `${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)} (${pct.toFixed(1)}%)`;
-    }
-
-    async function renderSummariesProgress(quarterStrings) {
-      const isAdmin = currentUser && currentUser.role === 'admin';
-      document.getElementById('progressTeamTitle').textContent = isAdmin
-        ? 'Target Progress — Toàn team'
-        : 'Target Progress';
-      document.getElementById('progressCardSelf')?.classList.toggle('hidden', !isAdmin);
-
-      if (!quarterStrings.length) {
-        renderProgressCard('progressTeamFill', 'progressTeamNums', 0, 0);
-        if (isAdmin) renderProgressCard('progressSelfFill', 'progressSelfNums', 0, 0);
-        return;
-      }
-
-      const yearQuarterPairs = quarterStrings.map((qs) => {
-        const [y, qLabel] = qs.split(' ');
-        return { year: parseInt(y, 10), quarter: parseInt(qLabel.slice(1), 10) };
-      });
-      const matchesQuarter = (r) => yearQuarterPairs.some((p) => p.year === r.year && p.quarter === r.quarter);
-
-      const queries = [
-        scopeByRole(sb.from('v_kpi_achieved').select('achieved_qty, year, quarter')),
-        scopeByRole(sb.from('targets').select('target_qty, quarter').in('quarter', quarterStrings))
-      ];
-      if (isAdmin) {
-        queries.push(
-          sb.from('v_kpi_achieved').select('achieved_qty, year, quarter').eq('assigned_to', currentUser.id),
-          sb.from('targets').select('target_qty, quarter').in('quarter', quarterStrings).eq('assigned_to', currentUser.id)
-        );
-      }
-      const results = await Promise.all(queries);
-
-      const teamAchieved = (results[0].data || []).filter(matchesQuarter).reduce((s, r) => s + (r.achieved_qty || 0), 0);
-      const teamTarget = (results[1].data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
-      renderProgressCard('progressTeamFill', 'progressTeamNums', teamAchieved, teamTarget);
-
-      if (isAdmin) {
-        const selfAchieved = (results[2].data || []).filter(matchesQuarter).reduce((s, r) => s + (r.achieved_qty || 0), 0);
-        const selfTarget = (results[3].data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
-        renderProgressCard('progressSelfFill', 'progressSelfNums', selfAchieved, selfTarget);
-      }
-    }
 
     function renderBreakdownTable(containerId, byKey, totalQty) {
       const el = document.getElementById(containerId);
@@ -2490,6 +2483,30 @@
       }).join('');
     }
 
+    function renderTop10DealersTable(byCustomer, totalQty) {
+      const tbody = document.getElementById('top10DealersBody');
+      if (!tbody) return;
+      const rows = Object.entries(byCustomer).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">Không có dữ liệu</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(([name, qty], i) => {
+        const pct = totalQty > 0 ? (qty / totalQty) * 100 : 0;
+        return `<tr>
+          <td>${i + 1}</td>
+          <td>${name}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(qty)}</td>
+          <td>
+            <div class="msi-breakdown-row" style="gap:8px;">
+              <div class="msi-breakdown-track" style="flex:1;"><div class="msi-breakdown-fill" style="width:${pct.toFixed(1)}%"></div></div>
+              <span class="msi-breakdown-pct">${pct.toFixed(1)}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
     // Tính sellOutQty/targetQty/achievementPct/topLob/breakdown cho 1 khoảng
     // [start,end) cụ thể — dùng chung cho cả kỳ hiện tại và kỳ trước (so sánh).
     async function computeSummariesMetrics(start, end) {
@@ -2497,22 +2514,47 @@
       const endISO = toISODateUTC(end);
       const quarterStrings = getOverlappingQuarterStrings(start, end);
 
+      let targetQuery = quarterStrings.length
+        ? scopeByRole(sb.from('targets').select('target_qty, quarter').in('quarter', quarterStrings))
+        : null;
+      if (targetQuery && msiFilters.lob) {
+        const cats = LOB_TO_TARGET_CATEGORIES[msiFilters.lob] || ['__no_match__'];
+        targetQuery = targetQuery.in('category', cats);
+      }
+
       const [{ data: rows, error: rowsErr }, { data: targetRows, error: targetErr }] = await Promise.all([
         buildSelloutRangeQuery(startISO, endISO),
-        quarterStrings.length
-          ? scopeByRole(sb.from('targets').select('target_qty').in('quarter', quarterStrings))
-          : Promise.resolve({ data: [], error: null })
+        targetQuery || Promise.resolve({ data: [], error: null })
       ]);
       if (rowsErr) console.warn('[summaries sellout]', rowsErr.message);
       if (targetErr) console.warn('[summaries targets]', targetErr.message);
 
       const data = rows || [];
-      const targetQty = (targetRows || []).reduce((s, t) => s + (t.target_qty || 0), 0);
+
+      // Target theo quý lưu nguyên quý — kỳ báo cáo là tuần/tháng chỉ là 1
+      // PHẦN của quý đó, nên phải chia tỉ lệ theo số ngày kỳ đang chọn chồng
+      // lấn với từng quý. Với kỳ = quý/H1/H2/cả năm thì [start,end) trùng
+      // khít ranh giới quý nên tỉ lệ luôn = 1 (ra đúng full quý như cũ).
+      const targetByQuarter = {};
+      (targetRows || []).forEach((t) => { targetByQuarter[t.quarter] = (targetByQuarter[t.quarter] || 0) + (t.target_qty || 0); });
+      let targetQty = 0;
+      quarterStrings.forEach((qs) => {
+        const [y, qLabel] = qs.split(' ');
+        const { start: qStart, end: qEnd } = getQuarterDayBoundsUTC(parseInt(y, 10), parseInt(qLabel.slice(1), 10));
+        const overlapStart = start > qStart ? start : qStart;
+        const overlapEnd = end < qEnd ? end : qEnd;
+        const overlapDays = daysBetweenUTC(overlapStart, overlapEnd);
+        const totalDays = daysBetweenUTC(qStart, qEnd);
+        const ratio = totalDays > 0 ? overlapDays / totalDays : 0;
+        targetQty += (targetByQuarter[qs] || 0) * ratio;
+      });
+
       const sellOutQty = data.reduce((s, r) => s + (r.quantity || 0), 0);
       const achievementPct = targetQty > 0 ? (sellOutQty / targetQty) * 100 : null;
 
       const byLob = {};
       const byNpp = {};
+      const byCustomer = {};
       const byBucketMonth = {};
       const byBucketMonthNpp = {};
       const byBucketDay = {};
@@ -2522,8 +2564,10 @@
         const qty = r.quantity || 0;
         const lob = r.lob || '—';
         const npp = r.disty || '—';
+        const customer = r.customer_name || '—';
         byLob[lob] = (byLob[lob] || 0) + qty;
         byNpp[npp] = (byNpp[npp] || 0) + qty;
+        byCustomer[customer] = (byCustomer[customer] || 0) + qty;
         if (r.sale_date) {
           const monthKey = r.sale_date.slice(0, 7);
           byBucketMonth[monthKey] = byBucketMonth[monthKey] || {};
@@ -2541,7 +2585,7 @@
 
       return {
         sellOutQty, targetQty, achievementPct, topLob,
-        byLob, byNpp, byBucketMonth, byBucketMonthNpp, byBucketDay, byBucketDayNpp,
+        byLob, byNpp, byCustomer, byBucketMonth, byBucketMonthNpp, byBucketDay, byBucketDayNpp,
         quarterStrings, hasAnyData: data.length > 0 || targetQty > 0
       };
     }
@@ -2596,9 +2640,9 @@
         renderSummariesWeekChart(current.byBucketMonthNpp, axisType, start, end);
       }
 
-      await renderSummariesProgress(current.quarterStrings);
       renderBreakdownTable('breakdownNpp', current.byNpp, current.sellOutQty);
       renderBreakdownTable('breakdownLob', current.byLob, current.sellOutQty);
+      renderTop10DealersTable(current.byCustomer, current.sellOutQty);
     }
     tabLoaders['tab-summaries'] = loadSummariesDashboard;
 
