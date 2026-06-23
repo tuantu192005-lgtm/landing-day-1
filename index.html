@@ -1392,6 +1392,29 @@
       box-shadow: 0 18px 32px rgba(16, 42, 78, 0.14);
     }
 
+    .msi-achieve-pct {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--muted);
+      margin: 6px 0 10px;
+      line-height: 1;
+    }
+
+    .msi-achieve-pct.over { color: #1c9a5b; }
+    .msi-achieve-pct.warn { color: #e0a800; }
+    .msi-achieve-pct.low  { color: #c0392b; }
+
+    .msi-achieve-ij {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .msi-progress-track-lg {
+      height: 22px;
+      margin-top: 12px;
+    }
+
     .msi-employee-avatar {
       width: 56px;
       height: 56px;
@@ -1623,6 +1646,11 @@
         <div id="kpiEmployeeList" class="hidden">
           <div class="msi-kpi-detail-hd"><h3>Chọn nhân viên để xem KPI</h3></div>
           <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
+
+          <div class="msi-panel" id="kpiTeamAchieveRow" style="margin-top:16px">
+            <h3>Team Achieve Rate: <span id="kpiTeamAchievePct">—</span></h3>
+            <div class="msi-progress-track msi-progress-track-lg"><div class="msi-progress-fill" id="kpiTeamAchieveFill"></div></div>
+          </div>
         </div>
 
         <div id="kpiDetailView">
@@ -3134,19 +3162,81 @@
       loadKpiDetail(employeeId);
     }
 
-    function renderKpiEmployeeList() {
+    function achieveRateColorClass(pct) {
+      if (pct === null) return '';
+      if (pct >= 100) return 'over';
+      if (pct >= 80) return 'warn';
+      return 'low';
+    }
+
+    async function renderKpiEmployeeList() {
       const grid = document.getElementById('kpiEmployeeGrid');
       if (!grid) return;
       grid.innerHTML = EMPLOYEES.map((emp) => `
         <div class="msi-employee-card" data-emp-id="${emp.id}">
-          <div class="msi-employee-avatar"><i class="fas fa-user"></i></div>
           <div class="msi-employee-name">${emp.name}</div>
-          <div class="msi-employee-hint">Xem KPI <i class="fas fa-arrow-right"></i></div>
+          <div class="msi-achieve-pct">—</div>
+          <div class="msi-progress-track"><div class="msi-progress-fill" style="width:0%"></div></div>
+          <div class="msi-achieve-ij">Đang tải...</div>
         </div>
       `).join('');
       grid.querySelectorAll('.msi-employee-card').forEach((card) => {
         card.addEventListener('click', () => openKpiDetail(card.dataset.empId));
       });
+
+      // Achieve Rate = SUM(final_score_i) / SUM(target_score_j) theo đúng
+      // assigned_to + quarter đang chọn (lấy từ v_kpi_full, đã tính sẵn ở DB).
+      const { year, quarter } = getEffectiveSingleQuarter();
+      const quarterStr = `${year} Q${quarter}`;
+      const empIds = EMPLOYEES.map((e) => e.id);
+
+      const { data, error } = await sb
+        .from('v_kpi_full')
+        .select('assigned_to, final_score_i, target_score_j')
+        .in('assigned_to', empIds)
+        .eq('quarter', quarterStr);
+
+      if (error) {
+        console.warn('[renderKpiEmployeeList v_kpi_full]', error.message);
+        grid.querySelectorAll('.msi-achieve-ij').forEach((el) => { el.textContent = 'Lỗi tải dữ liệu KPI.'; });
+        return;
+      }
+
+      const rows = data || [];
+      let teamI = 0, teamJ = 0, teamHasData = false;
+
+      EMPLOYEES.forEach((emp) => {
+        const empRows = rows.filter((r) => r.assigned_to === emp.id);
+        const hasData = empRows.length > 0;
+        const sumI = empRows.reduce((s, r) => s + (r.final_score_i || 0), 0);
+        const sumJ = empRows.reduce((s, r) => s + (r.target_score_j || 0), 0);
+        if (hasData) { teamI += sumI; teamJ += sumJ; teamHasData = true; }
+
+        const pct = hasData && sumJ > 0 ? (sumI / sumJ) * 100 : null;
+        const cls = achieveRateColorClass(pct);
+
+        const card = grid.querySelector(`.msi-employee-card[data-emp-id="${emp.id}"]`);
+        if (!card) return;
+        const pctEl = card.querySelector('.msi-achieve-pct');
+        pctEl.textContent = pct === null ? '—' : `${pct.toFixed(1)}%`;
+        pctEl.className = `msi-achieve-pct ${cls}`;
+        const fill = card.querySelector('.msi-progress-fill');
+        fill.style.width = `${pct === null ? 0 : Math.min(100, pct)}%`;
+        fill.className = `msi-progress-fill ${cls}`;
+        card.querySelector('.msi-achieve-ij').textContent = hasData
+          ? `I: ${fmtQtyMsi(sumI)} / J: ${fmtQtyMsi(sumJ)}`
+          : 'Chưa có target';
+      });
+
+      const teamPct = teamHasData && teamJ > 0 ? (teamI / teamJ) * 100 : null;
+      const teamCls = achieveRateColorClass(teamPct);
+      const teamPctEl = document.getElementById('kpiTeamAchievePct');
+      const teamFillEl = document.getElementById('kpiTeamAchieveFill');
+      if (teamPctEl) teamPctEl.textContent = teamPct === null ? '—' : `${teamPct.toFixed(1)}%`;
+      if (teamFillEl) {
+        teamFillEl.style.width = `${teamPct === null ? 0 : Math.min(100, teamPct)}%`;
+        teamFillEl.className = `msi-progress-fill ${teamCls}`;
+      }
     }
 
     function showKpiEmployeeList() {
