@@ -1456,6 +1456,9 @@
     .staff-alloc-remaining.zero { color: #1c9a5b; font-weight: 700; }
     .staff-alloc-remaining.pos  { color: var(--muted); }
 
+    .qtg-alloc { background: #f0f3f7; color: var(--muted); }
+    .qtg-over { color: #c0392b; font-weight: 700; background: #fdeceb; }
+
     /* Bảng "Phân bổ Target" — cố định width từng nhóm cột để gọn lại,
        overflow-x:auto (đã có sẵn ở .table-wrapper) lo phần cuộn ngang.
        table-layout:fixed + width:auto (đè width:100% của .target-table)
@@ -1860,6 +1863,7 @@
           <div class="msi-kpi-detail-hd">
             <button type="button" class="btn-secondary hidden" id="kpiDetailBackBtn"><i class="fas fa-arrow-left"></i> Quay lại</button>
             <h3 id="kpiDetailName">KPI của bạn</h3>
+            <button type="button" class="btn-secondary hidden" id="openQuarterTargetGridBtn">Nhập Target Theo Quý</button>
           </div>
 
           <div class="msi-panel" style="margin-bottom:20px">
@@ -1892,6 +1896,35 @@
           <div class="msi-panel" style="max-width:480px">
             <h3>% Hoàn thành theo hạng mục</h3>
             <div class="msi-chart-wrap" style="height:320px"><canvas id="kpiDetailDonut"></canvas></div>
+          </div>
+        </div>
+
+        <div id="quarterTargetGridView" class="hidden">
+          <div class="msi-kpi-detail-hd">
+            <h3 id="quarterTargetGridTitle">Target — Năm</h3>
+          </div>
+          <div class="msi-panel">
+            <div class="table-wrapper">
+              <table class="target-table kpi-detail-table">
+                <thead>
+                  <tr>
+                    <th class="kpi-col-name">Hạng mục</th>
+                    <th class="kpi-col-num">Q1</th>
+                    <th class="kpi-col-num">Q2</th>
+                    <th class="kpi-col-num">Q3</th>
+                    <th class="kpi-col-num">Q4</th>
+                    <th class="kpi-col-num">Tổng năm</th>
+                    <th class="kpi-col-num">Phân bổ năm</th>
+                  </tr>
+                </thead>
+                <tbody id="quarterTargetGridBody"></tbody>
+              </table>
+            </div>
+            <div class="dashboard-actions" style="margin-top:14px">
+              <button type="button" class="btn-primary" id="saveQuarterTargetGridBtn">Lưu tất cả</button>
+              <button type="button" class="btn-secondary" id="cancelQuarterTargetGridBtn">Huỷ</button>
+            </div>
+            <div class="login-error" id="quarterTargetGridMessage"></div>
           </div>
         </div>
       </section>
@@ -3263,6 +3296,7 @@
     // targets và view v_kpi_full vẫn dùng K để tính E = F × K ở backend.
     let kpiDetailDonutInstance = null;
     let kpiCurrentEmployeeId = null; // null = đang ở màn chọn nhân viên (chỉ admin)
+    let quarterTargetGridState = null; // { employeeId, year, targetMap } của grid Q1-Q4 đang mở
 
     async function saveKpiTargetField(rowId, column, value, employeeId) {
       const num = value === '' ? null : Number(value);
@@ -3411,8 +3445,173 @@
       document.getElementById('kpiEmployeeList')?.classList.add('hidden');
       document.getElementById('kpiDetailView')?.classList.remove('hidden');
       document.getElementById('kpiDetailBackBtn')?.classList.toggle('hidden', currentUser?.role !== 'admin');
+      document.getElementById('openQuarterTargetGridBtn')?.classList.toggle('hidden', currentUser?.role !== 'admin');
       loadKpiDetail(employeeId);
     }
+
+    // ── Grid nhập nhanh target Q1-Q4 cho 1 nhân viên ────────────
+    function openQuarterTargetGrid() {
+      if (!kpiCurrentEmployeeId) return;
+      document.getElementById('kpiDetailView')?.classList.add('hidden');
+      document.getElementById('quarterTargetGridView')?.classList.remove('hidden');
+      const msgEl = document.getElementById('quarterTargetGridMessage');
+      if (msgEl) msgEl.textContent = '';
+      loadQuarterTargetGrid(kpiCurrentEmployeeId);
+    }
+
+    function closeQuarterTargetGrid() {
+      document.getElementById('quarterTargetGridView')?.classList.add('hidden');
+      document.getElementById('kpiDetailView')?.classList.remove('hidden');
+    }
+    document.getElementById('openQuarterTargetGridBtn')?.addEventListener('click', openQuarterTargetGrid);
+    document.getElementById('cancelQuarterTargetGridBtn')?.addEventListener('click', closeQuarterTargetGrid);
+
+    function recalcQuarterGridRow(tr) {
+      let total = 0;
+      tr.querySelectorAll('.qtg-q-input').forEach((inp) => { total += Number(inp.value) || 0; });
+      const totalEl = tr.querySelector('.qtg-total');
+      if (!totalEl) return;
+      totalEl.textContent = fmtQtyMsi(total);
+      const allocRaw = tr.dataset.alloc;
+      if (allocRaw === '') {
+        totalEl.classList.remove('qtg-over');
+        return;
+      }
+      totalEl.classList.toggle('qtg-over', total > Number(allocRaw));
+    }
+
+    async function loadQuarterTargetGrid(employeeId) {
+      const tbody = document.getElementById('quarterTargetGridBody');
+      const titleEl = document.getElementById('quarterTargetGridTitle');
+      const msgEl = document.getElementById('quarterTargetGridMessage');
+      if (!tbody) return;
+      const emp = EMPLOYEES.find((e) => e.id === employeeId);
+      const { year } = getEffectiveSingleQuarter();
+      if (titleEl) titleEl.textContent = `Target ${emp ? emp.name : ''} — Năm ${year}`;
+      tbody.innerHTML = '<tr><td colspan="7">Đang tải...</td></tr>';
+
+      const categories = await getAnnualTargetCategories();
+      if (!categories.length) {
+        tbody.innerHTML = '<tr><td colspan="7">Chưa có hạng mục KPI nào trong hệ thống.</td></tr>';
+        return;
+      }
+
+      const quarterStrings = [1, 2, 3, 4].map((q) => `${year} Q${q}`);
+      const [{ data: targetRows, error: targetErr }, { data: allocRows, error: allocErr }] = await Promise.all([
+        sb.from('targets').select('id, category, quarter, target_qty, item_weight, y2023_avg, parent_category')
+          .eq('assigned_to', employeeId).in('quarter', quarterStrings),
+        sb.from('annual_staff_targets').select('category, target_qty').eq('assigned_to', employeeId).eq('year', year)
+      ]);
+
+      if (targetErr) {
+        tbody.innerHTML = `<tr><td colspan="7">Lỗi tải target: ${targetErr.message}</td></tr>`;
+        return;
+      }
+      if (allocErr && !isMissingTableError(allocErr, 'annual_staff_targets')) {
+        console.warn('[loadQuarterTargetGrid annual_staff_targets]', allocErr.message);
+      }
+
+      // targetMap[category][quarterNum] = { id, target_qty, item_weight, y2023_avg, parent_category }
+      const targetMap = {};
+      (targetRows || []).forEach((r) => {
+        const qNum = parseInt(r.quarter.split(' Q')[1], 10);
+        targetMap[r.category] = targetMap[r.category] || {};
+        targetMap[r.category][qNum] = r;
+      });
+      const allocMap = {};
+      (allocRows || []).forEach((r) => { allocMap[r.category] = r.target_qty; });
+
+      quarterTargetGridState = { employeeId, year, targetMap };
+
+      tbody.innerHTML = categories.map((cat) => {
+        const hasAlloc = allocMap[cat] !== undefined;
+        const allocVal = hasAlloc ? allocMap[cat] : '';
+        const qCells = [1, 2, 3, 4].map((q) => {
+          const existing = targetMap[cat]?.[q];
+          const val = existing ? existing.target_qty : '';
+          return `<td class="kpi-col-num"><input type="number" step="1" class="target-input qtg-q-input" data-category="${cat}" data-quarter="${q}" value="${val ?? ''}" /></td>`;
+        }).join('');
+        const total = [1, 2, 3, 4].reduce((s, q) => s + (targetMap[cat]?.[q]?.target_qty || 0), 0);
+        const isOver = hasAlloc && total > allocVal;
+        return `<tr data-category="${cat}" data-alloc="${hasAlloc ? allocVal : ''}">
+          <td class="kpi-col-name">${cat}</td>
+          ${qCells}
+          <td class="kpi-col-num qtg-total ${isOver ? 'qtg-over' : ''}">${fmtQtyMsi(total)}</td>
+          <td class="kpi-col-num qtg-alloc">${hasAlloc ? fmtQtyMsi(allocVal) : '—'}</td>
+        </tr>`;
+      }).join('');
+
+      tbody.querySelectorAll('tr').forEach((tr) => {
+        tr.querySelectorAll('.qtg-q-input').forEach((inp) => {
+          inp.addEventListener('input', () => recalcQuarterGridRow(tr));
+        });
+      });
+
+      if (msgEl) msgEl.textContent = '';
+    }
+
+    async function saveQuarterTargetGrid() {
+      const msgEl = document.getElementById('quarterTargetGridMessage');
+      const tbody = document.getElementById('quarterTargetGridBody');
+      if (!tbody || !quarterTargetGridState) return;
+      const { employeeId, year, targetMap } = quarterTargetGridState;
+      const emp = EMPLOYEES.find((e) => e.id === employeeId);
+
+      const updates = [];
+      const inserts = [];
+      tbody.querySelectorAll('.qtg-q-input').forEach((inp) => {
+        const cat = inp.dataset.category;
+        const q = parseInt(inp.dataset.quarter, 10);
+        const val = Number(inp.value) || 0;
+        const existing = targetMap[cat]?.[q];
+        if (existing) {
+          // PostgREST upsert vẫn chạy qua câu INSERT ... ON CONFLICT nên phải
+          // truyền đủ các cột NOT NULL (category/quarter/assigned_to), không
+          // thể chỉ gửi {id, target_qty} — sẽ lỗi "null value in column
+          // category" dù dòng đó đã tồn tại.
+          updates.push({
+            id: existing.id,
+            assigned_to: employeeId,
+            quarter: `${year} Q${q}`,
+            category: cat,
+            target_qty: val,
+            item_weight: existing.item_weight,
+            y2023_avg: existing.y2023_avg,
+            parent_category: existing.parent_category
+          });
+        } else {
+          const q1Ref = targetMap[cat]?.[1];
+          inserts.push({
+            assigned_to: employeeId,
+            quarter: `${year} Q${q}`,
+            category: cat,
+            target_qty: val,
+            item_weight: q1Ref ? q1Ref.item_weight : null,
+            y2023_avg: q1Ref ? q1Ref.y2023_avg : null,
+            parent_category: q1Ref ? q1Ref.parent_category : null,
+            target_stretched: 0,
+            actual_qty: 0
+          });
+        }
+      });
+
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+
+      const ops = [];
+      if (updates.length) ops.push(sb.from('targets').upsert(updates));
+      if (inserts.length) ops.push(sb.from('targets').insert(inserts));
+      const results = await Promise.all(ops);
+      const failed = results.find((r) => r.error);
+      if (failed) {
+        if (msgEl) { msgEl.textContent = 'Lỗi lưu target: ' + failed.error.message; msgEl.style.color = '#b30012'; }
+        return;
+      }
+
+      closeQuarterTargetGrid();
+      showMsiToast(`Đã lưu target ${emp ? emp.name : ''} năm ${year}`);
+      await loadKpiDetail(employeeId);
+    }
+    document.getElementById('saveQuarterTargetGridBtn')?.addEventListener('click', saveQuarterTargetGrid);
 
     function achieveRateColorClass(pct) {
       if (pct === null) return '';
