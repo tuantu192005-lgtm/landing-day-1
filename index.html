@@ -3415,20 +3415,33 @@
       return annualTargetCategoriesCache;
     }
 
+    // QUAN TRỌNG: hàm này chạy lại MỖI LẦN mở màn hình (không chỉ lần đầu) —
+    // luôn set dropdown Năm = năm đang chọn ở bộ lọc chính (msiFilters.year),
+    // hoặc năm hiện tại thật nếu bộ lọc chính chưa chọn gì. Trước đây có guard
+    // "dataset.filled" khiến giá trị mặc định chỉ được set ĐÚNG 1 LẦN DUY NHẤT
+    // trong cả session, nên các lần mở sau bị kẹt ở năm cũ/sai → load trống.
     function initYearDropdownGeneric(selId, onChange) {
       const sel = document.getElementById(selId);
-      if (!sel || sel.dataset.filled) return;
+      if (!sel) return;
+
+      const defaultYear = getEffectiveSingleQuarter().year; // theo bộ lọc chính, fallback năm thật
       const current = new Date().getFullYear();
+      const minY = Math.min(current, defaultYear) - 2;
+      const maxY = Math.max(current, defaultYear) + 2;
       const years = [];
-      for (let y = current - 2; y <= current + 2; y++) years.push(y);
+      for (let y = minY; y <= maxY; y++) years.push(y);
       sel.innerHTML = years.map((y) => `<option value="${y}">${y}</option>`).join('');
-      sel.value = String(getSelectedAnnualYear());
-      sel.dataset.filled = '1';
-      sel.addEventListener('change', () => {
-        const year = parseInt(sel.value, 10);
-        setSelectedAnnualYear(year);
-        onChange(year);
-      });
+      sel.value = String(defaultYear);
+      selectedAnnualYear = defaultYear;
+
+      if (!sel.dataset.listenerBound) {
+        sel.addEventListener('change', () => {
+          const year = parseInt(sel.value, 10);
+          setSelectedAnnualYear(year);
+          onChange(year);
+        });
+        sel.dataset.listenerBound = '1';
+      }
     }
 
     function initAnnualTargetYearDropdown() {
