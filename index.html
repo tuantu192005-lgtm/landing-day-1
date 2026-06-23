@@ -1432,6 +1432,20 @@
       color: var(--muted);
     }
 
+    .annual-readonly {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .staff-alloc-total {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .staff-alloc-remaining.neg  { color: #c0392b; font-weight: 700; }
+    .staff-alloc-remaining.zero { color: #1c9a5b; font-weight: 700; }
+    .staff-alloc-remaining.pos  { color: var(--muted); }
+
     .msi-toast {
       position: fixed;
       bottom: 24px;
@@ -1686,7 +1700,10 @@
         <div id="kpiEmployeeList" class="hidden">
           <div class="msi-kpi-detail-hd">
             <h3>Chọn nhân viên để xem KPI</h3>
-            <button type="button" class="btn-secondary" id="openAnnualTargetBtn">Cài đặt Target Năm</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn-secondary" id="openAnnualTargetBtn">Cài đặt Target Năm</button>
+              <button type="button" class="btn-secondary" id="openStaffAllocationBtn">Phân bổ Target</button>
+            </div>
           </div>
           <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
 
@@ -1723,6 +1740,40 @@
               <button type="button" class="btn-secondary" id="cancelAnnualTargetsBtn">Huỷ</button>
             </div>
             <div class="login-error" id="annualTargetMessage"></div>
+          </div>
+        </div>
+
+        <div id="staffAllocationView" class="hidden">
+          <div class="msi-kpi-detail-hd">
+            <h3>Phân bổ Target Năm cho Nhân viên</h3>
+            <div class="form-group" style="max-width:140px;margin:0">
+              <label for="staffAllocationYear">Năm</label>
+              <select id="staffAllocationYear"></select>
+            </div>
+          </div>
+          <div class="msi-panel">
+            <div class="table-wrapper">
+              <table class="target-table kpi-detail-table">
+                <thead>
+                  <tr>
+                    <th class="kpi-col-name">Hạng mục</th>
+                    <th class="kpi-col-num">Target Năm</th>
+                    <th class="kpi-col-num">Tú</th>
+                    <th class="kpi-col-num">Lập</th>
+                    <th class="kpi-col-num">Linh</th>
+                    <th class="kpi-col-num">Tâm</th>
+                    <th class="kpi-col-num">Tổng phân bổ</th>
+                    <th class="kpi-col-num">Còn lại</th>
+                  </tr>
+                </thead>
+                <tbody id="staffAllocationTableBody"></tbody>
+              </table>
+            </div>
+            <div class="dashboard-actions" style="margin-top:14px">
+              <button type="button" class="btn-primary" id="saveStaffAllocationBtn">Lưu</button>
+              <button type="button" class="btn-secondary" id="cancelStaffAllocationBtn">Huỷ</button>
+            </div>
+            <div class="login-error" id="staffAllocationMessage"></div>
           </div>
         </div>
 
@@ -3244,9 +3295,23 @@
       return 'low';
     }
 
+    // Năm dùng chung cho 3 nơi (thẻ nhân viên, màn Cài đặt Target Năm, màn
+    // Phân bổ Target) — đổi ở 1 nơi thì 2 nơi còn lại cũng đồng bộ theo.
+    let selectedAnnualYear = null;
     function getSelectedAnnualYear() {
-      const v = parseInt(document.getElementById('annualTargetYear')?.value, 10);
-      return v || getEffectiveSingleQuarter().year;
+      if (!selectedAnnualYear) selectedAnnualYear = getEffectiveSingleQuarter().year;
+      return selectedAnnualYear;
+    }
+    function setSelectedAnnualYear(year) {
+      selectedAnnualYear = year;
+      const aSel = document.getElementById('annualTargetYear');
+      const sSel = document.getElementById('staffAllocationYear');
+      if (aSel && aSel.value !== String(year)) aSel.value = String(year);
+      if (sSel && sSel.value !== String(year)) sSel.value = String(year);
+    }
+
+    function isMissingTableError(error, tableName) {
+      return !!error && new RegExp(tableName).test(error.message) && /schema cache|does not exist/i.test(error.message);
     }
 
     async function renderKpiEmployeeList() {
@@ -3272,9 +3337,11 @@
       const empIds = EMPLOYEES.map((e) => e.id);
       const annualYear = getSelectedAnnualYear();
 
+      // "Phân bổ năm" của từng người lấy từ annual_staff_targets (đã phân bổ
+      // riêng theo người), KHÔNG còn cộng targets theo quý như trước.
       const [{ data, error }, { data: yearTargetRows, error: yearErr }, { data: annualRows, error: annualErr }] = await Promise.all([
         sb.from('v_kpi_full').select('assigned_to, final_score_i, target_score_j').in('assigned_to', empIds).eq('quarter', quarterStr),
-        sb.from('targets').select('assigned_to, target_qty').in('assigned_to', empIds).ilike('quarter', `${annualYear}%`),
+        sb.from('annual_staff_targets').select('assigned_to, target_qty').eq('year', annualYear).in('assigned_to', empIds),
         sb.from('annual_targets').select('target_qty').eq('year', annualYear)
       ]);
 
@@ -3283,7 +3350,9 @@
         grid.querySelectorAll('.msi-achieve-ij').forEach((el) => { el.textContent = 'Lỗi tải dữ liệu KPI.'; });
         return;
       }
-      if (yearErr) console.warn('[renderKpiEmployeeList targets theo năm]', yearErr.message);
+      if (yearErr && !isMissingTableError(yearErr, 'annual_staff_targets')) {
+        console.warn('[renderKpiEmployeeList annual_staff_targets]', yearErr.message);
+      }
       if (annualErr) console.warn('[renderKpiEmployeeList annual_targets]', annualErr.message);
 
       const rows = data || [];
@@ -3346,21 +3415,28 @@
       return annualTargetCategoriesCache;
     }
 
-    function initAnnualTargetYearDropdown() {
-      const sel = document.getElementById('annualTargetYear');
+    function initYearDropdownGeneric(selId, onChange) {
+      const sel = document.getElementById(selId);
       if (!sel || sel.dataset.filled) return;
       const current = new Date().getFullYear();
       const years = [];
       for (let y = current - 2; y <= current + 2; y++) years.push(y);
       sel.innerHTML = years.map((y) => `<option value="${y}">${y}</option>`).join('');
-      const defaultYear = getEffectiveSingleQuarter().year;
-      if (years.includes(defaultYear)) sel.value = String(defaultYear);
+      sel.value = String(getSelectedAnnualYear());
       sel.dataset.filled = '1';
       sel.addEventListener('change', () => {
         const year = parseInt(sel.value, 10);
-        loadAnnualTargetSection(year);
-        renderKpiEmployeeList();
+        setSelectedAnnualYear(year);
+        onChange(year);
       });
+    }
+
+    function initAnnualTargetYearDropdown() {
+      initYearDropdownGeneric('annualTargetYear', (year) => loadAnnualTargetSection(year));
+    }
+
+    function initStaffAllocationYearDropdown() {
+      initYearDropdownGeneric('staffAllocationYear', (year) => loadStaffAllocationSection(year));
     }
 
     async function loadAnnualTargetSection(year) {
@@ -3381,7 +3457,7 @@
       ]);
 
       if (annualErr) {
-        const msg = /annual_targets/.test(annualErr.message) && /schema cache|does not exist/i.test(annualErr.message)
+        const msg = isMissingTableError(annualErr, 'annual_targets')
           ? 'Bảng annual_targets chưa được tạo trong DB — chạy mcp_tables_v8.sql trong Supabase SQL Editor trước.'
           : 'Lỗi tải target năm: ' + annualErr.message;
         tbody.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
@@ -3472,10 +3548,144 @@
     }
     document.getElementById('saveAnnualTargetsBtn')?.addEventListener('click', saveAnnualTargets);
 
+    // ── Phân bổ Target Năm cho Nhân viên (annual_staff_targets) ─
+    function recalcStaffAllocationRow(tr) {
+      let total = 0;
+      tr.querySelectorAll('.staff-alloc-input').forEach((inp) => { total += Number(inp.value) || 0; });
+      const totalEl = tr.querySelector('.staff-alloc-total');
+      if (totalEl) totalEl.textContent = fmtQtyMsi(total);
+
+      const remEl = tr.querySelector('.staff-alloc-remaining');
+      if (!remEl) return;
+      const annualRaw = tr.dataset.annualTarget;
+      if (annualRaw === '') {
+        remEl.textContent = '—';
+        remEl.className = 'kpi-col-num staff-alloc-remaining';
+        return;
+      }
+      const remaining = Number(annualRaw) - total;
+      remEl.textContent = fmtQtyMsi(remaining);
+      remEl.className = 'kpi-col-num staff-alloc-remaining ' + (remaining < 0 ? 'neg' : remaining === 0 ? 'zero' : 'pos');
+    }
+
+    async function loadStaffAllocationSection(year) {
+      const tbody = document.getElementById('staffAllocationTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="8">Đang tải...</td></tr>';
+
+      const categories = await getAnnualTargetCategories();
+      if (!categories.length) {
+        tbody.innerHTML = '<tr><td colspan="8">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
+        return;
+      }
+
+      const empIds = EMPLOYEES.map((e) => e.id);
+      const [{ data: annualRows, error: annualErr }, { data: staffRows, error: staffErr }] = await Promise.all([
+        sb.from('annual_targets').select('category, target_qty').eq('year', year),
+        sb.from('annual_staff_targets').select('category, assigned_to, target_qty').eq('year', year).in('assigned_to', empIds)
+      ]);
+
+      if (annualErr) {
+        const msg = isMissingTableError(annualErr, 'annual_targets')
+          ? 'Bảng annual_targets chưa được tạo — chạy mcp_tables_v8.sql trước.'
+          : 'Lỗi tải target năm: ' + annualErr.message;
+        tbody.innerHTML = `<tr><td colspan="8">${msg}</td></tr>`;
+        return;
+      }
+      if (staffErr) {
+        if (isMissingTableError(staffErr, 'annual_staff_targets')) {
+          tbody.innerHTML = '<tr><td colspan="8">Bảng annual_staff_targets chưa được tạo — chạy mcp_tables_v9.sql trong Supabase SQL Editor trước.</td></tr>';
+          return;
+        }
+        console.warn('[loadStaffAllocationSection]', staffErr.message);
+      }
+
+      const annualByCategory = {};
+      (annualRows || []).forEach((r) => { annualByCategory[r.category] = r.target_qty; });
+
+      const staffByKey = {};
+      (staffRows || []).forEach((r) => { staffByKey[`${r.category}|${r.assigned_to}`] = r.target_qty; });
+
+      tbody.innerHTML = categories.map((cat) => {
+        const annualVal = annualByCategory[cat];
+        const hasAnnual = annualVal !== undefined;
+        const inputsHtml = EMPLOYEES.map((emp) => {
+          const val = staffByKey[`${cat}|${emp.id}`];
+          return `<td class="kpi-col-num"><input type="number" step="1" class="staff-alloc-input" data-category="${cat}" data-emp="${emp.id}" value="${val ?? ''}" /></td>`;
+        }).join('');
+        const total = EMPLOYEES.reduce((s, emp) => s + (staffByKey[`${cat}|${emp.id}`] || 0), 0);
+        const remaining = hasAnnual ? annualVal - total : null;
+        const remCls = !hasAnnual ? '' : remaining < 0 ? 'neg' : remaining === 0 ? 'zero' : 'pos';
+        return `<tr data-category="${cat}" data-annual-target="${hasAnnual ? annualVal : ''}">
+          <td class="kpi-col-name">${cat}</td>
+          <td class="kpi-col-num annual-readonly">${hasAnnual ? fmtQtyMsi(annualVal) : '—'}</td>
+          ${inputsHtml}
+          <td class="kpi-col-num staff-alloc-total">${fmtQtyMsi(total)}</td>
+          <td class="kpi-col-num staff-alloc-remaining ${remCls}">${hasAnnual ? fmtQtyMsi(remaining) : '—'}</td>
+        </tr>`;
+      }).join('');
+
+      tbody.querySelectorAll('.staff-alloc-input').forEach((input) => {
+        input.addEventListener('input', () => recalcStaffAllocationRow(input.closest('tr')));
+      });
+    }
+
+    function showStaffAllocationView() {
+      document.getElementById('kpiEmployeeList')?.classList.add('hidden');
+      document.getElementById('staffAllocationView')?.classList.remove('hidden');
+      const msgEl = document.getElementById('staffAllocationMessage');
+      if (msgEl) msgEl.textContent = '';
+      initStaffAllocationYearDropdown();
+      loadStaffAllocationSection(getSelectedAnnualYear());
+    }
+
+    function hideStaffAllocationView() {
+      document.getElementById('staffAllocationView')?.classList.add('hidden');
+      document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
+    }
+    document.getElementById('openStaffAllocationBtn')?.addEventListener('click', showStaffAllocationView);
+    document.getElementById('cancelStaffAllocationBtn')?.addEventListener('click', hideStaffAllocationView);
+
+    async function saveStaffAllocation() {
+      const year = parseInt(document.getElementById('staffAllocationYear')?.value, 10);
+      const msgEl = document.getElementById('staffAllocationMessage');
+      const inputs = document.querySelectorAll('#staffAllocationTableBody .staff-alloc-input');
+      if (!year || !inputs.length) return;
+
+      const upsertRows = [];
+      inputs.forEach((input) => {
+        if (input.value === '') return;
+        upsertRows.push({
+          year,
+          category: input.dataset.category,
+          assigned_to: input.dataset.emp,
+          target_qty: Number(input.value) || 0,
+          updated_at: new Date().toISOString()
+        });
+      });
+
+      if (!upsertRows.length) {
+        if (msgEl) { msgEl.textContent = 'Chưa nhập giá trị nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        return;
+      }
+
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      const { error } = await sb.from('annual_staff_targets').upsert(upsertRows, { onConflict: 'year,category,assigned_to' });
+      if (error) {
+        if (msgEl) { msgEl.textContent = 'Lỗi lưu phân bổ: ' + error.message; msgEl.style.color = '#b30012'; }
+        return;
+      }
+      hideStaffAllocationView();
+      showMsiToast('Đã lưu phân bổ');
+      await renderKpiEmployeeList();
+    }
+    document.getElementById('saveStaffAllocationBtn')?.addEventListener('click', saveStaffAllocation);
+
     function showKpiEmployeeList() {
       kpiCurrentEmployeeId = null;
       document.getElementById('kpiDetailView')?.classList.add('hidden');
       document.getElementById('annualTargetView')?.classList.add('hidden');
+      document.getElementById('staffAllocationView')?.classList.add('hidden');
       document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
     }
 
@@ -3485,6 +3695,7 @@
         // Staff vào thẳng KPI của chính họ, không qua màn chọn người.
         document.getElementById('kpiEmployeeList')?.classList.add('hidden');
         document.getElementById('annualTargetView')?.classList.add('hidden');
+        document.getElementById('staffAllocationView')?.classList.add('hidden');
         document.getElementById('kpiDetailView')?.classList.remove('hidden');
         document.getElementById('kpiDetailBackBtn')?.classList.add('hidden');
         openKpiDetail(currentUser.id);
@@ -3495,6 +3706,7 @@
       } else {
         document.getElementById('kpiDetailView')?.classList.add('hidden');
         document.getElementById('annualTargetView')?.classList.add('hidden');
+        document.getElementById('staffAllocationView')?.classList.add('hidden');
         document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
         renderKpiEmployeeList();
       }
