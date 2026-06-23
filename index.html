@@ -1404,6 +1404,10 @@
     .msi-achieve-pct.warn { color: #e0a800; }
     .msi-achieve-pct.low  { color: #c0392b; }
 
+    .nam-kpi-status.over { color: #1c9a5b; font-weight: 700; }
+    .nam-kpi-status.warn { color: #e0a800; font-weight: 700; }
+    .nam-kpi-status.low  { color: #c0392b; font-weight: 700; }
+
     .msi-achieve-ij {
       margin-top: 10px;
       font-size: 0.78rem;
@@ -1765,12 +1769,13 @@
                     <th class="kpi-col-num">Target Năm</th>
                     <th class="kpi-col-num">Achieved (tích lũy)</th>
                     <th class="kpi-col-num">% Năm</th>
+                    <th class="kpi-col-num">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody id="namKpiTableBody"></tbody>
                 <tfoot>
                   <tr>
-                    <td colspan="3" style="text-align:right; font-weight:700;">Achieve Rate tổng</td>
+                    <td colspan="4" style="text-align:right; font-weight:700;">Achieve Rate tổng</td>
                     <td class="kpi-col-num" id="namKpiAchieveRate" style="font-weight:700;">—</td>
                   </tr>
                 </tfoot>
@@ -3510,11 +3515,11 @@
       const yearLabel = document.getElementById('namKpiYearLabel');
       if (!tbody) return;
       if (yearLabel) yearLabel.textContent = year;
-      tbody.innerHTML = '<tr><td colspan="4">Đang tải...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5">Đang tải...</td></tr>';
 
       const categories = await getAnnualTargetCategories();
       if (!categories.length) {
-        tbody.innerHTML = '<tr><td colspan="4">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
         if (rateEl) rateEl.textContent = '—';
         return;
       }
@@ -3530,7 +3535,7 @@
         const msg = isMissingTableError(annualErr, 'annual_targets')
           ? 'Bảng annual_targets chưa được tạo — chạy mcp_tables_v8.sql trước.'
           : 'Lỗi tải target năm: ' + annualErr.message;
-        tbody.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">${msg}</td></tr>`;
         if (rateEl) rateEl.textContent = '—';
         return;
       }
@@ -3557,11 +3562,14 @@
           sumI += achieved * w;
           sumJ += target * w;
         }
+        const statusCls = achieveRateColorClass(pct);
+        const statusLabel = pct === null ? '—' : statusCls === 'over' ? '✅ Đạt' : statusCls === 'warn' ? '🟡 Đang chạy' : '🔴 Chưa đạt';
         return `<tr>
           <td class="kpi-col-name">${cat}</td>
           <td class="kpi-col-num">${hasTarget ? fmtQtyMsi(target) : '—'}</td>
           <td class="kpi-col-num">${fmtQtyMsi(achieved)}</td>
           <td class="kpi-col-num">${pct === null ? '—' : pct.toFixed(1) + '%'}</td>
+          <td class="kpi-col-num nam-kpi-status ${statusCls}">${statusLabel}</td>
         </tr>`;
       }).join('');
 
