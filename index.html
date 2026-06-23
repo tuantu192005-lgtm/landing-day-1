@@ -1740,7 +1740,21 @@
       <section class="msi-tab-pane" id="tab-sales-kpi">
         <!-- Chỉ admin thấy danh sách nhân viên để chọn; staff vào thẳng KPI của mình -->
         <div id="kpiEmployeeList" class="hidden">
-          <div class="msi-panel" id="namKpiSection" style="margin-bottom:16px">
+          <div class="msi-kpi-detail-hd">
+            <h3>Chọn nhân viên để xem KPI</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn-secondary" id="openAnnualTargetBtn">Cài đặt Target Năm</button>
+              <button type="button" class="btn-secondary" id="openStaffAllocationBtn">Phân bổ Target</button>
+            </div>
+          </div>
+          <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
+
+          <div class="msi-panel" id="kpiTeamAchieveRow" style="margin-top:16px">
+            <h3>Team Achieve Rate: <span id="kpiTeamAchievePct">—</span></h3>
+            <div class="msi-progress-track msi-progress-track-lg"><div class="msi-progress-fill" id="kpiTeamAchieveFill"></div></div>
+          </div>
+
+          <div class="msi-panel" id="namKpiSection" style="margin-top:16px">
             <h3>KPI Toàn Team (Nam) — Năm <span id="namKpiYearLabel"></span></h3>
             <p class="msi-panel-note">Target = target năm Nam nhận từ hãng (annual_targets). Achieved = tổng sellout của cả 4 nhân viên trong năm, theo đúng cách gom hạng mục của v_kpi_achieved.</p>
             <div class="table-wrapper">
@@ -1762,20 +1776,6 @@
                 </tfoot>
               </table>
             </div>
-          </div>
-
-          <div class="msi-kpi-detail-hd">
-            <h3>Chọn nhân viên để xem KPI</h3>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn-secondary" id="openAnnualTargetBtn">Cài đặt Target Năm</button>
-              <button type="button" class="btn-secondary" id="openStaffAllocationBtn">Phân bổ Target</button>
-            </div>
-          </div>
-          <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
-
-          <div class="msi-panel" id="kpiTeamAchieveRow" style="margin-top:16px">
-            <h3>Team Achieve Rate: <span id="kpiTeamAchievePct">—</span></h3>
-            <div class="msi-progress-track msi-progress-track-lg"><div class="msi-progress-fill" id="kpiTeamAchieveFill"></div></div>
           </div>
         </div>
 
@@ -2267,7 +2267,14 @@
       if (/^q[1-4]$/.test(period)) {
         return { year, quarter: parseInt(period.slice(1), 10) };
       }
-      return { year, quarter: getCurrentQuarterNumber() };
+      // Chỉ dùng "quý chứa ngày hôm nay" làm fallback khi năm đang chọn ĐÚNG
+      // LÀ năm thực tế hiện tại. Nếu admin đang xem 1 năm khác (vd 2024 khi
+      // hôm nay đang là 2026) thì "quý hôm nay" (Q2/2026) không liên quan gì
+      // tới năm 2024 đang chọn — dùng Q1 của đúng năm đó thay, vì targets
+      // theo quý luôn bắt đầu từ Q1.
+      const now = new Date();
+      const quarter = year === now.getFullYear() ? getCurrentQuarterNumber(now) : 1;
+      return { year, quarter };
     }
 
     function buildSelloutRangeQuery(startISO, endISO) {
