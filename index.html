@@ -1432,6 +1432,29 @@
       color: var(--muted);
     }
 
+    .msi-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--navy-strong);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 9999;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
+      pointer-events: none;
+    }
+
+    .msi-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     .msi-employee-avatar {
       width: 56px;
       height: 56px;
@@ -1661,38 +1684,45 @@
       <section class="msi-tab-pane" id="tab-sales-kpi">
         <!-- Chỉ admin thấy danh sách nhân viên để chọn; staff vào thẳng KPI của mình -->
         <div id="kpiEmployeeList" class="hidden">
-          <div class="msi-panel" id="annualTargetSection" style="margin-bottom:16px">
-            <div class="msi-kpi-detail-hd">
-              <h3>Target Năm Toàn Team</h3>
-              <div class="form-group" style="max-width:140px;margin:0">
-                <label for="annualTargetYear">Năm</label>
-                <select id="annualTargetYear"></select>
-              </div>
+          <div class="msi-kpi-detail-hd">
+            <h3>Chọn nhân viên để xem KPI</h3>
+            <button type="button" class="btn-secondary" id="openAnnualTargetBtn">Cài đặt Target Năm</button>
+          </div>
+          <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
+
+          <div class="msi-panel" id="kpiTeamAchieveRow" style="margin-top:16px">
+            <h3>Team Achieve Rate: <span id="kpiTeamAchievePct">—</span></h3>
+            <div class="msi-progress-track msi-progress-track-lg"><div class="msi-progress-fill" id="kpiTeamAchieveFill"></div></div>
+          </div>
+        </div>
+
+        <div id="annualTargetView" class="hidden">
+          <div class="msi-kpi-detail-hd">
+            <h3>Target Năm Toàn Team</h3>
+            <div class="form-group" style="max-width:140px;margin:0">
+              <label for="annualTargetYear">Năm</label>
+              <select id="annualTargetYear"></select>
             </div>
+          </div>
+          <div class="msi-panel">
             <div class="table-wrapper">
               <table class="target-table kpi-detail-table">
                 <thead>
                   <tr>
-                    <th class="kpi-col-name">Hạng mục</th>
-                    <th class="kpi-col-num">Target năm</th>
-                    <th>Phân bổ</th>
+                    <th class="kpi-col-name">Category</th>
+                    <th class="kpi-col-num">Target Năm</th>
+                    <th class="kpi-col-num">Đã phân bổ</th>
+                    <th class="kpi-col-num">Còn lại</th>
                   </tr>
                 </thead>
                 <tbody id="annualTargetTableBody"></tbody>
               </table>
             </div>
             <div class="dashboard-actions" style="margin-top:14px">
-              <button type="button" class="btn-primary" id="saveAnnualTargetsBtn">Lưu target năm</button>
+              <button type="button" class="btn-primary" id="saveAnnualTargetsBtn">Lưu</button>
+              <button type="button" class="btn-secondary" id="cancelAnnualTargetsBtn">Huỷ</button>
             </div>
             <div class="login-error" id="annualTargetMessage"></div>
-          </div>
-
-          <div class="msi-kpi-detail-hd"><h3>Chọn nhân viên để xem KPI</h3></div>
-          <div class="msi-employee-grid" id="kpiEmployeeGrid"></div>
-
-          <div class="msi-panel" id="kpiTeamAchieveRow" style="margin-top:16px">
-            <h3>Team Achieve Rate: <span id="kpiTeamAchievePct">—</span></h3>
-            <div class="msi-progress-track msi-progress-track-lg"><div class="msi-progress-fill" id="kpiTeamAchieveFill"></div></div>
           </div>
         </div>
 
@@ -1811,6 +1841,8 @@
       </section>
     </main>
   </div>
+
+  <div class="msi-toast" id="msiToast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -3334,11 +3366,11 @@
     async function loadAnnualTargetSection(year) {
       const tbody = document.getElementById('annualTargetTableBody');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="3">Đang tải...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4">Đang tải...</td></tr>';
 
       const categories = await getAnnualTargetCategories();
       if (!categories.length) {
-        tbody.innerHTML = '<tr><td colspan="3">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
         return;
       }
 
@@ -3352,7 +3384,7 @@
         const msg = /annual_targets/.test(annualErr.message) && /schema cache|does not exist/i.test(annualErr.message)
           ? 'Bảng annual_targets chưa được tạo trong DB — chạy mcp_tables_v8.sql trong Supabase SQL Editor trước.'
           : 'Lỗi tải target năm: ' + annualErr.message;
-        tbody.innerHTML = `<tr><td colspan="3">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
         return;
       }
       if (empErr) console.warn('[loadAnnualTargetSection targets]', empErr.message);
@@ -3374,10 +3406,36 @@
         return `<tr>
           <td class="kpi-col-name">${cat}</td>
           <td class="kpi-col-num"><input type="number" step="1" class="target-input" data-category="${cat}" value="${annualVal ?? ''}" /></td>
-          <td class="msi-allocate-info ${isOver ? 'over-allocated' : ''}">Đã phân bổ: ${fmtQtyMsi(allocated)} / Còn lại: ${hasAnnual ? fmtQtyMsi(remaining) : '—'}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(allocated)}</td>
+          <td class="kpi-col-num msi-allocate-info ${isOver ? 'over-allocated' : ''}">${hasAnnual ? fmtQtyMsi(remaining) : '—'}</td>
         </tr>`;
       }).join('');
     }
+
+    function showMsiToast(message) {
+      const el = document.getElementById('msiToast');
+      if (!el) return;
+      el.textContent = message;
+      el.classList.add('show');
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    function showAnnualTargetView() {
+      document.getElementById('kpiEmployeeList')?.classList.add('hidden');
+      document.getElementById('annualTargetView')?.classList.remove('hidden');
+      const msgEl = document.getElementById('annualTargetMessage');
+      if (msgEl) msgEl.textContent = '';
+      initAnnualTargetYearDropdown();
+      loadAnnualTargetSection(getSelectedAnnualYear());
+    }
+
+    function hideAnnualTargetView() {
+      document.getElementById('annualTargetView')?.classList.add('hidden');
+      document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
+    }
+    document.getElementById('openAnnualTargetBtn')?.addEventListener('click', showAnnualTargetView);
+    document.getElementById('cancelAnnualTargetsBtn')?.addEventListener('click', hideAnnualTargetView);
 
     async function saveAnnualTargets() {
       const year = parseInt(document.getElementById('annualTargetYear')?.value, 10);
@@ -3408,8 +3466,8 @@
         if (msgEl) { msgEl.textContent = 'Lỗi lưu target năm: ' + error.message; msgEl.style.color = '#b30012'; }
         return;
       }
-      if (msgEl) { msgEl.textContent = `Đã lưu ${upsertRows.length} hạng mục cho năm ${year}.`; msgEl.style.color = '#1c4d2b'; }
-      await loadAnnualTargetSection(year);
+      hideAnnualTargetView();
+      showMsiToast(`Đã lưu target năm ${year}`);
       await renderKpiEmployeeList();
     }
     document.getElementById('saveAnnualTargetsBtn')?.addEventListener('click', saveAnnualTargets);
@@ -3417,6 +3475,7 @@
     function showKpiEmployeeList() {
       kpiCurrentEmployeeId = null;
       document.getElementById('kpiDetailView')?.classList.add('hidden');
+      document.getElementById('annualTargetView')?.classList.add('hidden');
       document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
     }
 
@@ -3425,6 +3484,7 @@
       if (currentUser.role !== 'admin') {
         // Staff vào thẳng KPI của chính họ, không qua màn chọn người.
         document.getElementById('kpiEmployeeList')?.classList.add('hidden');
+        document.getElementById('annualTargetView')?.classList.add('hidden');
         document.getElementById('kpiDetailView')?.classList.remove('hidden');
         document.getElementById('kpiDetailBackBtn')?.classList.add('hidden');
         openKpiDetail(currentUser.id);
@@ -3434,9 +3494,8 @@
         loadKpiDetail(kpiCurrentEmployeeId);
       } else {
         document.getElementById('kpiDetailView')?.classList.add('hidden');
+        document.getElementById('annualTargetView')?.classList.add('hidden');
         document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
-        initAnnualTargetYearDropdown();
-        loadAnnualTargetSection(getSelectedAnnualYear());
         renderKpiEmployeeList();
       }
     }
