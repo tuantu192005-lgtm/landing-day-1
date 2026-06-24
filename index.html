@@ -1509,6 +1509,32 @@
       cursor: help;
     }
 
+    #categoryRatioGroups {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .msi-ratio-group {
+      flex: 1;
+      min-width: 220px;
+    }
+    .msi-ratio-group h4 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+      color: var(--navy-strong);
+    }
+    .ratio-group-table .ratio-input {
+      width: 90px;
+      text-align: right;
+    }
+    .ratio-total-row td {
+      font-weight: 700;
+      border-top: 2px solid #d9e2f0;
+    }
+    .ratio-total.ratio-total-warn {
+      color: #c0392b;
+    }
+
     /* Bảng "Phân bổ Target" — cố định width từng nhóm cột để gọn lại,
        overflow-x:auto (đã có sẵn ở .table-wrapper) lo phần cuộn ngang.
        table-layout:fixed + width:auto (đè width:100% của .target-table)
@@ -1873,6 +1899,16 @@
               <button type="button" class="btn-secondary" id="cancelAnnualTargetsBtn">Huỷ</button>
             </div>
             <div class="login-error" id="annualTargetMessage"></div>
+          </div>
+
+          <div class="msi-panel" style="margin-top:16px">
+            <h3>Tỉ lệ phân bổ K — % trung bình năm trước</h3>
+            <p class="msi-panel-note">K dùng để chia target hạng mục cha xuống các hạng mục con (v_kpi_full: target_e con = target_stretched cha × K con). Mỗi nhóm, tổng K các hạng mục phải = 1.000.</p>
+            <div id="categoryRatioGroups"></div>
+            <div class="dashboard-actions" style="margin-top:14px">
+              <button type="button" class="btn-primary" id="saveCategoryRatiosBtn">Lưu tỉ lệ K</button>
+            </div>
+            <div class="login-error" id="categoryRatioMessage"></div>
           </div>
         </div>
 
@@ -4086,7 +4122,10 @@
     }
 
     function initAnnualTargetYearDropdown() {
-      initYearDropdownGeneric('annualTargetYear', (year) => loadAnnualTargetSection(year));
+      initYearDropdownGeneric('annualTargetYear', (year) => {
+        loadAnnualTargetSection(year);
+        loadCategoryRatioSection(year);
+      });
     }
 
     function initStaffAllocationYearDropdown() {
@@ -4142,6 +4181,120 @@
       }).join('');
     }
 
+    // ── Tỉ lệ phân bổ K (category_ratios) ───────────────────────
+    // 3 nhóm hạng mục cha-con đang có K ≠ 1 (đã xác nhận qua mcp_tables_v10
+    // migrate từ targets.y2023_avg thật).
+    const CATEGORY_RATIO_GROUPS = [
+      { name: 'CND-MB', categories: ['CND-MB', 'CND-MB (B Chipset)', 'CND-MB (X,Z Chipset)'] },
+      { name: 'CND-GMNT', categories: ['CND-GMNT', 'CND-GMNT ( QHD )'] },
+      { name: 'GNP-VGA', categories: ['GNP-VGA ( GT )', 'GNP-VGA ( GTX + RTX )'] }
+    ];
+
+    function recalcRatioGroupTotal(groupName) {
+      const inputs = document.querySelectorAll(`.ratio-input[data-group="${groupName}"]`);
+      let total = 0;
+      inputs.forEach((inp) => { total += Number(inp.value) || 0; });
+      const totalEl = document.querySelector(`.ratio-total[data-group="${groupName}"]`);
+      if (!totalEl) return;
+      totalEl.textContent = total.toFixed(3);
+      totalEl.classList.toggle('ratio-total-warn', Math.abs(total - 1) > 0.0005);
+    }
+
+    async function loadCategoryRatioSection(year) {
+      const container = document.getElementById('categoryRatioGroups');
+      const msgEl = document.getElementById('categoryRatioMessage');
+      if (!container) return;
+      container.innerHTML = '<p class="msi-panel-note">Đang tải...</p>';
+      if (msgEl) msgEl.textContent = '';
+
+      const allCats = CATEGORY_RATIO_GROUPS.flatMap((g) => g.categories);
+      const [{ data: curRows, error: curErr }, { data: prevRows, error: prevErr }] = await Promise.all([
+        sb.from('category_ratios').select('category, ratio').eq('year', year).in('category', allCats),
+        sb.from('category_ratios').select('category, ratio').eq('year', year - 1).in('category', allCats)
+      ]);
+
+      if (curErr) {
+        const msg = isMissingTableError(curErr, 'category_ratios')
+          ? 'Bảng category_ratios chưa được tạo — chạy mcp_tables_v10.sql trước.'
+          : 'Lỗi tải tỉ lệ K: ' + curErr.message;
+        container.innerHTML = `<p class="msi-panel-note">${msg}</p>`;
+        return;
+      }
+      if (prevErr) console.warn('[loadCategoryRatioSection prev year]', prevErr.message);
+
+      const curMap = {};
+      (curRows || []).forEach((r) => { curMap[r.category] = r.ratio; });
+      const prevMap = {};
+      (prevRows || []).forEach((r) => { prevMap[r.category] = r.ratio; });
+
+      container.innerHTML = CATEGORY_RATIO_GROUPS.map((group) => {
+        const rows = group.categories.map((cat) => {
+          const val = curMap[cat] !== undefined ? curMap[cat] : (prevMap[cat] !== undefined ? prevMap[cat] : 1);
+          return `<tr>
+            <td class="kpi-col-name">${cat}</td>
+            <td class="kpi-col-num"><input type="number" step="0.001" class="target-input ratio-input" data-group="${group.name}" data-category="${cat}" value="${val}" /></td>
+          </tr>`;
+        }).join('');
+        return `<div class="msi-ratio-group">
+          <h4>Nhóm ${group.name}</h4>
+          <table class="target-table kpi-detail-table ratio-group-table">
+            <tbody>
+              ${rows}
+              <tr class="ratio-total-row">
+                <td class="kpi-col-name">Tổng</td>
+                <td class="kpi-col-num ratio-total" data-group="${group.name}">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
+      }).join('');
+
+      container.querySelectorAll('.ratio-input').forEach((inp) => {
+        inp.addEventListener('input', () => recalcRatioGroupTotal(inp.dataset.group));
+      });
+      CATEGORY_RATIO_GROUPS.forEach((g) => recalcRatioGroupTotal(g.name));
+    }
+
+    async function saveCategoryRatios() {
+      const msgEl = document.getElementById('categoryRatioMessage');
+      const year = parseInt(document.getElementById('annualTargetYear')?.value, 10);
+      const inputs = document.querySelectorAll('#categoryRatioGroups .ratio-input');
+      if (!year || !inputs.length) return;
+
+      const upsertRows = [...inputs].map((inp) => ({
+        year,
+        category: inp.dataset.category,
+        ratio: Number(inp.value) || 0
+      }));
+
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+
+      const { error: ratioErr } = await sb.from('category_ratios').upsert(upsertRows, { onConflict: 'year,category' });
+      if (ratioErr) {
+        if (msgEl) { msgEl.textContent = 'Lỗi lưu tỉ lệ K: ' + ratioErr.message; msgEl.style.color = '#b30012'; }
+        return;
+      }
+
+      // Đồng bộ targets.y2023_avg của TẤT CẢ nhân viên, TẤT CẢ quý của năm
+      // này theo đúng category — để v_kpi_full luôn dùng K mới nhất, không
+      // cần sửa từng dòng targets tay.
+      for (const row of upsertRows) {
+        const { error: updErr } = await sb
+          .from('targets')
+          .update({ y2023_avg: row.ratio })
+          .like('quarter', `${year} Q%`)
+          .eq('category', row.category);
+        if (updErr) {
+          if (msgEl) { msgEl.textContent = `Lỗi cập nhật targets cho "${row.category}": ${updErr.message}`; msgEl.style.color = '#b30012'; }
+          return;
+        }
+      }
+
+      if (msgEl) msgEl.textContent = '';
+      showMsiToast(`Đã lưu tỉ lệ K năm ${year}`);
+    }
+    document.getElementById('saveCategoryRatiosBtn')?.addEventListener('click', saveCategoryRatios);
+
     function showMsiToast(message) {
       const el = document.getElementById('msiToast');
       if (!el) return;
@@ -4158,6 +4311,7 @@
       if (msgEl) msgEl.textContent = '';
       initAnnualTargetYearDropdown();
       loadAnnualTargetSection(getSelectedAnnualYear());
+      loadCategoryRatioSection(getSelectedAnnualYear());
     }
 
     function hideAnnualTargetView() {
