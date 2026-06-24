@@ -818,7 +818,8 @@
       background: linear-gradient(135deg, var(--navy-soft), var(--navy-strong));
       color: #fff;
       border: none;
-      cursor: pointer;
+      cursor: grab;
+      touch-action: none;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1632,6 +1633,7 @@
         <button type="button" class="msi-menu-btn active" data-tab="tab-summaries"><i class="fas fa-chart-pie"></i> Summaries Dashboard</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-sales-kpi"><i class="fas fa-bullseye"></i> Sales &amp; KPI</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i> Disty Inventory</button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-weekly-report"><i class="fas fa-calendar-week"></i> Weekly Report</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i> Data Source</button>
       </nav>
       <div class="msi-header-right">
@@ -1771,7 +1773,7 @@
             <div class="msi-progress-track msi-progress-track-lg"><div class="msi-progress-fill" id="kpiTeamAchieveFill"></div></div>
           </div>
 
-          <div class="msi-panel" id="namKpiSection" style="margin-top:16px">
+          <div class="msi-panel" id="namKpiSection" style="margin-top:16px; max-width:50%; margin-left:0; margin-right:auto;">
             <h3>KPI Nam — <span id="namKpiYearLabel"></span></h3>
             <div class="table-wrapper">
               <table class="target-table kpi-detail-table nam-kpi-table">
@@ -1955,6 +1957,13 @@
               <tbody id="inventoryTableBody"></tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <section class="msi-tab-pane" id="tab-weekly-report">
+        <div class="msi-placeholder">
+          <i class="fas fa-calendar-week"></i>
+          <p>Weekly Report — nội dung sẽ xây dựng sau.</p>
         </div>
       </section>
 
@@ -3835,7 +3844,32 @@
       return tuItemWeightsCache;
     }
 
-    async function loadNamKpiSection(year) {
+    // v_kpi_achieved chỉ có grain tới QUÝ (year, quarter, category) — không
+    // có ngày, nên không thể lấy achieved theo đúng category cho tháng/tuần
+    // từ đó trực tiếp. Cách xử lý: SUM(sellout_data) tổng đúng khoảng ngày
+    // thật của tháng/tuần (chính xác 100%), rồi ước lượng breakdown theo
+    // hạng mục bằng cách scale cơ cấu achieved của quý chứa kỳ đó theo đúng
+    // tỉ lệ tổng — tổng cuối vẫn khớp chính xác SUM thật, từng dòng category
+    // là ước lượng hợp lý theo cơ cấu quý (không có nguồn dữ liệu chính xác
+    // hơn vì DB chưa lưu category theo ngày).
+    async function loadQuarterTeamTargets(qYear, qNum, empIds) {
+      const { data, error } = await sb.from('targets').select('category, target_qty')
+        .eq('quarter', `${qYear} Q${qNum}`).in('assigned_to', empIds);
+      if (error) { console.warn('[loadNamKpiSection targets]', error.message); return {}; }
+      const map = {};
+      (data || []).forEach((r) => { map[r.category] = (map[r.category] || 0) + (r.target_qty || 0); });
+      return map;
+    }
+    async function loadQuarterTeamAchieved(qYear, qNum, empIds) {
+      const { data, error } = await sb.from('v_kpi_achieved').select('category, achieved_qty')
+        .eq('year', qYear).eq('quarter', qNum).in('assigned_to', empIds);
+      if (error) { console.warn('[loadNamKpiSection v_kpi_achieved]', error.message); return {}; }
+      const map = {};
+      (data || []).forEach((r) => { map[r.category] = (map[r.category] || 0) + (r.achieved_qty || 0); });
+      return map;
+    }
+
+    async function loadNamKpiSection(periodType, year) {
       const tbody = document.getElementById('namKpiTableBody');
       const rateEl = document.getElementById('namKpiAchieveRate');
       const yearLabel = document.getElementById('namKpiYearLabel');
@@ -3851,31 +3885,57 @@
       }
 
       const empIds = EMPLOYEES.map((e) => e.id);
-      const [{ data: annualRows, error: annualErr }, { data: achievedRows, error: achErr }, weights] = await Promise.all([
-        sb.from('annual_targets').select('category, target_qty').eq('year', year),
-        sb.from('v_kpi_achieved').select('category, achieved_qty').eq('year', year).in('assigned_to', empIds),
-        getTuItemWeights()
-      ]);
-
-      if (annualErr) {
-        const msg = isMissingTableError(annualErr, 'annual_targets')
-          ? 'Bảng annual_targets chưa được tạo — chạy mcp_tables_v8.sql trước.'
-          : 'Lỗi tải target năm: ' + annualErr.message;
-        tbody.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
-        if (rateEl) rateEl.textContent = '—';
-        return;
-      }
-      if (achErr) console.warn('[loadNamKpiSection v_kpi_achieved]', achErr.message);
-
+      const weights = await getTuItemWeights();
       const targetByCategory = {};
-      (annualRows || []).forEach((r) => { targetByCategory[r.category] = r.target_qty; });
-
-      // Achieved gộp CẢ 4 NHÂN VIÊN (không phân biệt ai) — group theo category
-      // đã được v_kpi_achieved tính sẵn đúng theo luật CASE (lob/chipset...).
       const achievedByCategory = {};
-      (achievedRows || []).forEach((r) => {
-        achievedByCategory[r.category] = (achievedByCategory[r.category] || 0) + (r.achieved_qty || 0);
-      });
+      let suffix = '';
+
+      if (periodType === 'full_year' || periodType === 'h1' || periodType === 'h2') {
+        const { data: annualRows, error: annualErr } = await sb.from('annual_targets').select('category, target_qty').eq('year', year);
+        if (annualErr) {
+          const msg = isMissingTableError(annualErr, 'annual_targets')
+            ? 'Bảng annual_targets chưa được tạo — chạy mcp_tables_v8.sql trước.'
+            : 'Lỗi tải target năm: ' + annualErr.message;
+          tbody.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
+          if (rateEl) rateEl.textContent = '—';
+          return;
+        }
+        const divisor = periodType === 'full_year' ? 1 : 2;
+        (annualRows || []).forEach((r) => { targetByCategory[r.category] = (r.target_qty || 0) / divisor; });
+
+        const quarters = periodType === 'full_year' ? [1, 2, 3, 4] : periodType === 'h1' ? [1, 2] : [3, 4];
+        const achMaps = await Promise.all(quarters.map((q) => loadQuarterTeamAchieved(year, q, empIds)));
+        achMaps.forEach((m) => {
+          Object.entries(m).forEach(([cat, v]) => { achievedByCategory[cat] = (achievedByCategory[cat] || 0) + v; });
+        });
+      } else if (/^q[1-4]$/.test(periodType)) {
+        const qNum = parseInt(periodType.slice(1), 10);
+        Object.assign(targetByCategory, await loadQuarterTeamTargets(year, qNum, empIds));
+        Object.assign(achievedByCategory, await loadQuarterTeamAchieved(year, qNum, empIds));
+      } else {
+        const { start, end } = getReportPeriodRange(periodType, year);
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        const isMonth = periodType === 'this_month' || periodType === 'last_month';
+        const divisor = isMonth ? 3 : getWeeksInQuarter(qYear, qNum);
+        suffix = isMonth ? ` — Tháng ${start.getUTCMonth() + 1}` : ` — W${getWeekNum(start)}`;
+
+        const [quarterTargets, quarterAchieved, { data: selloutRows, error: selloutErr }] = await Promise.all([
+          loadQuarterTeamTargets(qYear, qNum, empIds),
+          loadQuarterTeamAchieved(qYear, qNum, empIds),
+          fetchAllPages((from, to) => sb.from('sellout_data').select('quantity')
+            .gte('sale_date', toISODateUTC(start)).lt('sale_date', toISODateUTC(end))
+            .in('assigned_to', empIds).range(from, to))
+        ]);
+        if (selloutErr) console.warn('[loadNamKpiSection sellout_data]', selloutErr.message);
+
+        Object.entries(quarterTargets).forEach(([cat, v]) => { targetByCategory[cat] = v / (divisor || 1); });
+
+        const quarterTotalAchieved = Object.values(quarterAchieved).reduce((a, b) => a + b, 0);
+        const periodTotalAchieved = (selloutRows || []).reduce((s, r) => s + (r.quantity || 0), 0);
+        const ratio = quarterTotalAchieved > 0 ? periodTotalAchieved / quarterTotalAchieved : 0;
+        Object.entries(quarterAchieved).forEach(([cat, v]) => { achievedByCategory[cat] = v * ratio; });
+      }
 
       let sumI = 0, sumJ = 0;
       tbody.innerHTML = categories.map((cat) => {
@@ -3898,7 +3958,7 @@
         </tr>`;
       }).join('');
 
-      if (rateEl) rateEl.textContent = sumJ > 0 ? `${((sumI / sumJ) * 100).toFixed(1)}%` : '—';
+      if (rateEl) rateEl.textContent = sumJ > 0 ? `${((sumI / sumJ) * 100).toFixed(1)}%${suffix}` : '—';
     }
 
     // QUAN TRỌNG: hàm này chạy lại MỖI LẦN mở màn hình (không chỉ lần đầu) —
@@ -4044,7 +4104,7 @@
       hideAnnualTargetView();
       showMsiToast(`Đã lưu target năm ${year}`);
       await renderKpiEmployeeList();
-      await loadNamKpiSection(year);
+      await loadNamKpiSection(msiFilters.period || 'full_year', year);
     }
     document.getElementById('saveAnnualTargetsBtn')?.addEventListener('click', saveAnnualTargets);
 
@@ -4209,7 +4269,7 @@
         document.getElementById('staffAllocationView')?.classList.add('hidden');
         document.getElementById('kpiEmployeeList')?.classList.remove('hidden');
         renderKpiEmployeeList();
-        loadNamKpiSection(getEffectiveSingleQuarter().year);
+        loadNamKpiSection(msiFilters.period || 'full_year', getEffectiveSingleQuarter().year);
       }
     }
     document.getElementById('kpiDetailBackBtn')?.addEventListener('click', showKpiEmployeeList);
@@ -4790,6 +4850,66 @@
       let opened = false;
       let badgeCount = 1;
 
+      /* ── Kéo-thả icon chatbot, lưu vị trí vào localStorage ── */
+      const FAB_SIZE = 56;
+      const FAB_POS_KEY = 'msi_chatbot_fab_pos';
+      let dragging = false;
+      let wasDragged = false;
+      let dragStartX = 0, dragStartY = 0, dragStartLeft = 0, dragStartTop = 0;
+
+      function clampFabPos(left, top) {
+        const maxLeft = Math.max(0, window.innerWidth - FAB_SIZE);
+        const maxTop = Math.max(0, window.innerHeight - FAB_SIZE);
+        return { left: Math.min(Math.max(left, 0), maxLeft), top: Math.min(Math.max(top, 0), maxTop) };
+      }
+      function applyFabPos(left, top) {
+        const pos = clampFabPos(left, top);
+        fab.style.left = `${pos.left}px`;
+        fab.style.top = `${pos.top}px`;
+        fab.style.right = 'auto';
+        fab.style.bottom = 'auto';
+        return pos;
+      }
+      function saveFabPos(pos) {
+        try { localStorage.setItem(FAB_POS_KEY, JSON.stringify(pos)); } catch (e) { /* localStorage có thể bị chặn (private mode) */ }
+      }
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(FAB_POS_KEY) || 'null');
+        if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') applyFabPos(saved.left, saved.top);
+      } catch (e) { /* dữ liệu lưu hỏng — bỏ qua, giữ vị trí mặc định góc dưới phải */ }
+
+      fab.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        wasDragged = false;
+        const rect = fab.getBoundingClientRect();
+        dragStartLeft = rect.left;
+        dragStartTop = rect.top;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        fab.setPointerCapture(e.pointerId);
+      });
+      fab.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) wasDragged = true;
+        if (wasDragged) applyFabPos(dragStartLeft + dx, dragStartTop + dy);
+      });
+      fab.addEventListener('pointerup', () => {
+        if (!dragging) return;
+        dragging = false;
+        if (wasDragged) {
+          const rect = fab.getBoundingClientRect();
+          saveFabPos(clampFabPos(rect.left, rect.top));
+        }
+      });
+      window.addEventListener('resize', () => {
+        if (fab.style.left === '' || fab.style.left === 'auto') return;
+        const rect = fab.getBoundingClientRect();
+        saveFabPos(applyFabPos(rect.left, rect.top));
+      });
+
       /* ── Product database (aliases → card) ── */
       function pc(name, sku, npps, rsp, policy, note) {
         return `<strong>${name}</strong><br/>SKU: <code>${sku}</code><br/>NPP có hàng: ${npps}<br/>Giá RSP: <strong>${rsp}</strong><br/>Chính sách 05/2026: ${policy}${note ? '<br/>💡 '+note : ''}`;
@@ -5163,6 +5283,9 @@ Không tìm được? Tui báo thẳng anh Tú — Zalo <strong>0906840384</stro
       });
 
       fab.addEventListener('click', () => {
+        // Vừa kéo icon xong thì click "ảo" do trình duyệt tự phát sau
+        // pointerup không được tính là bấm mở/đóng chat.
+        if (wasDragged) { wasDragged = false; return; }
         opened = !opened;
         win.classList.toggle('open', opened);
         badge.style.display = 'none';
