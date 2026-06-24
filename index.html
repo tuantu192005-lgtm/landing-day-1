@@ -2581,16 +2581,27 @@
     // [start,end) cụ thể — dùng chung cho cả kỳ hiện tại và kỳ trước (so sánh).
     // SUM(target_qty) đúng 1 quý — admin = cả 4 nhân viên, staff = chỉ chính
     // mình (scopeByRole đã lo việc đó), lọc thêm theo LOB nếu đang chọn.
+    // Admin: SUM(target_qty) thô. Staff: PHẢI khớp đúng nguồn target Sales &
+    // KPI đang dùng (v_kpi_full.target_e = target_stretched * y2023_avg) —
+    // không phải target_qty. target_qty là số gốc ban đầu nhập, còn
+    // target_stretched là target "hiệu lực" thật sự dùng để tính Hit
+    // Rate/Achieve Rate ở Sales & KPI; 2 cột này có thể lệch rất lớn (đã xác
+    // minh: Lập Q1/2024 target_qty=26.615 nhưng target_e thật chỉ ~5.840) —
+    // nếu Summaries dùng target_qty sẽ ra % Achievement sai khác hẳn Sales &
+    // KPI cho cùng 1 nhân viên/cùng 1 kỳ.
     async function sumQuarterTargetQty(year, quarter) {
       const quarterStr = `${year} Q${quarter}`;
-      let q = scopeByRole(sb.from('targets').select('target_qty').eq('quarter', quarterStr));
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      const cols = isAdmin ? 'target_qty' : 'target_qty, target_stretched, y2023_avg';
+      let q = scopeByRole(sb.from('targets').select(cols).eq('quarter', quarterStr));
       if (msiFilters.lob) {
         const cats = LOB_TO_TARGET_CATEGORIES[msiFilters.lob] || ['__no_match__'];
         q = q.in('category', cats);
       }
       const { data, error } = await q;
       if (error) { console.warn('[sumQuarterTargetQty]', error.message); return 0; }
-      return (data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+      if (isAdmin) return (data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+      return (data || []).reduce((s, r) => s + (r.target_stretched || 0) * (r.y2023_avg ?? 1), 0);
     }
 
     // SUM(target_qty) năm — annual_targets là target TOÀN TEAM nhận từ hãng,
