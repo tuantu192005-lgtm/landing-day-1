@@ -3589,7 +3589,11 @@
             item_weight: q1Ref ? q1Ref.item_weight : null,
             y2023_avg: q1Ref ? q1Ref.y2023_avg : null,
             parent_category: q1Ref ? q1Ref.parent_category : null,
-            target_stretched: 0,
+            // v_kpi_full tính target_f/target_e/Hit Rate trực tiếp từ
+            // target_stretched (KHÔNG fallback về target_qty) — để dòng mới
+            // tạo ra có target hiệu lực ngay, phải set bằng đúng giá trị vừa
+            // nhập, không để = 0 (sẽ làm Hit Rate/Achieve Rate hiện sai).
+            target_stretched: val,
             actual_qty: 0
           });
         }
