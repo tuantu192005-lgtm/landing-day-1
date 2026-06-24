@@ -1001,8 +1001,8 @@
       z-index: 40;
       display: flex;
       align-items: center;
-      gap: 22px;
-      padding: 0 28px;
+      gap: 14px;
+      padding: 0 18px;
       height: 64px;
       background: linear-gradient(90deg, var(--navy-strong), var(--navy-soft));
       color: var(--white);
@@ -1012,24 +1012,24 @@
     .msi-brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
       font-weight: 800;
-      font-size: 1.1rem;
+      font-size: 0.95rem;
       letter-spacing: 0.04em;
       flex-shrink: 0;
     }
 
     .msi-brand img {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
       background: var(--white);
-      padding: 4px;
+      padding: 3px;
     }
 
     .msi-menu {
       display: flex;
-      gap: 6px;
+      gap: 3px;
       flex: 1;
       min-width: 0;
       overflow-x: auto;
@@ -1039,10 +1039,10 @@
       background: none;
       border: none;
       color: rgba(255, 255, 255, 0.72);
-      padding: 10px 16px;
+      padding: 8px 12px;
       border-radius: 10px;
       font-weight: 600;
-      font-size: 0.92rem;
+      font-size: 13px;
       cursor: pointer;
       white-space: nowrap;
       transition: background 0.15s, color 0.15s;
@@ -1137,6 +1137,15 @@
       margin-bottom: 14px;
       color: var(--navy-soft);
       display: block;
+    }
+
+    /* Màn hẹp hơn (nhưng vẫn chưa tới mức gập thành hamburger ở 860px) —
+       bỏ chữ "MSI" cạnh logo, chỉ giữ icon, để nhường chỗ cho 5 tab + tên
+       người dùng + nút Đăng xuất nằm trên đúng 1 hàng, không cần scroll. */
+    @media (max-width: 1300px) {
+      .msi-brand span {
+        display: none;
+      }
     }
 
     @media (max-width: 860px) {
@@ -1413,6 +1422,28 @@
     .nam-kpi-table td {
       font-size: 12px;
       padding: 4px 8px;
+    }
+
+    /* Đè min-width:680px của .target-table + width:220px/110px của
+       .kpi-detail-table — đó là lý do bảng vẫn tràn dù panel cha đã set
+       max-width:50%. table-layout:fixed để "Hạng mục" tự giãn lấy hết phần
+       còn lại, 3 cột số liệu cố định 80px, không cột nào xuống dòng. */
+    .nam-kpi-table {
+      min-width: 0;
+      width: 100%;
+      table-layout: fixed;
+    }
+    .nam-kpi-table .kpi-col-name {
+      width: auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .nam-kpi-table .kpi-col-num {
+      width: 80px;
+      min-width: 80px;
+      white-space: nowrap;
     }
 
     .msi-achieve-ij {
@@ -3759,7 +3790,12 @@
       const { year, quarter } = getEffectiveSingleQuarter();
       const quarterStr = `${year} Q${quarter}`;
       const empIds = EMPLOYEES.map((e) => e.id);
-      const annualYear = getSelectedAnnualYear();
+      // Dùng trực tiếp năm của bộ lọc chính (year ở trên) — KHÔNG dùng
+      // getSelectedAnnualYear(), vì hàm đó chỉ tính 1 lần đầu rồi cache mãi,
+      // không tự re-sync khi Năm ở bộ lọc chính đổi sau đó (4 thẻ này không
+      // có dropdown Năm riêng như 2 màn "Cài đặt Target Năm"/"Phân bổ
+      // Target" nên phải luôn theo đúng bộ lọc chính).
+      const annualYear = year;
 
       // "Phân bổ năm" của từng người lấy từ annual_staff_targets (đã phân bổ
       // riêng theo người), KHÔNG còn cộng targets theo quý như trước.
