@@ -1491,6 +1491,24 @@
     .qtg-alloc { background: #f0f3f7; color: var(--muted); }
     .qtg-over { color: #c0392b; font-weight: 700; background: #fdeceb; }
 
+    .qtg-child-input {
+      background: #f0f3f7;
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    .qtg-child-row { background: #fafbfd; }
+    .qtg-child-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      background: #e7ecf3;
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin-left: 4px;
+      cursor: help;
+    }
+
     /* Bảng "Phân bổ Target" — cố định width từng nhóm cột để gọn lại,
        overflow-x:auto (đã có sẵn ở .table-wrapper) lo phần cuộn ngang.
        table-layout:fixed + width:auto (đè width:100% của .target-table)
@@ -3623,10 +3641,11 @@
       }
 
       const quarterStrings = [1, 2, 3, 4].map((q) => `${year} Q${q}`);
-      const [{ data: targetRows, error: targetErr }, { data: allocRows, error: allocErr }] = await Promise.all([
-        sb.from('targets').select('id, category, quarter, target_qty, item_weight, y2023_avg, parent_category')
+      const [{ data: targetRows, error: targetErr }, { data: allocRows, error: allocErr }, parentMap] = await Promise.all([
+        sb.from('targets').select('id, category, quarter, target_qty, target_stretched, item_weight, y2023_avg, parent_category')
           .eq('assigned_to', employeeId).in('quarter', quarterStrings),
-        sb.from('annual_staff_targets').select('category, target_qty').eq('assigned_to', employeeId).eq('year', year)
+        sb.from('annual_staff_targets').select('category, target_qty').eq('assigned_to', employeeId).eq('year', year),
+        getCategoryParentMap()
       ]);
 
       if (targetErr) {
@@ -3652,17 +3671,22 @@
       tbody.innerHTML = categories.map((cat) => {
         const hasAlloc = allocMap[cat] !== undefined;
         const allocVal = hasAlloc ? allocMap[cat] : '';
+        const parentCat = parentMap[cat];
+        const isChild = !!parentCat;
         const qCells = [1, 2, 3, 4].map((q) => {
           const existing = targetMap[cat]?.[q];
-          const val = existing ? existing.target_qty : '';
+          if (isChild) {
+            return `<td class="kpi-col-num"><input type="number" class="target-input qtg-q-input qtg-child-input" data-category="${cat}" data-quarter="${q}" value="" disabled title="Tự động tính từ target của ${parentCat} × K" /></td>`;
+          }
+          const val = existing ? existing.target_stretched : '';
           return `<td class="kpi-col-num"><input type="number" step="1" class="target-input qtg-q-input" data-category="${cat}" data-quarter="${q}" value="${val ?? ''}" /></td>`;
         }).join('');
-        const total = [1, 2, 3, 4].reduce((s, q) => s + (targetMap[cat]?.[q]?.target_qty || 0), 0);
-        const isOver = hasAlloc && total > allocVal;
-        return `<tr data-category="${cat}" data-alloc="${hasAlloc ? allocVal : ''}">
-          <td class="kpi-col-name">${cat}</td>
+        const total = isChild ? 0 : [1, 2, 3, 4].reduce((s, q) => s + (targetMap[cat]?.[q]?.target_stretched || 0), 0);
+        const isOver = !isChild && hasAlloc && total > allocVal;
+        return `<tr data-category="${cat}" data-alloc="${hasAlloc ? allocVal : ''}" ${isChild ? 'class="qtg-child-row"' : ''}>
+          <td class="kpi-col-name">${cat}${isChild ? ` <span class="qtg-child-badge" title="Tự động tính từ target của ${parentCat} × K">con</span>` : ''}</td>
           ${qCells}
-          <td class="kpi-col-num qtg-total ${isOver ? 'qtg-over' : ''}">${fmtQtyMsi(total)}</td>
+          <td class="kpi-col-num qtg-total ${isOver ? 'qtg-over' : ''}">${isChild ? '—' : fmtQtyMsi(total)}</td>
           <td class="kpi-col-num qtg-alloc">${hasAlloc ? fmtQtyMsi(allocVal) : '—'}</td>
         </tr>`;
       }).join('');
@@ -3685,7 +3709,10 @@
 
       const updates = [];
       const inserts = [];
-      tbody.querySelectorAll('.qtg-q-input').forEach((inp) => {
+      // Hạng mục con (qtg-child-input, bị disabled) KHÔNG được lưu — target
+      // hiệu lực của chúng do v_kpi_full tự tính từ target_stretched của
+      // cha × y2023_avg của con, lưu trực tiếp ở đây sẽ ghi sai/đè dữ liệu.
+      tbody.querySelectorAll('.qtg-q-input:not(.qtg-child-input)').forEach((inp) => {
         const cat = inp.dataset.category;
         const q = parseInt(inp.dataset.quarter, 10);
         const val = Number(inp.value) || 0;
@@ -3701,6 +3728,11 @@
             quarter: `${year} Q${q}`,
             category: cat,
             target_qty: val,
+            // target_stretched bị thiếu ở đây trước đây — chỉ insert dòng
+            // mới mới set, còn sửa dòng đã tồn tại chỉ đổi target_qty, để
+            // target_stretched (cột v_kpi_full thật sự dùng để tính
+            // target_e/Hit Rate/Achieve Rate) bị kẹt ở giá trị cũ.
+            target_stretched: val,
             item_weight: existing.item_weight,
             y2023_avg: existing.y2023_avg,
             parent_category: existing.parent_category
@@ -3873,6 +3905,22 @@
       if (error || !data || !data.length) return [];
       annualTargetCategoriesCache = [...new Set(data.map((r) => r.category))].sort();
       return annualTargetCategoriesCache;
+    }
+
+    // Bản đồ category -> parent_category (cấu trúc cha-con dùng chung cho
+    // mọi nhân viên/mọi quý — KHÔNG đổi theo người). v_kpi_full tính
+    // target_e của hạng mục con = target_stretched của CHA × y2023_avg của
+    // CON, nên hạng mục con không được nhập target_stretched trực tiếp.
+    let categoryParentMapCache = null;
+    async function getCategoryParentMap() {
+      if (categoryParentMapCache) return categoryParentMapCache;
+      const tuId = EMPLOYEES.find((e) => normalizeNameForMatch(e.name) === 'tu')?.id;
+      const { data, error } = await sb.from('targets').select('category, parent_category').eq('assigned_to', tuId);
+      if (error || !data) return {};
+      const map = {};
+      data.forEach((r) => { if (map[r.category] === undefined) map[r.category] = r.parent_category; });
+      categoryParentMapCache = map;
+      return categoryParentMapCache;
     }
 
     // ── KPI Toàn Team (Nam) ──────────────────────────────────────
