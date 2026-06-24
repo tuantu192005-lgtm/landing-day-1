@@ -2191,13 +2191,38 @@
       return date.toISOString().slice(0, 10);
     }
 
-    function getQuarterDayBoundsUTC(year, quarter) {
-      const { startISO, endISO } = getQuarterDateRange(year, quarter);
-      return { start: new Date(`${startISO}T00:00:00Z`), end: new Date(`${endISO}T00:00:00Z`) };
+    // WeekNum kiểu Excel (WEEKNUM(date, 1)): tuần bắt đầu từ Chủ nhật, tuần 1
+    // luôn bắt đầu từ 01/01 (không phải tuần ISO bắt đầu Thứ 2). Dùng
+    // getUTCFullYear/getUTCDay (không phải bản local-time) để khớp với toàn
+    // bộ phần còn lại của code luôn dựng Date qua Date.UTC(...).
+    function getWeekNum(date) {
+      const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+      return Math.ceil(((date - start) / 86400000 + start.getUTCDay() + 1) / 7);
     }
 
-    function daysBetweenUTC(a, b) {
-      return Math.max(0, Math.round((b - a) / 86400000));
+    // Số tuần thật trong 1 quý, tính theo WeekNum Excel ở trên (tuần đầu/cuối
+    // quý có thể bị "cắt" ở ranh giới năm, công thức lastWeek-firstWeek+1 vẫn
+    // ra đúng số tuần theo đúng cách Excel đếm).
+    function getWeeksInQuarter(year, quarter) {
+      const startMonth = (quarter - 1) * 3;
+      const endMonth = startMonth + 2;
+      const firstDay = new Date(Date.UTC(year, startMonth, 1));
+      const lastDay = new Date(Date.UTC(year, endMonth + 1, 0));
+      const firstWeek = getWeekNum(firstDay);
+      const lastWeek = getWeekNum(lastDay);
+      return lastWeek - firstWeek + 1;
+    }
+
+    // Tìm ngày đầu tiên của tuần Excel chứa `date`, bằng cách lùi dần ngày
+    // cho tới khi WeekNum đổi khác — tránh tự suy ngược công thức (dễ sai ở
+    // ranh giới năm/tuần 1 bị cắt ngắn), luôn khớp 100% với getWeekNum.
+    function getExcelWeekStartUTC(date) {
+      const wn = getWeekNum(date);
+      let cursor = date;
+      while (getWeekNum(addDaysUTC(cursor, -1)) === wn) {
+        cursor = addDaysUTC(cursor, -1);
+      }
+      return cursor;
     }
 
     // Bộ lọc LOB trên thanh filter chính dùng giá trị TRỰC TIẾP từ
@@ -2231,13 +2256,6 @@
       return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
     }
 
-    function startOfISOWeekUTC(date) {
-      const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-      const dayNum = (d.getUTCDay() + 6) % 7; // Mon=0..Sun=6
-      d.setUTCDate(d.getUTCDate() - dayNum);
-      return d;
-    }
-
     const REPORT_PERIOD_LABELS = {
       this_week: 'Tuần này', last_week: 'Tuần trước',
       this_month: 'Tháng này', last_month: 'Tháng trước',
@@ -2266,12 +2284,13 @@
 
       switch (periodType) {
         case 'this_week': {
-          const start = startOfISOWeekUTC(today);
+          const start = getExcelWeekStartUTC(today);
           return { start, end: addDaysUTC(start, 7), axisType: 'day-of-week' };
         }
         case 'last_week': {
-          const thisStart = startOfISOWeekUTC(today);
-          return { start: addDaysUTC(thisStart, -7), end: thisStart, axisType: 'day-of-week' };
+          const thisStart = getExcelWeekStartUTC(today);
+          const start = getExcelWeekStartUTC(addDaysUTC(thisStart, -1));
+          return { start, end: thisStart, axisType: 'day-of-week' };
         }
         case 'this_month': {
           const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
@@ -2301,7 +2320,8 @@
         case 'this_week': return getReportPeriodRange('last_week', year);
         case 'last_week': {
           const cur = getReportPeriodRange('last_week', year);
-          return { start: addDaysUTC(cur.start, -7), end: cur.start, axisType: cur.axisType };
+          const start = getExcelWeekStartUTC(addDaysUTC(cur.start, -1));
+          return { start, end: cur.start, axisType: cur.axisType };
         }
         case 'this_month': return getReportPeriodRange('last_month', year);
         case 'last_month': {
@@ -2319,21 +2339,29 @@
       }
     }
 
+    // Song song với getPreviousPeriodRange — trả về periodType+year của kỳ
+    // trước (không phải [start,end)) để computeTargetForPeriod tra đúng
+    // annual_targets/targets cho kỳ trước khi tính dòng so sánh kỳ trước.
+    function getPreviousPeriodTypeYear(periodType, year) {
+      switch (periodType) {
+        case 'this_week': return { periodType: 'last_week', year };
+        case 'last_week': return { periodType: 'last_week', year };
+        case 'this_month': return { periodType: 'last_month', year };
+        case 'last_month': return { periodType: 'last_month', year };
+        case 'q1': return { periodType: 'q4', year: year - 1 };
+        case 'q2': return { periodType: 'q1', year };
+        case 'q3': return { periodType: 'q2', year };
+        case 'q4': return { periodType: 'q3', year };
+        case 'h1': return { periodType: 'h2', year: year - 1 };
+        case 'h2': return { periodType: 'h1', year };
+        case 'full_year':
+        default: return { periodType: 'full_year', year: year - 1 };
+      }
+    }
+
     // Quy về danh sách quarter "YYYY QN" giao với [start,end) — targets/
     // v_kpi_achieved vốn chỉ lưu theo quý, nên mọi loại kỳ báo cáo (kể cả
     // tuần/tháng/H1/H2/cả năm không khớp đúng 1 quý) đều quy về tập quý này.
-    function getOverlappingQuarterStrings(start, end) {
-      const set = new Set();
-      let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
-      while (cursor < end) {
-        const y = cursor.getUTCFullYear();
-        const q = Math.floor(cursor.getUTCMonth() / 3) + 1;
-        set.add(`${y} Q${q}`);
-        cursor = addMonthsUTC(cursor, 1);
-      }
-      return [...set];
-    }
-
     // Sales & KPI tab (bảng D-J) cần ĐÚNG 1 quý cụ thể. Nếu kỳ báo cáo hiện
     // tại là q1-q4 thì dùng luôn; còn lại (tuần/tháng/H1/H2/cả năm) lấy quý
     // chứa ngày hôm nay làm fallback hợp lý (giữ hành vi mặc định cũ).
@@ -2421,10 +2449,10 @@
       el.innerHTML = `<span class="${cls}">${arrow} ${sign}${diff.toFixed(1)} điểm % so với ${previousLabel}</span>`;
     }
 
-    function renderSummariesKpiCards(current, previous, previousLabel) {
+    function renderSummariesKpiCards(current, previous, previousLabel, achievementSuffix) {
       document.getElementById('kpiSellOut').textContent = fmtQtyMsi(current.sellOutQty);
       document.getElementById('kpiTarget').textContent = fmtQtyMsi(current.targetQty);
-      document.getElementById('kpiAchievement').textContent = current.achievementPct === null ? '—' : `${current.achievementPct.toFixed(1)}%`;
+      document.getElementById('kpiAchievement').textContent = current.achievementPct === null ? '—' : `${current.achievementPct.toFixed(1)}%${achievementSuffix || ''}`;
       document.getElementById('kpiTopLob').textContent = current.topLob;
 
       renderCompareLine('kpiSellOutCompare', current.sellOutQty, previous.sellOutQty, previous.hasAnyData, previousLabel);
@@ -2542,46 +2570,85 @@
 
     // Tính sellOutQty/targetQty/achievementPct/topLob/breakdown cho 1 khoảng
     // [start,end) cụ thể — dùng chung cho cả kỳ hiện tại và kỳ trước (so sánh).
-    async function computeSummariesMetrics(start, end) {
+    // SUM(target_qty) đúng 1 quý — admin = cả 4 nhân viên, staff = chỉ chính
+    // mình (scopeByRole đã lo việc đó), lọc thêm theo LOB nếu đang chọn.
+    async function sumQuarterTargetQty(year, quarter) {
+      const quarterStr = `${year} Q${quarter}`;
+      let q = scopeByRole(sb.from('targets').select('target_qty').eq('quarter', quarterStr));
+      if (msiFilters.lob) {
+        const cats = LOB_TO_TARGET_CATEGORIES[msiFilters.lob] || ['__no_match__'];
+        q = q.in('category', cats);
+      }
+      const { data, error } = await q;
+      if (error) { console.warn('[sumQuarterTargetQty]', error.message); return 0; }
+      return (data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+    }
+
+    // SUM(target_qty) năm — annual_targets là target TOÀN TEAM nhận từ hãng,
+    // KHÔNG có cột assigned_to nên chỉ dùng cho admin (cả năm/H1/H2); staff
+    // không có "target năm riêng" trong bảng này, phải cộng dồn từ targets
+    // theo quý của chính họ (xem computeTargetForPeriod).
+    async function sumAnnualTargetQty(year) {
+      let q = sb.from('annual_targets').select('target_qty').eq('year', year);
+      if (msiFilters.lob) {
+        const cats = LOB_TO_TARGET_CATEGORIES[msiFilters.lob] || ['__no_match__'];
+        q = q.in('category', cats);
+      }
+      const { data, error } = await q;
+      if (error) { console.warn('[sumAnnualTargetQty]', error.message); return 0; }
+      return (data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+    }
+
+    // Target theo đúng từng loại kỳ báo cáo:
+    // - Cả năm/H1/H2 (admin): annual_targets (toàn năm, hoặc /2 cho H1/H2).
+    // - Cả năm/H1/H2 (staff): annual_targets không có theo người -> cộng
+    //   targets theo quý của chính họ (Q1-4, Q1-2, hoặc Q3-4).
+    // - Quý: SUM(targets.target_qty) đúng quý đó.
+    // - Tháng: SUM target quý chứa tháng đó / 3.
+    // - Tuần: SUM target quý chứa tuần đó / getWeeksInQuarter (WeekNum Excel).
+    async function computeTargetForPeriod(periodType, year, start) {
+      const isAdmin = currentUser && currentUser.role === 'admin';
+
+      if (/^q[1-4]$/.test(periodType)) {
+        return await sumQuarterTargetQty(year, parseInt(periodType.slice(1), 10));
+      }
+      if (periodType === 'h1' || periodType === 'h2') {
+        if (isAdmin) return (await sumAnnualTargetQty(year)) / 2;
+        const quarters = periodType === 'h1' ? [1, 2] : [3, 4];
+        const sums = await Promise.all(quarters.map((q) => sumQuarterTargetQty(year, q)));
+        return sums.reduce((a, b) => a + b, 0);
+      }
+      if (periodType === 'full_year') {
+        if (isAdmin) return await sumAnnualTargetQty(year);
+        const sums = await Promise.all([1, 2, 3, 4].map((q) => sumQuarterTargetQty(year, q)));
+        return sums.reduce((a, b) => a + b, 0);
+      }
+      if (periodType === 'this_month' || periodType === 'last_month') {
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        return (await sumQuarterTargetQty(qYear, qNum)) / 3;
+      }
+      if (periodType === 'this_week' || periodType === 'last_week') {
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        const total = await sumQuarterTargetQty(qYear, qNum);
+        const weeks = getWeeksInQuarter(qYear, qNum);
+        return weeks > 0 ? total / weeks : 0;
+      }
+      return 0;
+    }
+
+    async function computeSummariesMetrics(periodType, year, start, end) {
       const startISO = toISODateUTC(start);
       const endISO = toISODateUTC(end);
-      const quarterStrings = getOverlappingQuarterStrings(start, end);
 
-      let targetQuery = quarterStrings.length
-        ? scopeByRole(sb.from('targets').select('target_qty, quarter').in('quarter', quarterStrings))
-        : null;
-      if (targetQuery && msiFilters.lob) {
-        const cats = LOB_TO_TARGET_CATEGORIES[msiFilters.lob] || ['__no_match__'];
-        targetQuery = targetQuery.in('category', cats);
-      }
-
-      const [{ data: rows, error: rowsErr }, { data: targetRows, error: targetErr }] = await Promise.all([
+      const [{ data: rows, error: rowsErr }, targetQty] = await Promise.all([
         buildSelloutRangeQuery(startISO, endISO),
-        targetQuery || Promise.resolve({ data: [], error: null })
+        computeTargetForPeriod(periodType, year, start)
       ]);
       if (rowsErr) console.warn('[summaries sellout]', rowsErr.message);
-      if (targetErr) console.warn('[summaries targets]', targetErr.message);
 
       const data = rows || [];
-
-      // Target theo quý lưu nguyên quý — kỳ báo cáo là tuần/tháng chỉ là 1
-      // PHẦN của quý đó, nên phải chia tỉ lệ theo số ngày kỳ đang chọn chồng
-      // lấn với từng quý. Với kỳ = quý/H1/H2/cả năm thì [start,end) trùng
-      // khít ranh giới quý nên tỉ lệ luôn = 1 (ra đúng full quý như cũ).
-      const targetByQuarter = {};
-      (targetRows || []).forEach((t) => { targetByQuarter[t.quarter] = (targetByQuarter[t.quarter] || 0) + (t.target_qty || 0); });
-      let targetQty = 0;
-      quarterStrings.forEach((qs) => {
-        const [y, qLabel] = qs.split(' ');
-        const { start: qStart, end: qEnd } = getQuarterDayBoundsUTC(parseInt(y, 10), parseInt(qLabel.slice(1), 10));
-        const overlapStart = start > qStart ? start : qStart;
-        const overlapEnd = end < qEnd ? end : qEnd;
-        const overlapDays = daysBetweenUTC(overlapStart, overlapEnd);
-        const totalDays = daysBetweenUTC(qStart, qEnd);
-        const ratio = totalDays > 0 ? overlapDays / totalDays : 0;
-        targetQty += (targetByQuarter[qs] || 0) * ratio;
-      });
-
       const sellOutQty = data.reduce((s, r) => s + (r.quantity || 0), 0);
       const achievementPct = targetQty > 0 ? (sellOutQty / targetQty) * 100 : null;
 
@@ -2619,7 +2686,7 @@
       return {
         sellOutQty, targetQty, achievementPct, topLob,
         byLob, byNpp, byCustomer, byBucketMonth, byBucketMonthNpp, byBucketDay, byBucketDayNpp,
-        quarterStrings, hasAnyData: data.length > 0 || targetQty > 0
+        hasAnyData: data.length > 0 || targetQty > 0
       };
     }
 
@@ -2629,12 +2696,20 @@
       const periodType = msiFilters.period || 'full_year';
       const { start, end, axisType } = getReportPeriodRange(periodType, year);
       const prevRange = getPreviousPeriodRange(periodType, year);
+      const { periodType: prevPeriodType, year: prevYear } = getPreviousPeriodTypeYear(periodType, year);
       const previousLabel = PREVIOUS_PERIOD_LABELS[periodType] || 'kỳ trước';
 
       const [current, previous] = await Promise.all([
-        computeSummariesMetrics(start, end),
-        computeSummariesMetrics(prevRange.start, prevRange.end)
+        computeSummariesMetrics(periodType, year, start, end),
+        computeSummariesMetrics(prevPeriodType, prevYear, prevRange.start, prevRange.end)
       ]);
+
+      // "X.X% — Tháng N" / "X.X% — WN" theo đúng kỳ tháng/tuần đang xem.
+      const achievementSuffix = periodType === 'this_month' || periodType === 'last_month'
+        ? ` — Tháng ${start.getUTCMonth() + 1}`
+        : periodType === 'this_week' || periodType === 'last_week'
+          ? ` — W${getWeekNum(start)}`
+          : '';
 
       // Không có dữ liệu (sellout VÀ target) cho đúng kỳ đang chọn => dừng
       // hẳn, hiện empty state. KHÔNG fallback/hiện lại số liệu kỳ khác.
@@ -2652,7 +2727,7 @@
       emptyState?.classList.add('hidden');
       content?.classList.remove('hidden');
 
-      renderSummariesKpiCards(current, previous, previousLabel);
+      renderSummariesKpiCards(current, previous, previousLabel, achievementSuffix);
 
       const monthNote = document.getElementById('summariesMonthChartNote');
       const weekNote = document.getElementById('summariesWeekChartNote');
