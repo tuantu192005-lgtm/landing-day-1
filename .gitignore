@@ -1,5 +1,6 @@
 .claude/
 node_modules/
+dist/
 resend_config.txt
 verify_*.png
 send_test.py
