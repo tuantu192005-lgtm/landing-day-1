@@ -6,7 +6,7 @@
   "main": "mcp_server.js",
   "scripts": {
     "start": "node mcp_server.js",
-    "build:cf": "mkdir -p dist && cp index.html CNAME Logo.png dist/ && cp -r admin dist/"
+    "build:cf": "mkdir -p dist && cp index.html Logo.png dist/ && cp -r admin dist/"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
