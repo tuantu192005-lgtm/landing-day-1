@@ -1875,9 +1875,7 @@
                 <thead>
                   <tr>
                     <th class="kpi-col-name">Hạng mục</th>
-                    <th class="kpi-col-num">Trọng số</th>
-                    <th class="kpi-col-num">Target gốc</th>
-                    <th class="kpi-col-num">Target hiệu lực</th>
+                    <th class="kpi-col-num">Target</th>
                     <th class="kpi-col-num">Achieved (G)</th>
                     <th class="kpi-col-num">Hit Rate (H)</th>
                     <th class="kpi-col-num">Điểm đạt (I)</th>
@@ -1887,7 +1885,7 @@
                 <tbody id="kpiDetailTableBody"></tbody>
                 <tfoot>
                   <tr>
-                    <td colspan="7" style="text-align:right; font-weight:700;">Achieve Rate</td>
+                    <td colspan="4" style="text-align:right; font-weight:700;">Achieve Rate</td>
                     <td class="kpi-col-num" id="kpiDetailAchieveRate" style="font-weight:700;">—</td>
                   </tr>
                 </tfoot>
@@ -2545,28 +2543,28 @@
 
     // Tính sellOutQty/targetQty/achievementPct/topLob/breakdown cho 1 khoảng
     // [start,end) cụ thể — dùng chung cho cả kỳ hiện tại và kỳ trước (so sánh).
-    // SUM(target_qty) đúng 1 quý — admin = cả 4 nhân viên, staff = chỉ chính
-    // mình (scopeByRole đã lo việc đó), lọc thêm theo LOB nếu đang chọn.
-    // Admin: SUM(target_qty) thô. Staff: PHẢI khớp đúng nguồn target Sales &
-    // KPI đang dùng (v_kpi_full.target_e = target_stretched * y2023_avg) —
-    // không phải target_qty. target_qty là số gốc ban đầu nhập, còn
-    // target_stretched là target "hiệu lực" thật sự dùng để tính Hit
-    // Rate/Achieve Rate ở Sales & KPI; 2 cột này có thể lệch rất lớn (đã xác
-    // minh: Lập Q1/2024 target_qty=26.615 nhưng target_e thật chỉ ~5.840) —
-    // nếu Summaries dùng target_qty sẽ ra % Achievement sai khác hẳn Sales &
-    // KPI cho cùng 1 nhân viên/cùng 1 kỳ.
+    // Admin: SUM(target_stretched) của 4 nhân viên, CHỈ tính hạng mục cha/
+    // đứng một mình (parent_category IS NULL) — không cộng dòng con, vì:
+    //  (1) target_e của con đã được tính lại từ target_stretched CHA × K
+    //      con trong v_kpi_full rồi, cộng thêm sẽ tính trùng;
+    //  (2) một số dòng con còn sót target_stretched cũ từ trước khi màn
+    //      "Nhập Target Theo Quý" khoá nhập trực tiếp cho hạng mục con (đã
+    //      xác minh thật: Tú/Lập/Linh/Tâm đều còn vài dòng con > 0 từ
+    //      trước) — cộng thô sẽ bị lệch lên do dữ liệu cũ này.
+    // Staff: vẫn dùng target_e = target_stretched × y2023_avg của chính họ
+    // (đã đồng bộ với Sales & KPI ở fix trước, KHÔNG đổi ở đây).
     async function sumQuarterTargetQty(year, quarter) {
       const quarterStr = `${year} Q${quarter}`;
       const isAdmin = currentUser && currentUser.role === 'admin';
-      const cols = isAdmin ? 'target_qty' : 'target_qty, target_stretched, y2023_avg';
-      let q = scopeByRole(sb.from('targets').select(cols).eq('quarter', quarterStr));
+      let q = scopeByRole(sb.from('targets').select('target_stretched, y2023_avg, parent_category').eq('quarter', quarterStr));
       if (msiFilters.lob) {
         const cats = LOB_TO_TARGET_CATEGORIES[msiFilters.lob] || ['__no_match__'];
         q = q.in('category', cats);
       }
+      if (isAdmin) q = q.is('parent_category', null);
       const { data, error } = await q;
       if (error) { console.warn('[sumQuarterTargetQty]', error.message); return 0; }
-      if (isAdmin) return (data || []).reduce((s, r) => s + (r.target_qty || 0), 0);
+      if (isAdmin) return (data || []).reduce((s, r) => s + (r.target_stretched || 0), 0);
       return (data || []).reduce((s, r) => s + (r.target_stretched || 0) * (r.y2023_avg ?? 1), 0);
     }
 
@@ -2586,10 +2584,13 @@
     }
 
     // Target theo đúng từng loại kỳ báo cáo:
-    // - Cả năm/H1/H2 (admin): annual_targets (toàn năm, hoặc /2 cho H1/H2).
-    // - Cả năm/H1/H2 (staff): annual_targets không có theo người -> cộng
-    //   targets theo quý của chính họ (Q1-4, Q1-2, hoặc Q3-4).
-    // - Quý: SUM(targets.target_qty) đúng quý đó.
+    // - Cả năm (admin): annual_targets (target toàn team nhận từ hãng).
+    // - Cả năm (staff): annual_targets không có theo người -> cộng targets
+    //   theo quý của chính họ (Q1-4).
+    // - H1/H2 (cả admin và staff): cộng targets theo quý (Q1+Q2 hoặc Q3+Q4)
+    //   — KHÔNG dùng annual_targets/2 nữa, vì target năm toàn team chưa
+    //   chắc chia đều 2 nửa năm.
+    // - Quý: SUM(targets.target_stretched) đúng quý đó.
     // - Tháng: SUM target quý chứa tháng đó / 3.
     // - Tuần: SUM target quý chứa tuần đó / getWeeksInQuarter (WeekNum Excel).
     async function computeTargetForPeriod(periodType, year, start) {
@@ -2599,7 +2600,6 @@
         return await sumQuarterTargetQty(year, parseInt(periodType.slice(1), 10));
       }
       if (periodType === 'h1' || periodType === 'h2') {
-        if (isAdmin) return (await sumAnnualTargetQty(year)) / 2;
         const quarters = periodType === 'h1' ? [1, 2] : [3, 4];
         const sums = await Promise.all(quarters.map((q) => sumQuarterTargetQty(year, q)));
         return sums.reduce((a, b) => a + b, 0);
@@ -2758,16 +2758,6 @@
     let kpiCurrentEmployeeId = null; // null = đang ở màn chọn nhân viên (chỉ admin)
     let quarterTargetGridState = null; // { employeeId, year, targetMap } của grid Q1-Q4 đang mở
 
-    async function saveKpiTargetField(rowId, column, value, employeeId) {
-      const num = value === '' ? null : Number(value);
-      const { error } = await sb.from('targets').update({ [column]: num }).eq('id', rowId);
-      if (error) {
-        console.warn('[saveKpiTargetField]', column, error.message);
-        return;
-      }
-      await loadKpiDetail(employeeId);
-    }
-
     function renderKpiDonut(rows) {
       const canvas = document.getElementById('kpiDetailDonut');
       if (!canvas) return;
@@ -2853,7 +2843,7 @@
       if (!rows.length) {
         const tuId = EMPLOYEES.find((e) => normalizeNameForMatch(e.name) === 'tu')?.id;
         const canCreate = currentUser?.role === 'admin' && employeeId !== tuId;
-        targetsBody.innerHTML = `<tr><td colspan="8">
+        targetsBody.innerHTML = `<tr><td colspan="5">
           <div class="empty-state">
             <p>Chưa có target cho quý ${quarter}/${year}.</p>
             ${canCreate ? '<button type="button" class="btn-primary" id="createTargetTemplateBtn">Tạo target mới cho quý này</button>' : ''}
@@ -2869,11 +2859,11 @@
         return;
       }
 
+      // Chỉ xem, không nhập — Nam nhập target qua "Nhập Target Theo Quý",
+      // K (y2023_avg) qua "Cài đặt Target Năm". Nhân viên không sửa gì ở đây.
       targetsBody.innerHTML = rows.map((r) => `
         <tr>
           <td class="kpi-col-name">${r.category}</td>
-          <td class="kpi-col-num"><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="item_weight" value="${r.item_weight ?? ''}" /></td>
-          <td class="kpi-col-num"><input type="number" step="any" class="target-input" data-row-id="${r.id}" data-field="target_stretched" value="${r.target_f ?? ''}" /></td>
           <td class="kpi-col-num">${fmtKpiNumber(r.target_e)}</td>
           <td class="kpi-col-num">${fmtKpiNumber(r.achieved_g)}</td>
           <td class="kpi-col-num">${fmtPercent1(r.hit_rate_h)}</td>
@@ -2881,12 +2871,6 @@
           <td class="kpi-col-num">${r.target_score_j === null ? '—' : fmtKpiNumber(r.target_score_j)}</td>
         </tr>
       `).join('');
-
-      targetsBody.querySelectorAll('.target-input').forEach((input) => {
-        input.addEventListener('blur', (e) => {
-          saveKpiTargetField(e.target.dataset.rowId, e.target.dataset.field, e.target.value, employeeId);
-        });
-      });
 
       const sumI = rows.reduce((sum, r) => sum + (r.final_score_i ?? 0), 0);
       const sumJ = rows.reduce((sum, r) => sum + (r.target_score_j ?? 0), 0);
@@ -3263,12 +3247,16 @@
     // tỉ lệ tổng — tổng cuối vẫn khớp chính xác SUM thật, từng dòng category
     // là ước lượng hợp lý theo cơ cấu quý (không có nguồn dữ liệu chính xác
     // hơn vì DB chưa lưu category theo ngày).
+    // Giống đúng nguồn target Summaries Dashboard dùng cho admin: SUM
+    // target_stretched, CHỈ hạng mục cha/đứng một mình (parent_category IS
+    // NULL) — không cộng hạng mục con (vài dòng con còn target_stretched cũ
+    // sót lại từ trước khi bị khoá nhập trực tiếp, cộng vào sẽ tính trùng).
     async function loadQuarterTeamTargets(qYear, qNum, empIds) {
-      const { data, error } = await sb.from('targets').select('category, target_qty')
-        .eq('quarter', `${qYear} Q${qNum}`).in('assigned_to', empIds);
+      const { data, error } = await sb.from('targets').select('category, target_stretched')
+        .eq('quarter', `${qYear} Q${qNum}`).in('assigned_to', empIds).is('parent_category', null);
       if (error) { console.warn('[loadNamKpiSection targets]', error.message); return {}; }
       const map = {};
-      (data || []).forEach((r) => { map[r.category] = (map[r.category] || 0) + (r.target_qty || 0); });
+      (data || []).forEach((r) => { map[r.category] = (map[r.category] || 0) + (r.target_stretched || 0); });
       return map;
     }
     async function loadQuarterTeamAchieved(qYear, qNum, empIds) {
