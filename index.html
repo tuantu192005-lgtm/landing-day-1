@@ -2624,19 +2624,68 @@
       return 0;
     }
 
+    // % Achievement của Summaries Dashboard PHẢI khớp đúng cách Sales & KPI
+    // tính Achieve Rate (I/J từ v_kpi_full) — KHÔNG còn dùng sellOutQty/
+    // targetQty (target_qty hay target_stretched×y2023_avg) nữa, để admin
+    // và staff luôn ra cùng 1 công thức, chỉ khác phạm vi assigned_to.
+    // Cột "Target"/"Sell-out" trên 2 thẻ riêng vẫn giữ nguyên — vẫn dùng
+    // sumQuarterTargetQty/sellOutQty ở trên, vì 2 thẻ đó hiển thị số LƯỢNG
+    // thật (đơn vị), không phải điểm số có trọng số; chỉ riêng % Achievement
+    // tách ra dùng nguồn I/J độc lập theo đúng yêu cầu.
+    async function sumQuarterIJ(year, quarter) {
+      const quarterStr = `${year} Q${quarter}`;
+      const { data, error } = await scopeByRole(sb.from('v_kpi_full').select('final_score_i, target_score_j').eq('quarter', quarterStr));
+      if (error) { console.warn('[sumQuarterIJ]', error.message); return { sumI: 0, sumJ: 0 }; }
+      let sumI = 0, sumJ = 0;
+      (data || []).forEach((r) => { sumI += r.final_score_i || 0; sumJ += r.target_score_j || 0; });
+      return { sumI, sumJ };
+    }
+
+    function addIJ(results) {
+      return results.reduce((acc, r) => ({ sumI: acc.sumI + r.sumI, sumJ: acc.sumJ + r.sumJ }), { sumI: 0, sumJ: 0 });
+    }
+
+    async function computeAchievementForPeriod(periodType, year, start) {
+      if (/^q[1-4]$/.test(periodType)) {
+        return await sumQuarterIJ(year, parseInt(periodType.slice(1), 10));
+      }
+      if (periodType === 'h1' || periodType === 'h2') {
+        const quarters = periodType === 'h1' ? [1, 2] : [3, 4];
+        return addIJ(await Promise.all(quarters.map((q) => sumQuarterIJ(year, q))));
+      }
+      if (periodType === 'full_year') {
+        return addIJ(await Promise.all([1, 2, 3, 4].map((q) => sumQuarterIJ(year, q))));
+      }
+      if (periodType === 'this_month' || periodType === 'last_month') {
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        const { sumI, sumJ } = await sumQuarterIJ(qYear, qNum);
+        return { sumI: sumI / 3, sumJ: sumJ / 3 };
+      }
+      if (periodType === 'this_week' || periodType === 'last_week') {
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        const { sumI, sumJ } = await sumQuarterIJ(qYear, qNum);
+        const weeks = getWeeksInQuarter(qYear, qNum);
+        return weeks > 0 ? { sumI: sumI / weeks, sumJ: sumJ / weeks } : { sumI: 0, sumJ: 0 };
+      }
+      return { sumI: 0, sumJ: 0 };
+    }
+
     async function computeSummariesMetrics(periodType, year, start, end) {
       const startISO = toISODateUTC(start);
       const endISO = toISODateUTC(end);
 
-      const [{ data: rows, error: rowsErr }, targetQty] = await Promise.all([
+      const [{ data: rows, error: rowsErr }, targetQty, { sumI, sumJ }] = await Promise.all([
         buildSelloutRangeQuery(startISO, endISO),
-        computeTargetForPeriod(periodType, year, start)
+        computeTargetForPeriod(periodType, year, start),
+        computeAchievementForPeriod(periodType, year, start)
       ]);
       if (rowsErr) console.warn('[summaries sellout]', rowsErr.message);
 
       const data = rows || [];
       const sellOutQty = data.reduce((s, r) => s + (r.quantity || 0), 0);
-      const achievementPct = targetQty > 0 ? (sellOutQty / targetQty) * 100 : null;
+      const achievementPct = sumJ > 0 ? (sumI / sumJ) * 100 : null;
 
       const byLob = {};
       const byNpp = {};
@@ -2672,7 +2721,7 @@
       return {
         sellOutQty, targetQty, achievementPct, topLob,
         byLob, byNpp, byCustomer, byBucketMonth, byBucketMonthNpp, byBucketDay, byBucketDayNpp,
-        hasAnyData: data.length > 0 || targetQty > 0
+        hasAnyData: data.length > 0 || targetQty > 0 || sumJ > 0
       };
     }
 
