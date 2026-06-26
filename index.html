@@ -3227,17 +3227,6 @@
     // Nam không phải sales nên không có thẻ riêng trong 4 thẻ nhân viên —
     // KPI tổng của Nam = target năm Nam nhận từ hãng (annual_targets) so
     // với tổng achieved của CẢ 4 NHÂN VIÊN gộp lại (không phải của Nam).
-    let tuItemWeightsCache = null;
-    async function getTuItemWeights() {
-      if (tuItemWeightsCache) return tuItemWeightsCache;
-      const tuId = EMPLOYEES.find((e) => normalizeNameForMatch(e.name) === 'tu')?.id;
-      const { data, error } = await sb.from('targets').select('category, item_weight').eq('assigned_to', tuId);
-      if (error || !data) return {};
-      const map = {};
-      data.forEach((r) => { if (map[r.category] === undefined) map[r.category] = r.item_weight || 0; });
-      tuItemWeightsCache = map;
-      return tuItemWeightsCache;
-    }
 
     // v_kpi_achieved chỉ có grain tới QUÝ (year, quarter, category) — không
     // có ngày, nên không thể lấy achieved theo đúng category cho tháng/tuần
@@ -3284,12 +3273,11 @@
       }
 
       const empIds = EMPLOYEES.map((e) => e.id);
-      const weights = await getTuItemWeights();
       const targetByCategory = {};
       const achievedByCategory = {};
       let suffix = '';
 
-      if (periodType === 'full_year' || periodType === 'h1' || periodType === 'h2') {
+      if (periodType === 'full_year') {
         const { data: annualRows, error: annualErr } = await sb.from('annual_targets').select('category, target_qty').eq('year', year);
         if (annualErr) {
           const msg = isMissingTableError(annualErr, 'annual_targets')
@@ -3299,11 +3287,24 @@
           if (rateEl) rateEl.textContent = '—';
           return;
         }
-        const divisor = periodType === 'full_year' ? 1 : 2;
-        (annualRows || []).forEach((r) => { targetByCategory[r.category] = (r.target_qty || 0) / divisor; });
+        (annualRows || []).forEach((r) => { targetByCategory[r.category] = r.target_qty || 0; });
 
-        const quarters = periodType === 'full_year' ? [1, 2, 3, 4] : periodType === 'h1' ? [1, 2] : [3, 4];
-        const achMaps = await Promise.all(quarters.map((q) => loadQuarterTeamAchieved(year, q, empIds)));
+        const achMaps = await Promise.all([1, 2, 3, 4].map((q) => loadQuarterTeamAchieved(year, q, empIds)));
+        achMaps.forEach((m) => {
+          Object.entries(m).forEach(([cat, v]) => { achievedByCategory[cat] = (achievedByCategory[cat] || 0) + v; });
+        });
+      } else if (periodType === 'h1' || periodType === 'h2') {
+        // Giống đúng Summaries Dashboard: H1/H2 = cộng SUM(target_stretched
+        // WHERE parent_category IS NULL) của 2 quý — KHÔNG dùng
+        // annual_targets/2 nữa (năm chưa chắc chia đều 2 nửa năm).
+        const quarters = periodType === 'h1' ? [1, 2] : [3, 4];
+        const [targetMaps, achMaps] = await Promise.all([
+          Promise.all(quarters.map((q) => loadQuarterTeamTargets(year, q, empIds))),
+          Promise.all(quarters.map((q) => loadQuarterTeamAchieved(year, q, empIds)))
+        ]);
+        targetMaps.forEach((m) => {
+          Object.entries(m).forEach(([cat, v]) => { targetByCategory[cat] = (targetByCategory[cat] || 0) + v; });
+        });
         achMaps.forEach((m) => {
           Object.entries(m).forEach(([cat, v]) => { achievedByCategory[cat] = (achievedByCategory[cat] || 0) + v; });
         });
@@ -3336,17 +3337,21 @@
         Object.entries(quarterAchieved).forEach(([cat, v]) => { achievedByCategory[cat] = v * ratio; });
       }
 
-      let sumI = 0, sumJ = 0;
+      // Achieve Rate tổng = tỉ lệ THÔ (không nhân item_weight) — phải khớp
+      // đúng cách Summaries Dashboard tính (Achieved / Target trực tiếp),
+      // không phải SUM(I)/SUM(J) có trọng số như bảng KPI chi tiết từng
+      // nhân viên. totalTarget chỉ cộng hạng mục có target (12 hạng mục
+      // cha/standalone); totalAchieved cộng TOÀN BỘ achieved thật (kể cả
+      // hạng mục con + phần "Chưa phân loại" nếu có) để khớp đúng tổng
+      // sellout thật, giống Summaries.
+      let totalTarget = 0;
+      const totalAchieved = Object.values(achievedByCategory).reduce((s, v) => s + v, 0);
       tbody.innerHTML = categories.map((cat) => {
         const target = targetByCategory[cat];
         const achieved = achievedByCategory[cat] || 0;
         const hasTarget = target !== undefined;
         const pct = hasTarget && target > 0 ? (achieved / target) * 100 : null;
-        if (hasTarget) {
-          const w = weights[cat] || 0;
-          sumI += achieved * w;
-          sumJ += target * w;
-        }
+        if (hasTarget) totalTarget += target;
         const statusCls = achieveRateColorClass(pct);
         const statusIcon = pct === null ? '' : statusCls === 'over' ? ' ✅' : statusCls === 'warn' ? ' 🟡' : ' 🔴';
         return `<tr>
@@ -3357,7 +3362,7 @@
         </tr>`;
       }).join('');
 
-      if (rateEl) rateEl.textContent = sumJ > 0 ? `${((sumI / sumJ) * 100).toFixed(1)}%${suffix}` : '—';
+      if (rateEl) rateEl.textContent = totalTarget > 0 ? `${((totalAchieved / totalTarget) * 100).toFixed(1)}%${suffix}` : '—';
     }
 
     // QUAN TRỌNG: hàm này chạy lại MỖI LẦN mở màn hình (không chỉ lần đầu) —
