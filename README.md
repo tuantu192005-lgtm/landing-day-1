@@ -72,3 +72,4 @@ sudo certbot --nginx -d south.msivn.io.vn
 - `resend_config.txt` bị gitignore — **phải upload thủ công lên server**
 - EmailJS credentials trong `index.html` là client-side by design; nên thêm **domain restriction** tại [EmailJS Dashboard](https://dashboard.emailjs.com) → Account → API Keys → Allowed Origins
 - `brain.db` và `data/` phải bị chặn bởi Nginx (đã có trong nginx_config.txt)
+.
