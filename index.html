@@ -2632,44 +2632,59 @@
     // sumQuarterTargetQty/sellOutQty ở trên, vì 2 thẻ đó hiển thị số LƯỢNG
     // thật (đơn vị), không phải điểm số có trọng số; chỉ riêng % Achievement
     // tách ra dùng nguồn I/J độc lập theo đúng yêu cầu.
-    async function sumQuarterIJ(year, quarter) {
-      const quarterStr = `${year} Q${quarter}`;
-      const { data, error } = await scopeByRole(sb.from('v_kpi_full').select('final_score_i, target_score_j').eq('quarter', quarterStr));
-      if (error) { console.warn('[sumQuarterIJ]', error.message); return { sumI: 0, sumJ: 0 }; }
+    // Quy 1 loại kỳ báo cáo (q1-4/h1/h2/full_year/tháng/tuần) về danh sách
+    // quarter "YYYY QN" cần cộng + hệ số chia (chỉ tháng/tuần cần chia, để
+    // hiện I/J đã chia nhỏ cho đúng tỉ lệ phần kỳ đó chiếm trong quý — KHÔNG
+    // ảnh hưởng tỉ lệ I/J vì chia đều cả tử và mẫu). Dùng CHUNG cho Summaries
+    // Dashboard, 4 thẻ nhân viên, và bảng KPI Nam — tránh mỗi nơi tính kiểu
+    // khác nhau như đã từng xảy ra (mỗi nơi fallback quý khác nhau).
+    function getQuarterPlanForPeriod(periodType, year, start) {
+      if (/^q[1-4]$/.test(periodType)) {
+        return { quarterStrings: [`${year} Q${periodType.slice(1)}`], divisor: 1 };
+      }
+      if (periodType === 'h1') return { quarterStrings: [`${year} Q1`, `${year} Q2`], divisor: 1 };
+      if (periodType === 'h2') return { quarterStrings: [`${year} Q3`, `${year} Q4`], divisor: 1 };
+      if (periodType === 'full_year') return { quarterStrings: [1, 2, 3, 4].map((q) => `${year} Q${q}`), divisor: 1 };
+      if (periodType === 'this_month' || periodType === 'last_month') {
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        return { quarterStrings: [`${qYear} Q${qNum}`], divisor: 3 };
+      }
+      if (periodType === 'this_week' || periodType === 'last_week') {
+        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
+        const qYear = start.getUTCFullYear();
+        return { quarterStrings: [`${qYear} Q${qNum}`], divisor: getWeeksInQuarter(qYear, qNum) || 1 };
+      }
+      return { quarterStrings: [], divisor: 1 };
+    }
+
+    // SUM(I)/SUM(J) từ v_kpi_full cho đúng danh sách quarter — admin/staff
+    // theo scopeByRole (admin = toàn team, staff = chỉ chính họ).
+    async function sumIJForQuarters(quarterStrings) {
+      if (!quarterStrings.length) return { sumI: 0, sumJ: 0 };
+      const { data, error } = await scopeByRole(sb.from('v_kpi_full').select('final_score_i, target_score_j').in('quarter', quarterStrings));
+      if (error) { console.warn('[sumIJForQuarters]', error.message); return { sumI: 0, sumJ: 0 }; }
       let sumI = 0, sumJ = 0;
       (data || []).forEach((r) => { sumI += r.final_score_i || 0; sumJ += r.target_score_j || 0; });
       return { sumI, sumJ };
     }
 
-    function addIJ(results) {
-      return results.reduce((acc, r) => ({ sumI: acc.sumI + r.sumI, sumJ: acc.sumJ + r.sumJ }), { sumI: 0, sumJ: 0 });
+    // Giống sumIJForQuarters nhưng lọc đúng danh sách assigned_to cho trước
+    // (dùng cho bảng "KPI Nam" — luôn lấy CẢ 4 nhân viên, không theo
+    // scopeByRole vì màn đó chỉ admin xem, luôn cần toàn team bất kể role).
+    async function sumIJForQuartersAndEmployees(quarterStrings, empIds) {
+      if (!quarterStrings.length) return { sumI: 0, sumJ: 0 };
+      const { data, error } = await sb.from('v_kpi_full').select('final_score_i, target_score_j').in('quarter', quarterStrings).in('assigned_to', empIds);
+      if (error) { console.warn('[sumIJForQuartersAndEmployees]', error.message); return { sumI: 0, sumJ: 0 }; }
+      let sumI = 0, sumJ = 0;
+      (data || []).forEach((r) => { sumI += r.final_score_i || 0; sumJ += r.target_score_j || 0; });
+      return { sumI, sumJ };
     }
 
     async function computeAchievementForPeriod(periodType, year, start) {
-      if (/^q[1-4]$/.test(periodType)) {
-        return await sumQuarterIJ(year, parseInt(periodType.slice(1), 10));
-      }
-      if (periodType === 'h1' || periodType === 'h2') {
-        const quarters = periodType === 'h1' ? [1, 2] : [3, 4];
-        return addIJ(await Promise.all(quarters.map((q) => sumQuarterIJ(year, q))));
-      }
-      if (periodType === 'full_year') {
-        return addIJ(await Promise.all([1, 2, 3, 4].map((q) => sumQuarterIJ(year, q))));
-      }
-      if (periodType === 'this_month' || periodType === 'last_month') {
-        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
-        const qYear = start.getUTCFullYear();
-        const { sumI, sumJ } = await sumQuarterIJ(qYear, qNum);
-        return { sumI: sumI / 3, sumJ: sumJ / 3 };
-      }
-      if (periodType === 'this_week' || periodType === 'last_week') {
-        const qNum = Math.floor(start.getUTCMonth() / 3) + 1;
-        const qYear = start.getUTCFullYear();
-        const { sumI, sumJ } = await sumQuarterIJ(qYear, qNum);
-        const weeks = getWeeksInQuarter(qYear, qNum);
-        return weeks > 0 ? { sumI: sumI / weeks, sumJ: sumJ / weeks } : { sumI: 0, sumJ: 0 };
-      }
-      return { sumI: 0, sumJ: 0 };
+      const { quarterStrings, divisor } = getQuarterPlanForPeriod(periodType, year, start);
+      const { sumI, sumJ } = await sumIJForQuarters(quarterStrings);
+      return { sumI: sumI / divisor, sumJ: sumJ / divisor };
     }
 
     async function computeSummariesMetrics(periodType, year, start, end) {
@@ -3167,9 +3182,15 @@
       });
 
       // Achieve Rate = SUM(final_score_i) / SUM(target_score_j) theo đúng
-      // assigned_to + quarter đang chọn (lấy từ v_kpi_full, đã tính sẵn ở DB).
-      const { year, quarter } = getEffectiveSingleQuarter();
-      const quarterStr = `${year} Q${quarter}`;
+      // assigned_to + ĐÚNG KỲ ĐANG CHỌN (lấy từ v_kpi_full, đã tính sẵn ở
+      // DB). v_kpi_full chỉ lưu theo quý, nên kỳ "Cả năm"/"H1"/"H2" phải
+      // cộng nhiều quý — KHÔNG dùng getEffectiveSingleQuarter() (luôn trả
+      // về ĐÚNG 1 quý, khiến đổi sang Cả năm/H1/H2 vẫn ra y nguyên kết quả
+      // của 1 quý fallback, card không đổi khi đổi kỳ).
+      const year = parseInt(msiFilters.year, 10) || new Date().getFullYear();
+      const periodType = msiFilters.period || 'full_year';
+      const { start } = getReportPeriodRange(periodType, year);
+      const { quarterStrings, divisor } = getQuarterPlanForPeriod(periodType, year, start);
       const empIds = EMPLOYEES.map((e) => e.id);
       // Dùng trực tiếp năm của bộ lọc chính (year ở trên) — KHÔNG dùng
       // getSelectedAnnualYear(), vì hàm đó chỉ tính 1 lần đầu rồi cache mãi,
@@ -3181,7 +3202,9 @@
       // "Phân bổ năm" của từng người lấy từ annual_staff_targets (đã phân bổ
       // riêng theo người), KHÔNG còn cộng targets theo quý như trước.
       const [{ data, error }, { data: yearTargetRows, error: yearErr }, { data: annualRows, error: annualErr }] = await Promise.all([
-        sb.from('v_kpi_full').select('assigned_to, final_score_i, target_score_j').in('assigned_to', empIds).eq('quarter', quarterStr),
+        quarterStrings.length
+          ? sb.from('v_kpi_full').select('assigned_to, final_score_i, target_score_j').in('assigned_to', empIds).in('quarter', quarterStrings)
+          : Promise.resolve({ data: [], error: null }),
         sb.from('annual_staff_targets').select('assigned_to, target_qty').eq('year', annualYear).in('assigned_to', empIds),
         sb.from('annual_targets').select('target_qty').eq('year', annualYear)
       ]);
@@ -3204,8 +3227,8 @@
       EMPLOYEES.forEach((emp) => {
         const empRows = rows.filter((r) => r.assigned_to === emp.id);
         const hasData = empRows.length > 0;
-        const sumI = empRows.reduce((s, r) => s + (r.final_score_i || 0), 0);
-        const sumJ = empRows.reduce((s, r) => s + (r.target_score_j || 0), 0);
+        const sumI = empRows.reduce((s, r) => s + (r.final_score_i || 0), 0) / divisor;
+        const sumJ = empRows.reduce((s, r) => s + (r.target_score_j || 0), 0) / divisor;
         if (hasData) { teamI += sumI; teamJ += sumJ; teamHasData = true; }
 
         const pct = hasData && sumJ > 0 ? (sumI / sumJ) * 100 : null;
@@ -3326,6 +3349,12 @@
       const achievedByCategory = {};
       let suffix = '';
 
+      const { start: periodStart } = getReportPeriodRange(periodType, year);
+      // Chỉ cần quarterStrings — không cần chia theo divisor như target_qty,
+      // vì tỉ lệ I/J không đổi khi chia đều cả tử và mẫu cho cùng 1 số.
+      const { quarterStrings: ijQuarters } = getQuarterPlanForPeriod(periodType, year, periodStart);
+      const ijPromise = sumIJForQuartersAndEmployees(ijQuarters, empIds);
+
       if (periodType === 'full_year') {
         const { data: annualRows, error: annualErr } = await sb.from('annual_targets').select('category, target_qty').eq('year', year);
         if (annualErr) {
@@ -3386,21 +3415,16 @@
         Object.entries(quarterAchieved).forEach(([cat, v]) => { achievedByCategory[cat] = v * ratio; });
       }
 
-      // Achieve Rate tổng = tỉ lệ THÔ (không nhân item_weight) — phải khớp
-      // đúng cách Summaries Dashboard tính (Achieved / Target trực tiếp),
-      // không phải SUM(I)/SUM(J) có trọng số như bảng KPI chi tiết từng
-      // nhân viên. totalTarget chỉ cộng hạng mục có target (12 hạng mục
-      // cha/standalone); totalAchieved cộng TOÀN BỘ achieved thật (kể cả
-      // hạng mục con + phần "Chưa phân loại" nếu có) để khớp đúng tổng
-      // sellout thật, giống Summaries.
-      let totalTarget = 0;
-      const totalAchieved = Object.values(achievedByCategory).reduce((s, v) => s + v, 0);
+      // Mỗi dòng hạng mục vẫn hiện Target/Achieved/% riêng theo target_stretched
+      // (tham khảo chi tiết theo từng category). Dòng "Achieve Rate" TỔNG ở
+      // cuối bảng phải khớp đúng Summaries Dashboard/4 thẻ nhân viên — cả 3
+      // nơi giờ CHỈ dùng SUM(I)/SUM(J) từ v_kpi_full, không còn tính riêng
+      // theo Achieved/Target thô nữa.
       tbody.innerHTML = categories.map((cat) => {
         const target = targetByCategory[cat];
         const achieved = achievedByCategory[cat] || 0;
         const hasTarget = target !== undefined;
         const pct = hasTarget && target > 0 ? (achieved / target) * 100 : null;
-        if (hasTarget) totalTarget += target;
         const statusCls = achieveRateColorClass(pct);
         const statusIcon = pct === null ? '' : statusCls === 'over' ? ' ✅' : statusCls === 'warn' ? ' 🟡' : ' 🔴';
         return `<tr>
@@ -3411,7 +3435,8 @@
         </tr>`;
       }).join('');
 
-      if (rateEl) rateEl.textContent = totalTarget > 0 ? `${((totalAchieved / totalTarget) * 100).toFixed(1)}%${suffix}` : '—';
+      const { sumI, sumJ } = await ijPromise;
+      if (rateEl) rateEl.textContent = sumJ > 0 ? `${((sumI / sumJ) * 100).toFixed(1)}%${suffix}` : '—';
     }
 
     // QUAN TRỌNG: hàm này chạy lại MỖI LẦN mở màn hình (không chỉ lần đầu) —
