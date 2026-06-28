@@ -1186,6 +1186,92 @@
       color: var(--muted);
     }
 
+    /* ── Tab "Sản phẩm" — toolbar tìm kiếm/filter, bảng sort, pagination,
+       sub-tab màn chi tiết (Chương trình giá/NPP/Tồn kho) ── */
+    .msi-products-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .msi-search-input {
+      flex: 1 1 240px;
+      min-width: 180px;
+      padding: 8px 12px;
+      border: 1px solid #d6deea;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    .msi-products-toolbar select {
+      padding: 8px 10px;
+      border: 1px solid #d6deea;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+    .msi-products-toolbar-spacer {
+      flex: 1 1 auto;
+    }
+    .products-table th.sortable-col {
+      cursor: pointer;
+      user-select: none;
+    }
+    .products-table th.sortable-col:hover {
+      color: var(--navy-strong);
+    }
+    .products-table th.sortable-col .sort-arrow {
+      font-size: 0.75rem;
+      margin-left: 3px;
+      opacity: 0.6;
+    }
+    .msi-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .msi-pagination button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .msi-subtabs {
+      display: flex;
+      gap: 8px;
+      margin: 14px 0;
+      border-bottom: 1px solid #e6eef9;
+    }
+    .msi-subtab-btn {
+      padding: 8px 16px;
+      border: none;
+      background: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .msi-subtab-btn.active {
+      color: var(--navy-strong);
+      border-bottom-color: var(--navy-strong);
+    }
+    .msi-subtab-pane.hidden {
+      display: none;
+    }
+    .products-pricing-table input,
+    .products-pricing-table select {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 0.85rem;
+      padding: 4px 6px;
+    }
+    .products-pricing-table .net-price-cell {
+      font-weight: 700;
+      text-align: right;
+    }
+
     .msi-chart-row,
     .msi-progress-row,
     .msi-table-row {
@@ -1677,6 +1763,7 @@
       <nav class="msi-menu" id="msiMenu">
         <button type="button" class="msi-menu-btn active" data-tab="tab-summaries"><i class="fas fa-chart-pie"></i> Summaries Dashboard</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-sales-kpi"><i class="fas fa-bullseye"></i> Sales &amp; KPI</button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-products"><i class="fas fa-box"></i> Sản phẩm</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i> Disty Inventory</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-weekly-report"><i class="fas fa-calendar-week"></i> Weekly Report</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i> Data Source</button>
@@ -1991,6 +2078,168 @@
               <button type="button" class="btn-secondary" id="cancelQuarterTargetGridBtn">Huỷ</button>
             </div>
             <div class="login-error" id="quarterTargetGridMessage"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="msi-tab-pane" id="tab-products">
+        <div id="productsListView">
+          <div class="msi-panel">
+            <div class="msi-products-toolbar">
+              <input type="text" id="productSearchInput" class="msi-search-input" placeholder="Tìm theo SKU hoặc tên model..." />
+              <select id="productFilterLob">
+                <option value="">Tất cả LOB</option>
+                <option>MB</option><option>VGA</option><option>MNT</option><option>PSU</option>
+                <option>CASE</option><option>COOLER</option><option>SSD</option><option>MINIPC</option><option>GG</option>
+              </select>
+              <select id="productFilterNpp">
+                <option value="">Tất cả NPP</option>
+                <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option><option>MH</option><option>AD</option>
+              </select>
+              <select id="productFilterStatus">
+                <option value="">Tất cả trạng thái</option>
+                <option value="active">Đang bán</option>
+                <option value="inactive">Ngừng bán</option>
+              </select>
+              <div class="msi-products-toolbar-spacer"></div>
+              <button type="button" class="btn-primary hidden" id="addProductBtn">+ Thêm sản phẩm</button>
+              <button type="button" class="btn-secondary hidden" id="importProductsBtn">Import từ Excel</button>
+              <input type="file" id="importProductsInput" accept=".xlsx,.xls" class="hidden" />
+            </div>
+            <div class="table-wrapper">
+              <table class="target-table products-table" id="productsTable">
+                <thead>
+                  <tr>
+                    <th class="sortable-col" data-sort="sku">SKU</th>
+                    <th class="sortable-col" data-sort="model_name">Tên model</th>
+                    <th class="sortable-col" data-sort="lob">LOB</th>
+                    <th>NPP</th>
+                    <th class="kpi-col-num sortable-col" data-sort="sdp_price">Giá SDP</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="productsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="msi-pagination" id="productsPagination"></div>
+            <div class="login-error" id="productsMessage"></div>
+          </div>
+        </div>
+
+        <div id="productDetailView" class="hidden">
+          <div class="msi-kpi-detail-hd">
+            <button type="button" class="btn-secondary" id="productDetailBackBtn"><i class="fas fa-arrow-left"></i> Quay lại</button>
+            <h3 id="productDetailTitle">—</h3>
+            <button type="button" class="btn-secondary hidden" id="editProductBtn">Sửa sản phẩm</button>
+          </div>
+          <p class="msi-panel-note" id="productDetailMeta">—</p>
+
+          <div class="msi-subtabs" id="productDetailSubtabs">
+            <button type="button" class="msi-subtab-btn active" data-subtab="productPricingPane">Chương trình giá</button>
+            <button type="button" class="msi-subtab-btn" data-subtab="productDistyPane">NPP phân phối</button>
+            <button type="button" class="msi-subtab-btn" data-subtab="productInventoryPane">Tồn kho</button>
+          </div>
+
+          <div id="productPricingPane" class="msi-subtab-pane">
+            <div class="msi-panel">
+              <div class="msi-kpi-detail-hd" style="margin-bottom:8px">
+                <h3>Chương trình giá</h3>
+                <div class="form-group" style="max-width:160px;margin:0">
+                  <label for="productPricingQuarter">Quý</label>
+                  <select id="productPricingQuarter"></select>
+                </div>
+              </div>
+              <div class="table-wrapper">
+                <table class="target-table products-pricing-table" id="productPricingTable">
+                  <thead>
+                    <tr>
+                      <th>NPP</th>
+                      <th>Đại lý</th>
+                      <th>Nhân viên</th>
+                      <th class="kpi-col-num">Hero</th>
+                      <th class="kpi-col-num">Extra 1</th>
+                      <th class="kpi-col-num">Extra 2</th>
+                      <th class="kpi-col-num">Extra 3</th>
+                      <th class="kpi-col-num">Extra 4</th>
+                      <th class="kpi-col-num">Net Price</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="productPricingTableBody"></tbody>
+                </table>
+              </div>
+              <div class="dashboard-actions hidden" id="productPricingActions" style="margin-top:14px">
+                <button type="button" class="btn-secondary" id="addPricingRowBtn">+ Thêm dòng</button>
+                <button type="button" class="btn-primary" id="savePricingBtn">Lưu tất cả</button>
+              </div>
+              <div class="login-error" id="productPricingMessage"></div>
+            </div>
+          </div>
+
+          <div id="productDistyPane" class="msi-subtab-pane hidden">
+            <div class="msi-panel">
+              <div class="table-wrapper">
+                <table class="target-table">
+                  <thead><tr><th>NPP</th><th>Mã NPP</th><th>Tên NPP</th></tr></thead>
+                  <tbody id="productDistyTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="productInventoryPane" class="msi-subtab-pane hidden">
+            <div class="msi-panel">
+              <div class="table-wrapper">
+                <table class="target-table">
+                  <thead><tr><th>NPP</th><th>Tuần gần nhất</th><th class="kpi-col-num">Closing</th></tr></thead>
+                  <tbody id="productInventoryTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="productFormView" class="hidden">
+          <div class="msi-kpi-detail-hd">
+            <h3 id="productFormTitle">Thêm sản phẩm</h3>
+          </div>
+          <div class="msi-panel" style="max-width:480px">
+            <form id="productForm">
+              <input type="hidden" id="productFormOrigSku" value="" />
+              <div class="form-group">
+                <label for="productFormSku">SKU *</label>
+                <input type="text" id="productFormSku" required />
+              </div>
+              <div class="form-group">
+                <label for="productFormModelName">Tên model *</label>
+                <input type="text" id="productFormModelName" required />
+              </div>
+              <div class="form-group">
+                <label for="productFormLob">LOB *</label>
+                <select id="productFormLob" required>
+                  <option value="">— Chọn LOB —</option>
+                  <option>MB</option><option>VGA</option><option>MNT</option><option>PSU</option>
+                  <option>CASE</option><option>COOLER</option><option>SSD</option><option>MINIPC</option><option>GG</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="productFormPrice">Giá SDP</label>
+                <input type="number" id="productFormPrice" step="1" />
+              </div>
+              <div class="form-group">
+                <label for="productFormStatus">Trạng thái</label>
+                <select id="productFormStatus">
+                  <option value="true">Đang bán</option>
+                  <option value="false">Ngừng bán</option>
+                </select>
+              </div>
+              <div class="dashboard-actions">
+                <button type="submit" class="btn-primary">Lưu</button>
+                <button type="button" class="btn-secondary" id="cancelProductFormBtn">Huỷ</button>
+              </div>
+              <div class="login-error" id="productFormMessage"></div>
+            </form>
           </div>
         </div>
       </section>
@@ -4017,6 +4266,554 @@
       }).join('');
     }
     tabLoaders['tab-disty-inventory'] = loadInventoryTab;
+
+    // ══════════════════ Tab "Sản phẩm" ══════════════════
+    const PRODUCTS_PAGE_SIZE = 50;
+    const PRODUCTS_DISTY_LIST = ['DGW', 'SPC', 'KTC', 'NWH', 'MH', 'AD'];
+    const productsState = { page: 0, sortCol: 'sku', sortAsc: true, search: '', lob: '', npp: '', status: '' };
+    let productsSearchDebounce = null;
+    let currentProductSku = null;
+    let currentProductData = null;
+
+    function isProductsAdmin() {
+      return currentUser && currentUser.role === 'admin';
+    }
+
+    function showProductsListView() {
+      document.getElementById('productsListView')?.classList.remove('hidden');
+      document.getElementById('productDetailView')?.classList.add('hidden');
+      document.getElementById('productFormView')?.classList.add('hidden');
+    }
+
+    async function loadProductsTab() {
+      if (!currentUser) return;
+      const isAdmin = isProductsAdmin();
+      document.getElementById('addProductBtn')?.classList.toggle('hidden', !isAdmin);
+      document.getElementById('importProductsBtn')?.classList.toggle('hidden', !isAdmin);
+      showProductsListView();
+      await loadProductsList();
+    }
+    tabLoaders['tab-products'] = loadProductsTab;
+
+    function updateProductsSortArrows() {
+      document.querySelectorAll('#productsTable th.sortable-col').forEach((th) => {
+        th.querySelector('.sort-arrow')?.remove();
+        if (th.dataset.sort === productsState.sortCol) {
+          th.insertAdjacentHTML('beforeend', `<span class="sort-arrow">${productsState.sortAsc ? '▲' : '▼'}</span>`);
+        }
+      });
+    }
+
+    async function loadProductsList() {
+      const tbody = document.getElementById('productsTableBody');
+      const msgEl = document.getElementById('productsMessage');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7">Đang tải...</td></tr>';
+      if (msgEl) msgEl.textContent = '';
+      updateProductsSortArrows();
+
+      // NPP là filter cross-table (product_disty_codes) — lọc trước theo
+      // SKU thuộc NPP đó, rồi mới .in('sku', ...) vào query products_master.
+      let skuFilterFromNpp = null;
+      if (productsState.npp) {
+        const { data: nppRows, error: nppErr } = await sb.from('product_disty_codes').select('sku').eq('disty', productsState.npp);
+        if (nppErr) {
+          if (msgEl) msgEl.textContent = 'Lỗi tải dữ liệu NPP: ' + nppErr.message;
+          tbody.innerHTML = '<tr><td colspan="7">Lỗi tải dữ liệu.</td></tr>';
+          return;
+        }
+        skuFilterFromNpp = [...new Set((nppRows || []).map((r) => r.sku).filter(Boolean))];
+        if (!skuFilterFromNpp.length) {
+          tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Không có sản phẩm nào của NPP này.</div></td></tr>';
+          renderProductsPagination(0);
+          return;
+        }
+      }
+
+      let query = sb.from('products_master').select('sku, model_name, lob, sdp_price, is_active', { count: 'exact' });
+      if (productsState.search) {
+        const term = productsState.search.replace(/[%,()]/g, '');
+        if (term) query = query.or(`sku.ilike.%${term}%,model_name.ilike.%${term}%`);
+      }
+      if (productsState.lob) query = query.eq('lob', productsState.lob);
+      if (productsState.status === 'active') query = query.eq('is_active', true);
+      if (productsState.status === 'inactive') query = query.eq('is_active', false);
+      if (skuFilterFromNpp) query = query.in('sku', skuFilterFromNpp);
+
+      const from = productsState.page * PRODUCTS_PAGE_SIZE;
+      const to = from + PRODUCTS_PAGE_SIZE - 1;
+      query = query.order(productsState.sortCol, { ascending: productsState.sortAsc }).range(from, to);
+
+      const { data, error, count } = await query;
+      if (error) {
+        const msg = isMissingTableError(error, 'products_master')
+          ? 'Bảng products_master chưa được tạo — chạy mcp_tables_v11.sql trước.'
+          : 'Lỗi tải danh sách sản phẩm: ' + error.message;
+        tbody.innerHTML = `<tr><td colspan="7">${msg}</td></tr>`;
+        return;
+      }
+
+      const rows = data || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Không có sản phẩm phù hợp.</div></td></tr>';
+        renderProductsPagination(count || 0);
+        return;
+      }
+
+      const skus = rows.map((r) => r.sku);
+      const { data: distyRows } = await sb.from('product_disty_codes').select('sku, disty').in('sku', skus);
+      const nppBySku = {};
+      (distyRows || []).forEach((r) => { (nppBySku[r.sku] ||= new Set()).add(r.disty); });
+
+      tbody.innerHTML = rows.map((p) => {
+        const nppList = nppBySku[p.sku] ? [...nppBySku[p.sku]].sort().join(', ') : '—';
+        return `<tr>
+          <td>${p.sku}</td>
+          <td>${p.model_name}</td>
+          <td>${p.lob}</td>
+          <td>${nppList}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(p.sdp_price)}</td>
+          <td>${p.is_active ? '🟢 Đang bán' : '⚪ Ngừng bán'}</td>
+          <td><button type="button" class="btn-secondary product-detail-btn" data-sku="${p.sku}">Xem chi tiết</button></td>
+        </tr>`;
+      }).join('');
+
+      tbody.querySelectorAll('.product-detail-btn').forEach((btn) => {
+        btn.addEventListener('click', () => openProductDetail(btn.dataset.sku));
+      });
+
+      renderProductsPagination(count || 0);
+    }
+
+    function renderProductsPagination(total) {
+      const el = document.getElementById('productsPagination');
+      if (!el) return;
+      if (!total) { el.innerHTML = ''; return; }
+      const totalPages = Math.max(1, Math.ceil(total / PRODUCTS_PAGE_SIZE));
+      const curPage = productsState.page + 1;
+      el.innerHTML = `
+        <button type="button" id="productsPrevBtn" ${curPage <= 1 ? 'disabled' : ''}>‹ Trước</button>
+        <span>Trang ${curPage} / ${totalPages} (tổng ${total} sản phẩm)</span>
+        <button type="button" id="productsNextBtn" ${curPage >= totalPages ? 'disabled' : ''}>Sau ›</button>
+      `;
+      document.getElementById('productsPrevBtn')?.addEventListener('click', () => { productsState.page--; loadProductsList(); });
+      document.getElementById('productsNextBtn')?.addEventListener('click', () => { productsState.page++; loadProductsList(); });
+    }
+
+    document.getElementById('productSearchInput')?.addEventListener('input', (e) => {
+      clearTimeout(productsSearchDebounce);
+      productsSearchDebounce = setTimeout(() => {
+        productsState.search = e.target.value.trim();
+        productsState.page = 0;
+        loadProductsList();
+      }, 300);
+    });
+    document.getElementById('productFilterLob')?.addEventListener('change', (e) => {
+      productsState.lob = e.target.value; productsState.page = 0; loadProductsList();
+    });
+    document.getElementById('productFilterNpp')?.addEventListener('change', (e) => {
+      productsState.npp = e.target.value; productsState.page = 0; loadProductsList();
+    });
+    document.getElementById('productFilterStatus')?.addEventListener('change', (e) => {
+      productsState.status = e.target.value; productsState.page = 0; loadProductsList();
+    });
+    document.querySelectorAll('#productsTable th.sortable-col').forEach((th) => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (productsState.sortCol === col) productsState.sortAsc = !productsState.sortAsc;
+        else { productsState.sortCol = col; productsState.sortAsc = true; }
+        productsState.page = 0;
+        loadProductsList();
+      });
+    });
+
+    // ── Màn hình chi tiết sản phẩm: 3 sub-tab (Chương trình giá/NPP/Tồn kho) ──
+    function switchProductSubtab(paneId) {
+      document.querySelectorAll('.msi-subtab-btn').forEach((b) => b.classList.toggle('active', b.dataset.subtab === paneId));
+      document.querySelectorAll('.msi-subtab-pane').forEach((p) => p.classList.toggle('hidden', p.id !== paneId));
+    }
+    document.querySelectorAll('.msi-subtab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => switchProductSubtab(btn.dataset.subtab));
+    });
+
+    async function openProductDetail(sku) {
+      currentProductSku = sku;
+      document.getElementById('productsListView')?.classList.add('hidden');
+      document.getElementById('productDetailView')?.classList.remove('hidden');
+      document.getElementById('productFormView')?.classList.add('hidden');
+
+      const { data, error } = await sb.from('products_master').select('*').eq('sku', sku).maybeSingle();
+      if (error || !data) {
+        document.getElementById('productDetailTitle').textContent = 'Không tìm thấy sản phẩm';
+        document.getElementById('productDetailMeta').textContent = error?.message || '';
+        return;
+      }
+      currentProductData = data;
+      document.getElementById('productDetailTitle').textContent = `${data.sku} — ${data.model_name}`;
+      document.getElementById('productDetailMeta').textContent = `LOB: ${data.lob} · Giá SDP: ${fmtQtyMsi(data.sdp_price)} · ${data.is_active ? 'Đang bán' : 'Ngừng bán'}`;
+      document.getElementById('editProductBtn')?.classList.toggle('hidden', !isProductsAdmin());
+
+      switchProductSubtab('productPricingPane');
+      initProductPricingQuarterDropdown();
+      await loadProductPricingPane();
+      await loadProductDistyPane(sku);
+      await loadProductInventoryPane(sku);
+    }
+    document.getElementById('productDetailBackBtn')?.addEventListener('click', showProductsListView);
+    document.getElementById('editProductBtn')?.addEventListener('click', () => {
+      if (currentProductSku) openProductForm(currentProductSku);
+    });
+
+    function initProductPricingQuarterDropdown() {
+      const sel = document.getElementById('productPricingQuarter');
+      if (!sel) return;
+      if (!sel.dataset.initialized) {
+        const now = new Date();
+        const curYear = now.getFullYear();
+        const curQuarter = getCurrentQuarterNumber(now);
+        const defaultVal = `${curYear} Q${curQuarter}`;
+        const options = [];
+        for (let y = curYear - 1; y <= curYear + 1; y++) {
+          for (let q = 1; q <= 4; q++) options.push(`${y} Q${q}`);
+        }
+        sel.innerHTML = options.map((v) => `<option value="${v}" ${v === defaultVal ? 'selected' : ''}>${v}</option>`).join('');
+        sel.dataset.initialized = '1';
+        sel.addEventListener('change', () => loadProductPricingPane());
+      }
+    }
+
+    function productPricingRowHtml(r, isAdmin, sdpPrice) {
+      const net = sdpPrice - (r.hero || 0) - (r.extra_1 || 0) - (r.extra_2 || 0) - (r.extra_3 || 0) - (r.extra_4 || 0);
+      if (!isAdmin) {
+        const empName = EMPLOYEES.find((e) => e.id === r.assigned_to)?.name || '— Chung —';
+        return `<tr data-id="${r.id || ''}">
+          <td>${r.disty || '—'}</td>
+          <td>${r.customer_name || '—'}</td>
+          <td>${empName}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(r.hero)}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(r.extra_1)}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(r.extra_2)}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(r.extra_3)}</td>
+          <td class="kpi-col-num">${fmtQtyMsi(r.extra_4)}</td>
+          <td class="net-price-cell">${fmtQtyMsi(net)}</td>
+          <td></td>
+        </tr>`;
+      }
+      const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
+      const distyOptions = `<option value="" ${!r.disty ? 'selected' : ''}>—</option>` + PRODUCTS_DISTY_LIST.map((d) => `<option ${d === r.disty ? 'selected' : ''}>${d}</option>`).join('');
+      return `<tr data-id="${r.id || ''}">
+        <td><select class="pp-disty">${distyOptions}</select></td>
+        <td><input type="text" class="pp-customer" value="${r.customer_name || ''}" /></td>
+        <td><select class="pp-assigned">${empOptions}</select></td>
+        <td><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></td>
+        <td><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" /></td>
+        <td><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" /></td>
+        <td><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" /></td>
+        <td><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" /></td>
+        <td class="net-price-cell pp-net">${fmtQtyMsi(net)}</td>
+        <td><button type="button" class="btn-secondary pp-delete-row">Xoá</button></td>
+      </tr>`;
+    }
+
+    function attachPricingRowHandlers() {
+      const tbody = document.getElementById('productPricingTableBody');
+      if (!tbody) return;
+      const sdpPrice = currentProductData?.sdp_price || 0;
+      tbody.querySelectorAll('tr').forEach((tr) => {
+        if (!tr.querySelector('.pp-hero')) return;
+        const recalc = () => {
+          const hero = Number(tr.querySelector('.pp-hero')?.value) || 0;
+          const e1 = Number(tr.querySelector('.pp-extra1')?.value) || 0;
+          const e2 = Number(tr.querySelector('.pp-extra2')?.value) || 0;
+          const e3 = Number(tr.querySelector('.pp-extra3')?.value) || 0;
+          const e4 = Number(tr.querySelector('.pp-extra4')?.value) || 0;
+          const netEl = tr.querySelector('.pp-net');
+          if (netEl) netEl.textContent = fmtQtyMsi(sdpPrice - hero - e1 - e2 - e3 - e4);
+        };
+        ['.pp-hero', '.pp-extra1', '.pp-extra2', '.pp-extra3', '.pp-extra4'].forEach((sel) => {
+          tr.querySelector(sel)?.addEventListener('input', recalc);
+        });
+        tr.querySelector('.pp-delete-row')?.addEventListener('click', async () => {
+          const id = tr.dataset.id;
+          if (id) {
+            if (!confirm('Xoá chương trình giá này?')) return;
+            const { error } = await sb.from('product_programs').delete().eq('id', id);
+            if (error) { showMsiToast('Lỗi xoá: ' + error.message); return; }
+          }
+          tr.remove();
+        });
+      });
+    }
+
+    async function loadProductPricingPane() {
+      const tbody = document.getElementById('productPricingTableBody');
+      const msgEl = document.getElementById('productPricingMessage');
+      const actionsEl = document.getElementById('productPricingActions');
+      const quarter = document.getElementById('productPricingQuarter')?.value;
+      if (!tbody || !currentProductSku || !quarter) return;
+      tbody.innerHTML = '<tr><td colspan="10">Đang tải...</td></tr>';
+      if (msgEl) msgEl.textContent = '';
+
+      const { data, error } = await sb.from('product_programs').select('*').eq('sku', currentProductSku).eq('quarter', quarter).order('created_at', { ascending: true });
+      if (error) {
+        const msg = isMissingTableError(error, 'product_programs')
+          ? 'Bảng product_programs chưa được tạo — chạy mcp_tables_v11.sql trước.'
+          : 'Lỗi tải chương trình giá: ' + error.message;
+        tbody.innerHTML = `<tr><td colspan="10">${msg}</td></tr>`;
+        return;
+      }
+
+      const isAdmin = isProductsAdmin();
+      actionsEl?.classList.toggle('hidden', !isAdmin);
+      const rows = data || [];
+      const sdpPrice = currentProductData?.sdp_price || 0;
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="10">Chưa có chương trình giá cho quý này.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map((r) => productPricingRowHtml(r, isAdmin, sdpPrice)).join('');
+      attachPricingRowHandlers();
+    }
+
+    document.getElementById('addPricingRowBtn')?.addEventListener('click', () => {
+      const tbody = document.getElementById('productPricingTableBody');
+      if (!tbody) return;
+      if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
+      tbody.insertAdjacentHTML('beforeend', productPricingRowHtml({ hero: 0, extra_1: 0, extra_2: 0, extra_3: 0, extra_4: 0 }, true, currentProductData?.sdp_price || 0));
+      attachPricingRowHandlers();
+    });
+
+    document.getElementById('savePricingBtn')?.addEventListener('click', async () => {
+      const msgEl = document.getElementById('productPricingMessage');
+      const quarter = document.getElementById('productPricingQuarter')?.value;
+      const tbody = document.getElementById('productPricingTableBody');
+      if (!tbody || !currentProductSku || !quarter) return;
+
+      const rows = [...tbody.querySelectorAll('tr')].filter((tr) => tr.querySelector('.pp-hero'));
+      // Luôn gán id (random UUID phía client cho dòng mới) — nếu để 1 dòng
+      // trong cùng mảng upsert KHÔNG có id trong khi dòng khác CÓ, PostgREST
+      // sẽ NULL-fill cột id cho dòng thiếu (union cột theo cả batch) thay vì
+      // để DEFAULT gen_random_uuid() tự áp dụng, gây lỗi NOT NULL constraint.
+      const upsertRows = rows.map((tr) => ({
+        id: tr.dataset.id || crypto.randomUUID(),
+        sku: currentProductSku,
+        quarter,
+        disty: tr.querySelector('.pp-disty')?.value || null,
+        customer_name: tr.querySelector('.pp-customer')?.value || null,
+        assigned_to: tr.querySelector('.pp-assigned')?.value || null,
+        hero: Number(tr.querySelector('.pp-hero')?.value) || 0,
+        extra_1: Number(tr.querySelector('.pp-extra1')?.value) || 0,
+        extra_2: Number(tr.querySelector('.pp-extra2')?.value) || 0,
+        extra_3: Number(tr.querySelector('.pp-extra3')?.value) || 0,
+        extra_4: Number(tr.querySelector('.pp-extra4')?.value) || 0,
+        updated_at: new Date().toISOString()
+      }));
+      if (!upsertRows.length) {
+        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        return;
+      }
+
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      const { error } = await sb.from('product_programs').upsert(upsertRows);
+      if (error) {
+        if (msgEl) { msgEl.textContent = 'Lỗi lưu chương trình giá: ' + error.message; msgEl.style.color = '#b30012'; }
+        return;
+      }
+      if (msgEl) msgEl.textContent = '';
+      showMsiToast('Đã lưu chương trình giá');
+      await loadProductPricingPane();
+    });
+
+    async function loadProductDistyPane(sku) {
+      const tbody = document.getElementById('productDistyTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="3">Đang tải...</td></tr>';
+      const { data, error } = await sb.from('product_disty_codes').select('disty, disty_code, disty_name').eq('sku', sku).order('disty');
+      if (error) { tbody.innerHTML = `<tr><td colspan="3">Lỗi: ${error.message}</td></tr>`; return; }
+      if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="3">Chưa có NPP phân phối sản phẩm này.</td></tr>'; return; }
+      tbody.innerHTML = data.map((r) => `<tr><td>${r.disty}</td><td>${r.disty_code || '—'}</td><td>${r.disty_name || '—'}</td></tr>`).join('');
+    }
+
+    async function loadProductInventoryPane(sku) {
+      const tbody = document.getElementById('productInventoryTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="3">Đang tải...</td></tr>';
+      const { data, error } = await sb.from('disty_inventory').select('disty, week_date, closing').eq('sku', sku).order('week_date', { ascending: false });
+      if (error) { tbody.innerHTML = `<tr><td colspan="3">Lỗi: ${error.message}</td></tr>`; return; }
+      const latestByDisty = {};
+      (data || []).forEach((r) => { if (!latestByDisty[r.disty]) latestByDisty[r.disty] = r; });
+      const rows = Object.values(latestByDisty);
+      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="3">Chưa có dữ liệu tồn kho.</td></tr>'; return; }
+      tbody.innerHTML = rows.map((r) => `<tr><td>${r.disty}</td><td>${r.week_date}</td><td class="kpi-col-num">${fmtQtyMsi(r.closing)}</td></tr>`).join('');
+    }
+
+    // ── Form thêm/sửa sản phẩm (admin only) ──
+    function openProductForm(sku) {
+      document.getElementById('productsListView')?.classList.add('hidden');
+      document.getElementById('productDetailView')?.classList.add('hidden');
+      document.getElementById('productFormView')?.classList.remove('hidden');
+      const msgEl = document.getElementById('productFormMessage');
+      if (msgEl) msgEl.textContent = '';
+
+      const skuInput = document.getElementById('productFormSku');
+      if (sku) {
+        document.getElementById('productFormTitle').textContent = 'Sửa sản phẩm';
+        document.getElementById('productFormOrigSku').value = sku;
+        skuInput.value = currentProductData?.sku || sku;
+        skuInput.disabled = true;
+        document.getElementById('productFormModelName').value = currentProductData?.model_name || '';
+        document.getElementById('productFormLob').value = currentProductData?.lob || '';
+        document.getElementById('productFormPrice').value = currentProductData?.sdp_price ?? '';
+        document.getElementById('productFormStatus').value = String(currentProductData?.is_active !== false);
+      } else {
+        document.getElementById('productFormTitle').textContent = 'Thêm sản phẩm';
+        document.getElementById('productFormOrigSku').value = '';
+        skuInput.disabled = false;
+        document.getElementById('productForm').reset();
+      }
+    }
+    document.getElementById('addProductBtn')?.addEventListener('click', () => openProductForm(null));
+    document.getElementById('cancelProductFormBtn')?.addEventListener('click', () => {
+      document.getElementById('productFormView')?.classList.add('hidden');
+      if (currentProductSku) document.getElementById('productDetailView')?.classList.remove('hidden');
+      else showProductsListView();
+    });
+
+    document.getElementById('productForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msgEl = document.getElementById('productFormMessage');
+      const origSku = document.getElementById('productFormOrigSku').value;
+      const sku = document.getElementById('productFormSku').value.trim();
+      const modelName = document.getElementById('productFormModelName').value.trim();
+      const lob = document.getElementById('productFormLob').value;
+      const priceVal = document.getElementById('productFormPrice').value;
+      const isActive = document.getElementById('productFormStatus').value === 'true';
+
+      if (!sku || !modelName || !lob) {
+        if (msgEl) { msgEl.textContent = 'Vui lòng nhập đủ SKU, Tên model, LOB.'; msgEl.style.color = '#b30012'; }
+        return;
+      }
+
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      const { error } = await sb.from('products_master').upsert({
+        sku, model_name: modelName, lob, sdp_price: priceVal === '' ? 0 : Number(priceVal), is_active: isActive, updated_at: new Date().toISOString()
+      });
+      if (error) {
+        if (msgEl) { msgEl.textContent = 'Lỗi lưu sản phẩm: ' + error.message; msgEl.style.color = '#b30012'; }
+        return;
+      }
+
+      showMsiToast(origSku ? 'Đã cập nhật sản phẩm' : 'Đã thêm sản phẩm');
+      document.getElementById('productFormView')?.classList.add('hidden');
+      if (origSku) {
+        await openProductDetail(sku);
+      } else {
+        showProductsListView();
+        await loadProductsList();
+      }
+    });
+
+    // ── Import sản phẩm từ Excel NPP (DGW/SPC/KTC/MH) — tự nhận diện
+    // format, dùng cùng logic với scripts/import_products_from_disty.js ──
+    const DISTY_FORMAT_RULES = [
+      { disty: 'DGW', headerRow: 3, skuCol: 0, nameCol: 1, lobCol: 6, skuHint: 'product code', nameHint: 'description' },
+      { disty: 'SPC', headerRow: 2, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'internal code', nameHint: 'model name' },
+      { disty: 'KTC', headerRow: 3, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'ma', nameHint: 'ten' },
+      { disty: 'MH', headerRow: 6, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'model code', nameHint: 'ten' }
+    ];
+
+    function stripAccentsForDistyDetect(s) {
+      return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    }
+
+    function detectDistyFormat(rows) {
+      for (const rule of DISTY_FORMAT_RULES) {
+        const skuHeader = stripAccentsForDistyDetect(rows[rule.headerRow]?.[rule.skuCol] || '');
+        const nameHeader = stripAccentsForDistyDetect(rows[rule.headerRow]?.[rule.nameCol] || '');
+        if (skuHeader.includes(rule.skuHint) && nameHeader.includes(rule.nameHint)) return rule;
+      }
+      return null;
+    }
+
+    function parseDistyRows(rows, rule) {
+      const out = [];
+      for (let i = rule.headerRow + 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row[rule.skuCol] || !row[rule.nameCol]) continue;
+        out.push({
+          sku: String(row[rule.skuCol]).trim(),
+          model_name: String(row[rule.nameCol]).trim(),
+          lob: rule.lobCol !== null ? String(row[rule.lobCol] || '').trim() : ''
+        });
+      }
+      return out;
+    }
+
+    document.getElementById('importProductsBtn')?.addEventListener('click', () => {
+      document.getElementById('importProductsInput')?.click();
+    });
+    document.getElementById('importProductsInput')?.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const msgEl = document.getElementById('productsMessage');
+      if (msgEl) { msgEl.textContent = 'Đang đọc file...'; msgEl.style.color = '#5e6f8a'; }
+
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+
+        const rule = detectDistyFormat(rows);
+        if (!rule) {
+          if (msgEl) { msgEl.textContent = 'Không nhận diện được format NPP (DGW/SPC/KTC/MH) của file này.'; msgEl.style.color = '#b30012'; }
+          return;
+        }
+        const items = parseDistyRows(rows, rule);
+        if (!items.length) {
+          if (msgEl) { msgEl.textContent = `Nhận diện format ${rule.disty} nhưng không đọc được dòng dữ liệu nào.`; msgEl.style.color = '#b30012'; }
+          return;
+        }
+
+        if (msgEl) msgEl.textContent = `Nhận diện NPP ${rule.disty} — đang import ${items.length} dòng...`;
+
+        // products_master.lob NOT NULL — DGW có cột LOB thật, SPC/KTC/MH
+        // không có. Để tránh ghi đè LOB đúng (từ DGW) bằng rỗng khi import
+        // SPC/KTC/MH sau, giữ nguyên LOB cũ nếu sku đã tồn tại; chỉ dùng
+        // 'UNKNOWN' khi sku hoàn toàn mới và file không có cột LOB.
+        const skuList = [...new Set(items.map((it) => it.sku))];
+        const { data: existingRows } = await sb.from('products_master').select('sku, lob').in('sku', skuList);
+        const existingLobBySku = {};
+        (existingRows || []).forEach((r) => { existingLobBySku[r.sku] = r.lob; });
+
+        const masterRows = items.map((it) => ({
+          sku: it.sku,
+          model_name: it.model_name,
+          lob: it.lob || existingLobBySku[it.sku] || 'UNKNOWN',
+          updated_at: new Date().toISOString()
+        }));
+        const { error: masterErr } = await sb.from('products_master').upsert(masterRows, { onConflict: 'sku' });
+        if (masterErr) {
+          if (msgEl) { msgEl.textContent = 'Lỗi upsert products_master: ' + masterErr.message; msgEl.style.color = '#b30012'; }
+          return;
+        }
+
+        const codeRows = items.map((it) => ({ sku: it.sku, disty: rule.disty, disty_code: it.sku, disty_name: it.model_name }));
+        const { error: codeErr } = await sb.from('product_disty_codes').upsert(codeRows, { onConflict: 'disty,disty_code' });
+        if (codeErr) {
+          if (msgEl) { msgEl.textContent = `Đã import products_master, nhưng lỗi product_disty_codes: ${codeErr.message}`; msgEl.style.color = '#b30012'; }
+          return;
+        }
+
+        if (msgEl) { msgEl.textContent = ''; }
+        showMsiToast(`Đã import ${items.length} sản phẩm từ NPP ${rule.disty}`);
+        productsState.page = 0;
+        await loadProductsList();
+      } catch (err) {
+        if (msgEl) { msgEl.textContent = 'Lỗi đọc file Excel: ' + err.message; msgEl.style.color = '#b30012'; }
+      }
+    });
 
     // ══ SUPABASE AUTH ══════════════════════════════════════
     const SUPA_URL = 'https://ojmzgewuuoaqffnhcild.supabase.co';
