@@ -4365,6 +4365,7 @@
       const nppBySku = {};
       (distyRows || []).forEach((r) => { (nppBySku[r.sku] ||= new Set()).add(r.disty); });
 
+      const isAdmin = isProductsAdmin();
       tbody.innerHTML = rows.map((p) => {
         const nppList = nppBySku[p.sku] ? [...nppBySku[p.sku]].sort().join(', ') : '—';
         return `<tr>
@@ -4374,12 +4375,18 @@
           <td>${nppList}</td>
           <td class="kpi-col-num">${fmtQtyMsi(p.sdp_price)}</td>
           <td>${p.is_active ? '🟢 Đang bán' : '⚪ Ngừng bán'}</td>
-          <td><button type="button" class="btn-secondary product-detail-btn" data-sku="${p.sku}">Xem chi tiết</button></td>
+          <td>
+            <button type="button" class="btn-secondary product-detail-btn" data-sku="${p.sku}">Xem chi tiết</button>
+            ${isAdmin ? `<button type="button" class="btn-secondary product-delete-btn" data-sku="${p.sku}">Xóa</button>` : ''}
+          </td>
         </tr>`;
       }).join('');
 
       tbody.querySelectorAll('.product-detail-btn').forEach((btn) => {
         btn.addEventListener('click', () => openProductDetail(btn.dataset.sku));
+      });
+      tbody.querySelectorAll('.product-delete-btn').forEach((btn) => {
+        btn.addEventListener('click', () => deleteProduct(btn.dataset.sku));
       });
 
       renderProductsPagination(count || 0);
@@ -4398,6 +4405,21 @@
       `;
       document.getElementById('productsPrevBtn')?.addEventListener('click', () => { productsState.page--; loadProductsList(); });
       document.getElementById('productsNextBtn')?.addEventListener('click', () => { productsState.page++; loadProductsList(); });
+    }
+
+    // Xoá sản phẩm (admin only — RLS admin_all cũng chặn staff ở tầng DB).
+    // FK product_disty_codes/product_programs/disty_inventory đều ON DELETE
+    // CASCADE nên xoá products_master tự dọn sạch dữ liệu liên quan.
+    async function deleteProduct(sku) {
+      if (!isProductsAdmin()) return;
+      if (!confirm(`Xoá sản phẩm "${sku}"? Toàn bộ mã NPP/chương trình giá/tồn kho liên quan sẽ bị xoá theo.`)) return;
+      const { error } = await sb.from('products_master').delete().eq('sku', sku);
+      if (error) {
+        showMsiToast('Lỗi xoá: ' + error.message);
+        return;
+      }
+      showMsiToast(`Đã xoá sản phẩm ${sku}`);
+      await loadProductsList();
     }
 
     document.getElementById('productSearchInput')?.addEventListener('input', (e) => {
