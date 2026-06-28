@@ -1429,21 +1429,73 @@
       gap: 16px;
       align-items: flex-start;
     }
-    .msi-target-compare-grid > .msi-panel {
-      flex: 1 1 50%;
+    .msi-target-main-panel {
+      flex: 1 1 60%;
+      min-width: 0;
+    }
+    .msi-target-prev-panel {
+      flex: 1 1 40%;
       min-width: 0;
     }
     @media (max-width: 768px) {
       .msi-target-compare-grid {
         flex-direction: column;
       }
+      .msi-target-main-panel,
+      .msi-target-prev-panel {
+        flex: 1 1 100%;
+      }
     }
 
-    .annual-target-merged-table .ratio-input {
-      width: 80px;
-      text-align: right;
+    /* Bảng gộp Target/Tỉ trọng/K — width cố định từng cột để gọn vào 1
+       khung hình, không cần cuộn ngang ở màn 1366px (180 + 80×4 = 500px). */
+    .annual-target-merged-table,
+    .annual-target-prev-table {
+      table-layout: fixed;
+      width: auto;
+      min-width: 0;
+      font-size: 12px;
     }
-    .ratio-fixed {
+    .annual-target-merged-table th,
+    .annual-target-merged-table td,
+    .annual-target-prev-table th,
+    .annual-target-prev-table td {
+      padding: 4px 6px;
+    }
+    .annual-target-merged-table .kpi-col-name,
+    .annual-target-prev-table .kpi-col-name {
+      width: 180px;
+      min-width: 180px;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .annual-target-merged-table .kpi-col-num,
+    .annual-target-prev-table .kpi-col-num {
+      width: 80px;
+      min-width: 80px;
+      max-width: 80px;
+    }
+    .annual-target-merged-table th.kpi-col-num,
+    .annual-target-prev-table th.kpi-col-num {
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.25;
+    }
+    .annual-target-merged-table input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 12px;
+      text-align: right;
+      padding: 2px 4px;
+    }
+    .annual-target-merged-table td.annual-readonly {
+      background: #f0f3f7;
+      color: var(--muted);
+    }
+    .annual-target-prev-table tbody td {
+      background: #f5f6f8;
       color: var(--muted);
     }
     .ratio-input.ratio-input-warn {
@@ -1791,24 +1843,23 @@
         </div>
 
         <div id="annualTargetView" class="hidden">
-          <div class="msi-kpi-detail-hd">
-            <h3>Target Năm Toàn Team</h3>
-            <div class="form-group" style="max-width:140px;margin:0">
-              <label for="annualTargetYear">Năm</label>
-              <select id="annualTargetYear"></select>
-            </div>
-          </div>
-
           <div class="msi-target-compare-grid">
-            <div class="msi-panel">
-              <h3>Target Năm <span id="annualTargetYearLabel"></span></h3>
-              <p class="msi-panel-note">Cột "K" chỉ hiện ô nhập với hạng mục có K riêng (CND-MB, CND-GMNT, GNP-VGA và các hạng mục con) — hạng mục khác luôn = 1.000. Mỗi nhóm, tổng K phải = 1.000 (cảnh báo đỏ nếu lệch).</p>
+            <div class="msi-panel msi-target-main-panel">
+              <div class="msi-kpi-detail-hd" style="margin-bottom:6px">
+                <h3>Cài đặt Target Năm <span id="annualTargetYearLabel"></span></h3>
+                <div class="form-group" style="max-width:140px;margin:0">
+                  <label for="annualTargetYear">Năm</label>
+                  <select id="annualTargetYear"></select>
+                </div>
+              </div>
+              <p class="msi-panel-note">"Tỉ trọng (D)" và "K" áp dụng chung cho 4 nhân viên, mọi quý trong năm. Chỉ 3 nhóm cha-con (CND-MB, CND-GMNT, GNP-VGA) cảnh báo đỏ khi tổng K trong nhóm ≠ 1.000 — hạng mục đứng một mình tự nhập, không cảnh báo tổng.</p>
               <div class="table-wrapper">
                 <table class="target-table kpi-detail-table annual-target-merged-table">
                   <thead>
                     <tr>
                       <th class="kpi-col-name">Hạng mục</th>
                       <th class="kpi-col-num">Target Năm</th>
+                      <th class="kpi-col-num">Tỉ trọng (D)</th>
                       <th class="kpi-col-num">K</th>
                       <th class="kpi-col-num">Đã phân bổ</th>
                       <th class="kpi-col-num">Còn lại</th>
@@ -1824,11 +1875,11 @@
               <div class="login-error" id="annualTargetMessage"></div>
             </div>
 
-            <div class="msi-panel">
+            <div class="msi-panel msi-target-prev-panel">
               <h3>Đối chiếu năm <span id="annualTargetPrevYearLabel"></span></h3>
               <p class="msi-panel-note">Chỉ xem — target năm trước để tham khảo khi nhập target năm nay.</p>
               <div class="table-wrapper">
-                <table class="target-table kpi-detail-table">
+                <table class="target-table kpi-detail-table annual-target-prev-table">
                   <thead>
                     <tr>
                       <th class="kpi-col-name">Hạng mục</th>
@@ -3491,21 +3542,16 @@
       initYearDropdownGeneric('staffAllocationYear', (year) => loadStaffAllocationSection(year));
     }
 
-    // 3 nhóm hạng mục cha-con đang có K ≠ 1 (đã xác nhận qua mcp_tables_v10
-    // migrate từ targets.y2023_avg thật). Dùng để: (1) biết hạng mục nào
-    // hiện ô nhập K thay vì cố định 1.000, (2) gom theo nhóm để báo tổng K
-    // phải = 1.000.
+    // 3 nhóm hạng mục cha-con — CHỈ 3 nhóm này cảnh báo tổng K phải = 1.000.
+    // K vẫn nhập được cho TẤT CẢ 16 hạng mục (kể cả đứng một mình), nhưng
+    // hạng mục đứng một mình không thuộc nhóm nào nên không bị check tổng.
     const CATEGORY_RATIO_GROUPS = [
       { name: 'CND-MB', categories: ['CND-MB', 'CND-MB (B Chipset)', 'CND-MB (X,Z Chipset)'] },
       { name: 'CND-GMNT', categories: ['CND-GMNT', 'CND-GMNT ( QHD )'] },
       { name: 'GNP-VGA', categories: ['GNP-VGA ( GT )', 'GNP-VGA ( GTX + RTX )'] }
     ];
     const CATEGORY_TO_RATIO_GROUP = {};
-    const K_CATEGORIES = new Set();
-    CATEGORY_RATIO_GROUPS.forEach((g) => g.categories.forEach((cat) => {
-      CATEGORY_TO_RATIO_GROUP[cat] = g.name;
-      K_CATEGORIES.add(cat);
-    }));
+    CATEGORY_RATIO_GROUPS.forEach((g) => g.categories.forEach((cat) => { CATEGORY_TO_RATIO_GROUP[cat] = g.name; }));
 
     // Bảng K không còn dòng "Tổng" riêng (đã gộp vào bảng target năm, mỗi
     // hạng mục 1 dòng) — cảnh báo lệch tổng bằng cách tô đỏ trực tiếp các ô
@@ -3529,42 +3575,45 @@
       if (!tbody) return;
       if (yearLabel) yearLabel.textContent = year;
       if (prevYearLabel) prevYearLabel.textContent = year - 1;
-      tbody.innerHTML = '<tr><td colspan="5">Đang tải...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Đang tải...</td></tr>';
       if (prevTbody) prevTbody.innerHTML = '<tr><td colspan="2">Đang tải...</td></tr>';
 
       const categories = await getAnnualTargetCategories();
       if (!categories.length) {
-        tbody.innerHTML = '<tr><td colspan="5">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6">Chưa có hạng mục KPI nào trong hệ thống (targets rỗng).</td></tr>';
         return;
       }
 
       const empIds = EMPLOYEES.map((e) => e.id);
-      const ratioCats = [...K_CATEGORIES];
+      const tuId = EMPLOYEES.find((e) => normalizeNameForMatch(e.name) === 'tu')?.id;
       const [
         { data: annualRows, error: annualErr },
         { data: empTargetRows, error: empErr },
         { data: ratioRows, error: ratioErr },
         { data: prevRatioRows, error: prevRatioErr },
-        { data: prevAnnualRows, error: prevAnnualErr }
+        { data: prevAnnualRows, error: prevAnnualErr },
+        { data: weightRows, error: weightErr }
       ] = await Promise.all([
         sb.from('annual_targets').select('category, target_qty').eq('year', year),
         sb.from('targets').select('category, target_qty').in('assigned_to', empIds).ilike('quarter', `${year}%`),
-        sb.from('category_ratios').select('category, ratio').eq('year', year).in('category', ratioCats),
-        sb.from('category_ratios').select('category, ratio').eq('year', year - 1).in('category', ratioCats),
-        sb.from('annual_targets').select('category, target_qty').eq('year', year - 1)
+        sb.from('category_ratios').select('category, ratio').eq('year', year).in('category', categories),
+        sb.from('category_ratios').select('category, ratio').eq('year', year - 1).in('category', categories),
+        sb.from('annual_targets').select('category, target_qty').eq('year', year - 1),
+        sb.from('targets').select('category, item_weight').eq('assigned_to', tuId).ilike('quarter', `${year}%`)
       ]);
 
       if (annualErr) {
         const msg = isMissingTableError(annualErr, 'annual_targets')
           ? 'Bảng annual_targets chưa được tạo trong DB — chạy mcp_tables_v8.sql trong Supabase SQL Editor trước.'
           : 'Lỗi tải target năm: ' + annualErr.message;
-        tbody.innerHTML = `<tr><td colspan="5">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6">${msg}</td></tr>`;
         return;
       }
       if (empErr) console.warn('[loadAnnualTargetSection targets]', empErr.message);
       if (ratioErr && !isMissingTableError(ratioErr, 'category_ratios')) console.warn('[loadAnnualTargetSection category_ratios]', ratioErr.message);
       if (prevRatioErr) console.warn('[loadAnnualTargetSection prev category_ratios]', prevRatioErr.message);
       if (prevAnnualErr) console.warn('[loadAnnualTargetSection prev annual_targets]', prevAnnualErr.message);
+      if (weightErr) console.warn('[loadAnnualTargetSection item_weight]', weightErr.message);
 
       const annualByCategory = {};
       (annualRows || []).forEach((r) => { annualByCategory[r.category] = r.target_qty; });
@@ -3582,6 +3631,9 @@
       const prevAnnualByCategory = {};
       (prevAnnualRows || []).forEach((r) => { prevAnnualByCategory[r.category] = r.target_qty; });
 
+      const weightByCategory = {};
+      (weightRows || []).forEach((r) => { if (weightByCategory[r.category] === undefined) weightByCategory[r.category] = r.item_weight; });
+
       tbody.innerHTML = categories.map((cat) => {
         const annualVal = annualByCategory[cat];
         const allocated = allocatedByCategory[cat] || 0;
@@ -3589,31 +3641,29 @@
         const remaining = hasAnnual ? annualVal - allocated : null;
         const isOver = hasAnnual && remaining < 0;
 
-        const hasOwnK = K_CATEGORIES.has(cat);
-        const kCell = hasOwnK
-          ? (() => {
-              const kVal = ratioByCategory[cat] !== undefined ? ratioByCategory[cat] : (prevRatioByCategory[cat] !== undefined ? prevRatioByCategory[cat] : 1);
-              return `<input type="number" step="0.001" class="target-input ratio-input" data-group="${CATEGORY_TO_RATIO_GROUP[cat]}" data-category="${cat}" value="${kVal}" />`;
-            })()
-          : `<span class="ratio-fixed">1.000</span>`;
+        const weightVal = weightByCategory[cat];
+        const groupName = CATEGORY_TO_RATIO_GROUP[cat] || '';
+        const groupAttr = groupName ? ` data-group="${groupName}"` : '';
+        const kVal = ratioByCategory[cat] !== undefined ? ratioByCategory[cat] : (prevRatioByCategory[cat] !== undefined ? prevRatioByCategory[cat] : 1);
 
         return `<tr>
           <td class="kpi-col-name">${cat}</td>
           <td class="kpi-col-num"><input type="number" step="1" class="target-input annual-target-input" data-category="${cat}" value="${annualVal ?? ''}" /></td>
-          <td class="kpi-col-num">${kCell}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(allocated)}</td>
-          <td class="kpi-col-num msi-allocate-info ${isOver ? 'over-allocated' : ''}">${hasAnnual ? fmtQtyMsi(remaining) : '—'}</td>
+          <td class="kpi-col-num"><input type="number" step="0.001" class="target-input weight-input" data-category="${cat}" value="${weightVal ?? ''}" /></td>
+          <td class="kpi-col-num"><input type="number" step="0.001" min="0" max="1" class="target-input ratio-input"${groupAttr} data-category="${cat}" value="${kVal}" /></td>
+          <td class="kpi-col-num annual-readonly">${fmtQtyMsi(allocated)}</td>
+          <td class="kpi-col-num annual-readonly ${isOver ? 'over-allocated' : ''}">${hasAnnual ? fmtQtyMsi(remaining) : '—'}</td>
         </tr>`;
       }).join('');
 
-      tbody.querySelectorAll('.ratio-input').forEach((inp) => {
+      tbody.querySelectorAll('.ratio-input[data-group]').forEach((inp) => {
         inp.addEventListener('input', () => recalcRatioGroupWarn(inp.dataset.group));
       });
       CATEGORY_RATIO_GROUPS.forEach((g) => recalcRatioGroupWarn(g.name));
 
       if (prevTbody) {
         if (!prevAnnualRows || !prevAnnualRows.length) {
-          prevTbody.innerHTML = '<tr><td colspan="2">Chưa có dữ liệu</td></tr>';
+          prevTbody.innerHTML = `<tr><td colspan="2">Chưa có dữ liệu năm ${year - 1}</td></tr>`;
         } else {
           prevTbody.innerHTML = categories.map((cat) => {
             const v = prevAnnualByCategory[cat];
@@ -3657,7 +3707,9 @@
     async function saveAnnualTargets() {
       const year = parseInt(document.getElementById('annualTargetYear')?.value, 10);
       const msgEl = document.getElementById('annualTargetMessage');
+      const empIds = EMPLOYEES.map((e) => e.id);
       const targetInputs = document.querySelectorAll('#annualTargetTableBody .annual-target-input');
+      const weightInputs = document.querySelectorAll('#annualTargetTableBody .weight-input');
       const ratioInputs = document.querySelectorAll('#annualTargetTableBody .ratio-input');
       if (!year || !targetInputs.length) return;
 
@@ -3672,13 +3724,18 @@
           updated_at: new Date().toISOString()
         });
       });
+      const weightUpdateRows = [];
+      weightInputs.forEach((input) => {
+        if (input.value === '') return;
+        weightUpdateRows.push({ category: input.dataset.category, item_weight: Number(input.value) || 0 });
+      });
       const ratioUpsertRows = [...ratioInputs].map((inp) => ({
         year,
         category: inp.dataset.category,
         ratio: Number(inp.value) || 0
       }));
 
-      if (!targetUpsertRows.length && !ratioUpsertRows.length) {
+      if (!targetUpsertRows.length && !weightUpdateRows.length && !ratioUpsertRows.length) {
         if (msgEl) { msgEl.textContent = 'Chưa nhập giá trị nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
         return;
       }
@@ -3689,6 +3746,21 @@
         const { error } = await sb.from('annual_targets').upsert(targetUpsertRows, { onConflict: 'year,category' });
         if (error) {
           if (msgEl) { msgEl.textContent = 'Lỗi lưu target năm: ' + error.message; msgEl.style.color = '#b30012'; }
+          return;
+        }
+      }
+
+      // Đồng bộ targets.item_weight của TẤT CẢ 4 nhân viên, TẤT CẢ quý của
+      // năm này theo đúng category — Tỉ trọng (D) áp dụng chung cho cả team.
+      for (const row of weightUpdateRows) {
+        const { error: weightErr } = await sb
+          .from('targets')
+          .update({ item_weight: row.item_weight })
+          .in('assigned_to', empIds)
+          .like('quarter', `${year} Q%`)
+          .eq('category', row.category);
+        if (weightErr) {
+          if (msgEl) { msgEl.textContent = `Lỗi cập nhật tỉ trọng cho "${row.category}": ${weightErr.message}`; msgEl.style.color = '#b30012'; }
           return;
         }
       }
@@ -3714,6 +3786,7 @@
         }
       }
 
+      if (msgEl) msgEl.textContent = '';
       hideAnnualTargetView();
       showMsiToast(`Đã lưu target năm ${year}`);
       await renderKpiEmployeeList();
