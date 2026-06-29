@@ -1800,8 +1800,8 @@
         <label for="filterNpp">NPP</label>
         <select id="filterNpp">
           <option value="">Tất cả</option>
-          <option>DGW</option><option>SPC</option><option>KTC</option>
-          <option>NWH</option><option>MH</option><option>AD</option>
+          <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option>
+          <option>MAI HOANG</option><option>AD</option><option>PSD</option><option>MEKO</option>
         </select>
       </div>
       <div class="msi-filter-item">
@@ -2094,7 +2094,8 @@
               </select>
               <select id="productFilterNpp">
                 <option value="">Tất cả NPP</option>
-                <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option><option>MH</option><option>AD</option>
+                <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option>
+                <option>MAI HOANG</option><option>AD</option><option>PSD</option><option>MEKO</option>
               </select>
               <select id="productFilterStatus">
                 <option value="">Tất cả trạng thái</option>
@@ -4269,7 +4270,7 @@
 
     // ══════════════════ Tab "Sản phẩm" ══════════════════
     const PRODUCTS_PAGE_SIZE = 50;
-    const PRODUCTS_DISTY_LIST = ['DGW', 'SPC', 'KTC', 'NWH', 'MH', 'AD'];
+    const PRODUCTS_DISTY_LIST = ['DGW', 'SPC', 'KTC', 'NWH', 'MAI HOANG', 'AD', 'PSD', 'MEKO'];
     const productsState = { page: 0, sortCol: 'sku', sortAsc: true, search: '', lob: '', npp: '', status: '' };
     let productsSearchDebounce = null;
     let currentProductSku = null;
@@ -4741,7 +4742,7 @@
       { disty: 'DGW', headerRow: 3, skuCol: 0, nameCol: 1, lobCol: 6, skuHint: 'product code', nameHint: 'description' },
       { disty: 'SPC', headerRow: 2, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'internal code', nameHint: 'model name' },
       { disty: 'KTC', headerRow: 3, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'ma', nameHint: 'ten' },
-      { disty: 'MH', headerRow: 6, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'model code', nameHint: 'ten' }
+      { disty: 'MAI HOANG', headerRow: 6, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'model code', nameHint: 'ten' }
     ];
 
     function stripAccentsForDistyDetect(s) {
