@@ -4736,40 +4736,308 @@
       }
     });
 
-    // ── Import sản phẩm từ Excel NPP (DGW/SPC/KTC/MH) — tự nhận diện
-    // format, dùng cùng logic với scripts/import_products_from_disty.js ──
-    const DISTY_FORMAT_RULES = [
-      { disty: 'DGW', headerRow: 3, skuCol: 0, nameCol: 1, lobCol: 6, skuHint: 'product code', nameHint: 'description' },
-      { disty: 'SPC', headerRow: 2, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'internal code', nameHint: 'model name' },
-      { disty: 'KTC', headerRow: 3, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'ma', nameHint: 'ten' },
-      { disty: 'MAI HOANG', headerRow: 6, skuCol: 0, nameCol: 1, lobCol: null, skuHint: 'model code', nameHint: 'ten' }
-    ];
-
+    // ── Import tồn kho từ Excel NPP — 8 NPP (DGW/SPC/KTC/NWH/MAI HOANG/AD/
+    // PSD/MEKO), mỗi sheet trong file là 1 NPP. Logic giống hệt
+    // scripts/import_products_from_disty.js (Node), port sang chạy trong
+    // trình duyệt để Nam có thể import trực tiếp từ tab Sản phẩm. ──
     function stripAccentsForDistyDetect(s) {
       return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
     }
 
-    function detectDistyFormat(rows) {
-      for (const rule of DISTY_FORMAT_RULES) {
-        const skuHeader = stripAccentsForDistyDetect(rows[rule.headerRow]?.[rule.skuCol] || '');
-        const nameHeader = stripAccentsForDistyDetect(rows[rule.headerRow]?.[rule.nameCol] || '');
-        if (skuHeader.includes(rule.skuHint) && nameHeader.includes(rule.nameHint)) return rule;
-      }
-      return null;
+    function normalizeSheetNameForDisty(name) {
+      return stripAccentsForDistyDetect(name).toUpperCase().replace(/[^A-Z]/g, '');
     }
 
-    function parseDistyRows(rows, rule) {
+    const SHEET_NAME_TO_DISTY = {
+      DGW: 'DGW', SPC: 'SPC', KTC: 'KTC', NWH: 'NWH', AD: 'AD', PSD: 'PSD', MEKO: 'MEKO',
+      MAIHOANG: 'MAI HOANG', MH: 'MAI HOANG'
+    };
+
+    function detectDistyFromSheetName(sheetName) {
+      return SHEET_NAME_TO_DISTY[normalizeSheetNameForDisty(sheetName)] || null;
+    }
+
+    function excelSerialToISODateForDisty(serial) {
+      const utcMs = Date.UTC(1899, 11, 30) + Math.round(serial) * 86400000;
+      return new Date(utcMs).toISOString().slice(0, 10);
+    }
+
+    function parseVNDateForDisty(str) {
+      const m = String(str).match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+      if (!m) return null;
+      const [, d, mo, y] = m;
+      return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    function parseAnyDateForDisty(cell) {
+      if (cell == null || cell === '') return null;
+      if (typeof cell === 'number') return excelSerialToISODateForDisty(cell);
+      return parseVNDateForDisty(cell);
+    }
+
+    function findWeekDateForDisty(rows, maxRow) {
+      let found = null;
+      for (let i = 0; i < Math.min(maxRow, rows.length); i++) {
+        for (const cell of rows[i] || []) {
+          if (cell == null || cell === '') continue;
+          if (typeof cell === 'number') {
+            if (cell > 44000 && cell < 55000) found = excelSerialToISODateForDisty(cell);
+            continue;
+          }
+          const text = String(cell);
+          const rangeMatch = text.match(/to\s+(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4})/i);
+          if (rangeMatch) { found = parseVNDateForDisty(rangeMatch[1]); continue; }
+          const dateMatch = text.match(/\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}/);
+          if (dateMatch) found = parseVNDateForDisty(dateMatch[0]);
+        }
+      }
+      return found;
+    }
+
+    function isEmptyDistyCell(v) {
+      return v == null || String(v).trim() === '';
+    }
+
+    // "TOTAL"/"CODE" — dòng tổng cuối sheet (DGW) hoặc dòng chú giải cột
+    // chèn giữa header và data thật (SPC/MEKO), không phải SKU thật.
+    function isLegendRowDisty(code, name) {
+      const c = stripAccentsForDistyDetect(code).toUpperCase();
+      const n = stripAccentsForDistyDetect(name).toUpperCase();
+      return c === 'CODE' || c === 'TOTAL' || n === 'CODE' || n === 'TOTAL';
+    }
+
+    function parseDGWSheet(rows) {
       const out = [];
-      for (let i = rule.headerRow + 1; i < rows.length; i++) {
+      for (let i = 5; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || !row[rule.skuCol] || !row[rule.nameCol]) continue;
+        const code = row?.[0];
+        if (isEmptyDistyCell(code) || stripAccentsForDistyDetect(code).toUpperCase() === 'NAN') continue;
+        if (isLegendRowDisty(code, row[1])) continue;
         out.push({
-          sku: String(row[rule.skuCol]).trim(),
-          model_name: String(row[rule.nameCol]).trim(),
-          lob: rule.lobCol !== null ? String(row[rule.lobCol] || '').trim() : ''
+          disty_code: String(code).trim(),
+          disty_name: String(row[1] ?? '').trim(),
+          lob: isEmptyDistyCell(row[6]) ? null : String(row[6]).trim(),
+          opening: Number(row[2]) || 0,
+          sell_in: Number(row[3]) || 0,
+          sell_out: Number(row[4]) || 0,
+          closing: Number(row[5]) || 0
         });
       }
       return out;
+    }
+
+    function parsePSDSheet(rows) {
+      const out = [];
+      for (let i = 6; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[0];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, row[1])) continue;
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(row[1] ?? '').trim(),
+          lob: null,
+          opening: Number(row[2]) || 0,
+          sell_in: Number(row[3]) || 0,
+          sell_out: Number(row[4]) || 0,
+          closing: Number(row[5]) || 0
+        });
+      }
+      return out;
+    }
+
+    function parseKTCSheet(rows) {
+      const out = [];
+      for (let i = 4; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[0];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, row[1])) continue;
+        const hcmOpen = Number(row[2]) || 0;
+        const hcmBuyIn = Number(row[3]) || 0;
+        const hcmSellOut = Number(row[4]) || 0;
+        const hcmClose = Number(row[5]) || 0;
+        const hnOpen = Number(row[6]) || 0;
+        const hnBuyIn = Number(row[7]) || 0;
+        const hnSellOut = Number(row[8]) || 0;
+        const hnClose = Number(row[9]) || 0;
+        const totalClose = isEmptyDistyCell(row[10]) ? hcmClose + hnClose : Number(row[10]);
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(row[1] ?? '').trim(),
+          lob: null,
+          opening: hcmOpen + hnOpen,
+          sell_in: hcmBuyIn + hnBuyIn,
+          sell_out: hcmSellOut + hnSellOut,
+          closing: totalClose
+        });
+      }
+      return out;
+    }
+
+    function parseMaiHoangSheet(rows) {
+      const out = [];
+      for (let i = 8; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[0];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, row[1])) continue;
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(row[1] ?? '').trim(),
+          lob: null,
+          opening: Number(row[2]) || 0,
+          sell_in: Number(row[6]) || 0,
+          sell_out: Number(row[7]) || 0,
+          closing: Number(row[8]) || 0
+        });
+      }
+      return out;
+    }
+
+    function parseSPCSheet(rows) {
+      const out = [];
+      for (let i = 4; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[0];
+        const name = row?.[1];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, name)) continue;
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(name ?? '').trim(),
+          lob: null,
+          opening: Number(row[2]) || 0,
+          sell_in: Number(row[6]) || 0,
+          sell_out: Number(row[7]) || 0,
+          closing: Number(row[8]) || 0
+        });
+      }
+      return out;
+    }
+
+    function parseMEKOSheet(rows) {
+      const out = [];
+      for (let i = 5; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[0];
+        const name = row?.[1];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, name)) continue;
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(name ?? '').trim(),
+          lob: null,
+          opening: Number(row[2]) || 0,
+          sell_in: Number(row[3]) || 0,
+          sell_out: Number(row[4]) || 0,
+          closing: Number(row[5]) || 0
+        });
+      }
+      return out;
+    }
+
+    function parseNWHSheet(rows) {
+      const out = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[2];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, row[1])) continue;
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(row[1] ?? '').trim(),
+          lob: null,
+          opening: 0,
+          sell_in: 0,
+          sell_out: 0,
+          closing: Number(row[3]) || 0,
+          rowDate: parseAnyDateForDisty(row[0])
+        });
+      }
+      return out;
+    }
+
+    function parseADSheet(rows) {
+      const out = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const code = row?.[2];
+        if (isEmptyDistyCell(code) || isLegendRowDisty(code, row[1])) continue;
+        out.push({
+          disty_code: String(code).trim(),
+          disty_name: String(row[1] ?? '').trim(),
+          lob: null,
+          opening: 0,
+          sell_in: 0,
+          sell_out: 0,
+          closing: Number(row[3]) || 0
+        });
+      }
+      return out;
+    }
+
+    // headerRows: số dòng đầu (0-indexed, loại trừ) quét tìm ngày tuần —
+    // cũng là dòng mà data thật bắt đầu ngay sau đó.
+    const DISTY_RULES = {
+      DGW: { parser: parseDGWSheet, headerRows: 5 },
+      PSD: { parser: parsePSDSheet, headerRows: 6 },
+      KTC: { parser: parseKTCSheet, headerRows: 4 },
+      'MAI HOANG': { parser: parseMaiHoangSheet, headerRows: 8 },
+      SPC: { parser: parseSPCSheet, headerRows: 4 },
+      MEKO: { parser: parseMEKOSheet, headerRows: 5 },
+      NWH: { parser: parseNWHSheet, headerRows: 1, perRowDate: true },
+      AD: { parser: parseADSheet, headerRows: 1 }
+    };
+
+    // Dedupe theo disty_code trong cùng 1 sheet (giữ dòng cuối) — tránh lỗi
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time".
+    function dedupeDistyItemsByCode(items) {
+      const map = new Map();
+      for (const it of items) map.set(it.disty_code, it);
+      return [...map.values()];
+    }
+
+    async function importDistySheet(disty, sheetName, rows) {
+      const rule = DISTY_RULES[disty];
+      const items = dedupeDistyItemsByCode(rule.parser(rows));
+      if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };
+
+      let fallbackWeekDate = null;
+      if (!rule.perRowDate) {
+        fallbackWeekDate = findWeekDateForDisty(rows, rule.headerRows) || new Date().toISOString().slice(0, 10);
+      }
+
+      // 1. Upsert product_disty_codes — KHÔNG set sku, giữ mapping cũ nếu đã
+      // có (admin map tay), hoặc NULL nếu mã hoàn toàn mới.
+      const codeRows = items.map((it) => ({ disty, disty_code: it.disty_code, disty_name: it.disty_name }));
+      const { error: codeErr } = await sb.from('product_disty_codes').upsert(codeRows, { onConflict: 'disty,disty_code' });
+      if (codeErr) throw new Error(`[${disty}] Lỗi upsert product_disty_codes: ${codeErr.message}`);
+
+      // 2. Tra lại sku đã map theo (disty, disty_code)
+      const codes = items.map((it) => it.disty_code);
+      const { data: mapRows, error: mapErr } = await sb
+        .from('product_disty_codes')
+        .select('disty_code, sku')
+        .eq('disty', disty)
+        .in('disty_code', codes);
+      if (mapErr) throw new Error(`[${disty}] Lỗi đọc product_disty_codes: ${mapErr.message}`);
+      const skuByCode = {};
+      (mapRows || []).forEach((r) => { skuByCode[r.disty_code] = r.sku; });
+
+      // 3. Upsert disty_inventory — sku=NULL nếu chưa map.
+      const invRows = items.map((it) => ({
+        sku: skuByCode[it.disty_code] || null,
+        disty,
+        week_date: it.rowDate || fallbackWeekDate,
+        opening: it.opening,
+        sell_in: it.sell_in,
+        sell_out: it.sell_out,
+        closing: it.closing
+      }));
+      const { error: invErr } = await sb.from('disty_inventory').upsert(invRows, { onConflict: 'sku,disty,week_date' });
+      if (invErr) throw new Error(`[${disty}] Lỗi upsert disty_inventory: ${invErr.message}`);
+
+      const mapped = items.filter((it) => skuByCode[it.disty_code]).length;
+      return { disty, read: items.length, mapped, unmapped: items.length - mapped };
+    }
+
+    function escapeHtmlForDistyReport(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
     document.getElementById('importProductsBtn')?.addEventListener('click', () => {
@@ -4785,52 +5053,35 @@
       try {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: 'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
 
-        const rule = detectDistyFormat(rows);
-        if (!rule) {
-          if (msgEl) { msgEl.textContent = 'Không nhận diện được format NPP (DGW/SPC/KTC/MH) của file này.'; msgEl.style.color = '#b30012'; }
-          return;
-        }
-        const items = parseDistyRows(rows, rule);
-        if (!items.length) {
-          if (msgEl) { msgEl.textContent = `Nhận diện format ${rule.disty} nhưng không đọc được dòng dữ liệu nào.`; msgEl.style.color = '#b30012'; }
-          return;
+        const report = [];
+        const skippedSheets = [];
+        for (const sheetName of wb.SheetNames) {
+          const disty = detectDistyFromSheetName(sheetName);
+          if (!disty) { skippedSheets.push(sheetName); continue; }
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true });
+          report.push(await importDistySheet(disty, sheetName, rows));
         }
 
-        if (msgEl) msgEl.textContent = `Nhận diện NPP ${rule.disty} — đang import ${items.length} dòng...`;
-
-        // products_master.lob NOT NULL — DGW có cột LOB thật, SPC/KTC/MH
-        // không có. Để tránh ghi đè LOB đúng (từ DGW) bằng rỗng khi import
-        // SPC/KTC/MH sau, giữ nguyên LOB cũ nếu sku đã tồn tại; chỉ dùng
-        // 'UNKNOWN' khi sku hoàn toàn mới và file không có cột LOB.
-        const skuList = [...new Set(items.map((it) => it.sku))];
-        const { data: existingRows } = await sb.from('products_master').select('sku, lob').in('sku', skuList);
-        const existingLobBySku = {};
-        (existingRows || []).forEach((r) => { existingLobBySku[r.sku] = r.lob; });
-
-        const masterRows = items.map((it) => ({
-          sku: it.sku,
-          model_name: it.model_name,
-          lob: it.lob || existingLobBySku[it.sku] || 'UNKNOWN',
-          updated_at: new Date().toISOString()
-        }));
-        const { error: masterErr } = await sb.from('products_master').upsert(masterRows, { onConflict: 'sku' });
-        if (masterErr) {
-          if (msgEl) { msgEl.textContent = 'Lỗi upsert products_master: ' + masterErr.message; msgEl.style.color = '#b30012'; }
+        if (!report.length) {
+          if (msgEl) {
+            msgEl.textContent = 'Không nhận diện được sheet NPP nào trong file (cần đúng 1 trong 8 NPP: DGW/SPC/KTC/NWH/MAI HOANG/AD/PSD/MEKO).';
+            msgEl.style.color = '#b30012';
+          }
           return;
         }
 
-        const codeRows = items.map((it) => ({ sku: it.sku, disty: rule.disty, disty_code: it.sku, disty_name: it.model_name }));
-        const { error: codeErr } = await sb.from('product_disty_codes').upsert(codeRows, { onConflict: 'disty,disty_code' });
-        if (codeErr) {
-          if (msgEl) { msgEl.textContent = `Đã import products_master, nhưng lỗi product_disty_codes: ${codeErr.message}`; msgEl.style.color = '#b30012'; }
-          return;
-        }
+        const totalRead = report.reduce((s, r) => s + r.read, 0);
+        const totalMapped = report.reduce((s, r) => s + r.mapped, 0);
+        const totalUnmapped = report.reduce((s, r) => s + r.unmapped, 0);
 
-        if (msgEl) { msgEl.textContent = ''; }
-        showMsiToast(`Đã import ${items.length} sản phẩm từ NPP ${rule.disty}`);
+        const lines = report.map((r) => `${escapeHtmlForDistyReport(r.disty)}: đọc ${r.read} dòng — map được ${r.mapped} — chưa map ${r.unmapped}`);
+        if (skippedSheets.length) lines.push(`Bỏ qua sheet không khớp NPP: ${skippedSheets.map(escapeHtmlForDistyReport).join(', ')}`);
+        lines.push(`<strong>Tổng: đọc ${totalRead} dòng — map được ${totalMapped} — chưa map ${totalUnmapped}</strong>`);
+        if (totalUnmapped > 0) lines.push(`${totalUnmapped} dòng chưa map được sku — cần admin map tay vào products_master.`);
+
+        if (msgEl) { msgEl.innerHTML = lines.join('<br>'); msgEl.style.color = '#1a2b4c'; }
+        showMsiToast(`Đã import ${totalRead} dòng tồn kho từ ${report.length} NPP`);
         productsState.page = 0;
         await loadProductsList();
       } catch (err) {
@@ -5478,7 +5729,7 @@
           keys: ['npp la gi','npp là gì','ck la gi','ck là gì','so la gi','so là gì','si la gi','si là gì','sku','rsp','ttbh','kham tu viet tat','khám từ viết tắt','thuat ngu','thuật ngữ','tu viet tat','từ viết tắt','bh la gi','bh là gì','po la gi','km la gi'],
           answer: `<strong>Từ viết tắt ngành hay dùng:</strong>
 <ul>
-<li><strong>NPP</strong> — Nhà Phân Phối (DGW, SPC, KTC, NWH, MH, AD)</li>
+<li><strong>NPP</strong> — Nhà Phân Phối (DGW, SPC, KTC, NWH, MAI HOANG, AD, PSD, MEKO)</li>
 <li><strong>CK</strong> — Chiết khấu, Discount % theo chính sách tháng</li>
 <li><strong>SI</strong> — Sell-in, doanh số bán <em>vào kho</em> NPP/ĐL</li>
 <li><strong>SO</strong> — Sell-out, doanh số bán <em>ra</em> tới người dùng cuối</li>
@@ -5569,11 +5820,11 @@ Tự deal vượt khung không có duyệt = rủi ro về sau. Đừng để de
 <ul>
 <li>🔵 <strong>Miền Bắc</strong> → KTC (hỗ trợ: DGW, SPC)</li>
 <li>🟡 <strong>Miền Trung</strong> → NWH (hỗ trợ: DGW)</li>
-<li>🔴 <strong>TP.HCM & vùng ven</strong> → DGW, MH (hỗ trợ: SPC)</li>
+<li>🔴 <strong>TP.HCM & vùng ven</strong> → DGW, MAI HOANG (hỗ trợ: SPC)</li>
 <li>🟢 <strong>B2B toàn quốc</strong> → SPC (hỗ trợ: DGW)</li>
 <li>🟠 <strong>ĐBSCL</strong> → AD (hỗ trợ: DGW)</li>
 </ul>
-<strong>Thanh toán:</strong> Cấp 1 (DGW/SPC/KTC) → Net 30 · Cấp 2 (NWH/MH/AD) → Net 15<br/>
+<strong>Thanh toán:</strong> Cấp 1 (DGW/SPC/KTC) → Net 30 · Cấp 2 (NWH/MAI HOANG/AD/PSD/MEKO) → Net 15<br/>
 NPP hết hàng → mua NPP khác nhưng cần báo bộ phận KD MSI trước.`
         },
         {
