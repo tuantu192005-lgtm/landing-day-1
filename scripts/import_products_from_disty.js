@@ -88,6 +88,14 @@ function isLegendRow(code, name) {
   return c === 'CODE' || c === 'TOTAL' || n === 'CODE' || n === 'TOTAL';
 }
 
+// Dòng chú giải cột ở SPC nằm ngay trong cột LOB (vd. ["LOB","CODE","TOTAL",...])
+// — kiểm tra riêng cột LOB vì cột này đứng trước Internal Code/Model Name.
+function isLegendLobValue(v) {
+  if (isEmpty(v)) return true;
+  const s = stripAccents(v).toUpperCase();
+  return s === 'LOB' || s === 'CODE' || s === 'TOTAL' || s === 'NAN';
+}
+
 // ── Parser riêng từng NPP — trả về danh sách { disty_code, disty_name,
 // lob, opening, sell_in, sell_out, closing, rowDate? } ──
 
@@ -181,17 +189,18 @@ function parseSPC(rows) {
   const out = [];
   for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
-    const code = row?.[0];
-    const name = row?.[1];
-    if (isEmpty(code) || isLegendRow(code, name)) continue;
+    const lob = row?.[0];
+    const code = row?.[1];
+    const name = row?.[2];
+    if (isEmpty(code) || isLegendLobValue(lob)) continue;
     out.push({
       disty_code: String(code).trim(),
       disty_name: String(name ?? '').trim(),
-      lob: null,
-      opening: Number(row[2]) || 0,
-      sell_in: Number(row[6]) || 0,
-      sell_out: Number(row[7]) || 0,
-      closing: Number(row[8]) || 0
+      lob: String(lob).trim(),
+      opening: Number(row[3]) || 0,
+      sell_in: Number(row[7]) || 0,
+      sell_out: Number(row[8]) || 0,
+      closing: Number(row[9]) || 0
     });
   }
   return out;
@@ -201,17 +210,18 @@ function parseMEKO(rows) {
   const out = [];
   for (let i = 5; i < rows.length; i++) {
     const row = rows[i];
-    const code = row?.[0];
-    const name = row?.[1];
-    if (isEmpty(code) || isLegendRow(code, name)) continue;
+    const lob = row?.[0];
+    const code = row?.[1];
+    const name = row?.[2];
+    if (isEmpty(lob) || isEmpty(code)) continue;
     out.push({
       disty_code: String(code).trim(),
       disty_name: String(name ?? '').trim(),
-      lob: null,
-      opening: Number(row[2]) || 0,
-      sell_in: Number(row[3]) || 0,
-      sell_out: Number(row[4]) || 0,
-      closing: Number(row[5]) || 0
+      lob: String(lob).trim(),
+      opening: Number(row[3]) || 0,
+      sell_in: Number(row[4]) || 0,
+      sell_out: Number(row[5]) || 0,
+      closing: Number(row[6]) || 0
     });
   }
   return out;

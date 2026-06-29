@@ -4806,6 +4806,14 @@
       return c === 'CODE' || c === 'TOTAL' || n === 'CODE' || n === 'TOTAL';
     }
 
+    // Dòng chú giải cột ở SPC nằm ngay trong cột LOB (vd. ["LOB","CODE","TOTAL",...])
+    // — kiểm tra riêng cột LOB vì cột này đứng trước Internal Code/Model Name.
+    function isLegendLobValueDisty(v) {
+      if (isEmptyDistyCell(v)) return true;
+      const s = stripAccentsForDistyDetect(v).toUpperCase();
+      return s === 'LOB' || s === 'CODE' || s === 'TOTAL' || s === 'NAN';
+    }
+
     function parseDGWSheet(rows) {
       const out = [];
       for (let i = 5; i < rows.length; i++) {
@@ -4896,17 +4904,18 @@
       const out = [];
       for (let i = 4; i < rows.length; i++) {
         const row = rows[i];
-        const code = row?.[0];
-        const name = row?.[1];
-        if (isEmptyDistyCell(code) || isLegendRowDisty(code, name)) continue;
+        const lob = row?.[0];
+        const code = row?.[1];
+        const name = row?.[2];
+        if (isEmptyDistyCell(code) || isLegendLobValueDisty(lob)) continue;
         out.push({
           disty_code: String(code).trim(),
           disty_name: String(name ?? '').trim(),
-          lob: null,
-          opening: Number(row[2]) || 0,
-          sell_in: Number(row[6]) || 0,
-          sell_out: Number(row[7]) || 0,
-          closing: Number(row[8]) || 0
+          lob: String(lob).trim(),
+          opening: Number(row[3]) || 0,
+          sell_in: Number(row[7]) || 0,
+          sell_out: Number(row[8]) || 0,
+          closing: Number(row[9]) || 0
         });
       }
       return out;
@@ -4916,17 +4925,18 @@
       const out = [];
       for (let i = 5; i < rows.length; i++) {
         const row = rows[i];
-        const code = row?.[0];
-        const name = row?.[1];
-        if (isEmptyDistyCell(code) || isLegendRowDisty(code, name)) continue;
+        const lob = row?.[0];
+        const code = row?.[1];
+        const name = row?.[2];
+        if (isEmptyDistyCell(lob) || isEmptyDistyCell(code)) continue;
         out.push({
           disty_code: String(code).trim(),
           disty_name: String(name ?? '').trim(),
-          lob: null,
-          opening: Number(row[2]) || 0,
-          sell_in: Number(row[3]) || 0,
-          sell_out: Number(row[4]) || 0,
-          closing: Number(row[5]) || 0
+          lob: String(lob).trim(),
+          opening: Number(row[3]) || 0,
+          sell_in: Number(row[4]) || 0,
+          sell_out: Number(row[5]) || 0,
+          closing: Number(row[6]) || 0
         });
       }
       return out;
@@ -5053,6 +5063,7 @@
       try {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: 'array' });
+        console.log('[importProducts] Sheet names đọc được từ file:', wb.SheetNames);
 
         const report = [];
         const skippedSheets = [];
@@ -5060,6 +5071,10 @@
           const disty = detectDistyFromSheetName(sheetName);
           if (!disty) { skippedSheets.push(sheetName); continue; }
           const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true });
+          if (sheetName.trim().toUpperCase() === 'DGW') {
+            console.log('[importProducts] 5 dòng đầu sheet DGW (raw):', rows.slice(0, 5));
+          }
+          console.log(`[importProducts] Sheet "${sheetName}" → NPP ${disty}, đọc thô ${rows.length} dòng.`);
           report.push(await importDistySheet(disty, sheetName, rows));
         }
 
