@@ -7,28 +7,39 @@ const SUPA_KEY = readFileSync(new URL('../supabase_service_key.txt', import.meta
 
 const sb = createClient(SUPA_URL, SUPA_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
-// Thứ tự ưu tiên: VGA > MB > PSU > CASE > COOLER > MNT > SSD > MINIPC > GG > SERVER
-// PSU/CASE/COOLER kiểm tra TRƯỚC MNT để tránh 'MAG A', 'MAG FORGE', 'MAG CORELIQUID'
-// bị bắt nhầm bởi pattern 'MAG' rộng của MNT.
+const LAPTOP_PATTERNS = ['laptop', 'máy tính xách tay', 'notebook', 'xách tay'];
+
+// Thứ tự ưu tiên: VGA > MB > PSU > CASE > DESKTOP > COOLER > MNT > SSD > MINIPC > GDT > GG > SERVER
+// DESKTOP trước COOLER: '(aio)' desktop không bị 'aio' của cooler bắt nhầm.
+// MINIPC trước GDT: '(mini server)' không bị 'server' của GDT bắt nhầm.
+// GDT đã bao gồm 'server'/'máy chủ' → thay thế SERVER cho hàng hóa thực tế.
 const LOB_RULES = [
-  ['VGA',    ['rtx', 'gtx', 'gt ', 'radeon', 'geforce', 'vga']],
-  ['MB',     ['h310','h410','h510','h610','b360','b460','b560','b660',
-               'b760','b850','z390','z490','z590','z690','z790','z890',
-               'x570','x670','x870','a320','a520','pro h','mag b','mpg z',
-               'meg z','mainboard']],
-  ['PSU',    ['mag a','mpg a','meg a','mag gf','mpg gf','mag gm',
-               'gold','watt','power','nguồn','psu']],
-  ['CASE',   ['mag forge','mag pano','mpg gungnir','meg prospect','case','tower','vỏ']],
-  ['COOLER', ['mag coreliquid','mag core','coreliquid','coreflow',
-               'cooler','tản nhiệt','aio','cpu fan']],
-  ['MNT',    ['mp2','mag 2','mag 3','mag 4','g274','g275','g27q',
-               'g24','g32','pro mp','monitor','màn hình','lcd']],
-  ['SSD',    ['ssd','spatium','datamag','nvme','m.2']],
-  ['MINIPC', ['cubi','mini pc','minipc','nuc']],
-  ['GG',     ['gaming gear','headset','mouse','keyboard','mousepad',
-               'controller','vigor','clutch','force']],
-  ['SERVER', ['server','máy chủ']],
+  ['VGA',     ['rtx', 'gtx', 'gt ', 'radeon', 'geforce', 'vga']],
+  ['MB',      ['h310','h410','h510','h610','b360','b460','b560','b660',
+                'b760','b850','z390','z490','z590','z690','z790','z890',
+                'x570','x670','x870','a320','a520','pro h','mag b','mpg z',
+                'meg z','mainboard']],
+  ['PSU',     ['mag a','mpg a','meg a','mag gf','mpg gf','mag gm',
+                'gold','watt','power','nguồn','psu']],
+  ['CASE',    ['mag forge','mag pano','mpg gungnir','meg prospect','case','tower','vỏ']],
+  ['DESKTOP', ['(desktop)','(dt)','(aio)']],
+  ['COOLER',  ['mag coreliquid','mag core','coreliquid','coreflow',
+                'cooler','tản nhiệt','aio','cpu fan']],
+  ['MNT',     ['mp2','mag 2','mag 3','mag 4','g274','g275','g27q',
+                'g24','g32','pro mp','monitor','màn hình','lcd']],
+  ['SSD',     ['ssd','spatium','datamag','nvme','m.2']],
+  ['MINIPC',  ['(mini server)','(minipc)','cubi','mini pc','minipc','nuc']],
+  ['GDT',     ['(pc)','máy chủ','server','g4101','s2205']],
+  ['GG',      ['gaming gear','headset','mouse','keyboard','mousepad',
+                'controller','vigor','clutch','force']],
+  ['SERVER',  ['máy chủ cũ']],
 ];
+
+function isLaptop(name) {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return LAPTOP_PATTERNS.some(p => n.includes(p));
+}
 
 function classifyLob(modelName) {
   if (!modelName) return null;
@@ -72,10 +83,31 @@ async function batchUpdate(byLob) {
   }
 }
 
+async function batchDelete(skus) {
+  for (let i = 0; i < skus.length; i += 200) {
+    const batch = skus.slice(i, i + 200);
+    const { error } = await sb.from('products_master').delete().in('sku', batch);
+    if (error) throw new Error('Lỗi xoá: ' + error.message);
+    process.stdout.write('x');
+  }
+}
+
 async function main() {
+  // ── Phase 0: Xoá Laptop/Notebook trong Unknown ──
+  console.log('══ Phase 0: Xoá Laptop/Notebook khỏi Unknown ══');
+  const unknownForLaptop = await fetchByLob('Unknown');
+  const laptopSkus = unknownForLaptop.filter(p => isLaptop(p.model_name)).map(p => p.sku);
+  if (laptopSkus.length) {
+    await batchDelete(laptopSkus);
+    console.log(` done. Đã xoá ${laptopSkus.length} Laptop/Notebook.`);
+  } else {
+    console.log('Không có Laptop/Notebook nào trong Unknown.');
+  }
+
   // ── Phase 1: Classify sản phẩm có lob=Unknown ──
-  console.log('══ Phase 1: Classify sản phẩm lob=Unknown ══');
-  const unknownProducts = await fetchByLob('Unknown');
+  console.log('\n══ Phase 1: Classify sản phẩm lob=Unknown ══');
+  // Fetch lại (Phase 0 đã xoá một số)
+  const unknownProducts = (await fetchByLob('Unknown')).filter(p => !isLaptop(p.model_name));
 
   if (!unknownProducts.length) {
     console.log('Không có sản phẩm nào lob=Unknown.');
@@ -131,6 +163,7 @@ async function main() {
 
   // ── Báo cáo tổng ──
   console.log('\n══════════ BÁO CÁO ══════════');
+  console.log(`Phase 0 — Laptop xoá: ${laptopSkus.length}`);
   console.log(`Phase 1 — Unknown đã classify: ${unknownProducts.length}`);
   console.log(`Phase 2 — MNT sai đã sửa: ${totalFixed}`);
   if (totalFixed) {

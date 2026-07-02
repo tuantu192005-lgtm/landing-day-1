@@ -1293,6 +1293,8 @@
     .lob-ssd     { background: #065f46; }
     .lob-minipc  { background: #92400e; }
     .lob-gg      { background: #1d4ed8; }
+    .lob-gdt     { background: #ea580c; }
+    .lob-desktop { background: #7c3aed; }
     .lob-unknown { background: #e5e7eb; color: #6b7280; font-style: italic; }
     .lob-other   { background: #6b7280; }
     /* NPP mini pills */
@@ -2149,7 +2151,8 @@
               <select id="productFilterLob">
                 <option value="">Tất cả LOB</option>
                 <option>MB</option><option>VGA</option><option>MNT</option><option>PSU</option>
-                <option>CASE</option><option>COOLER</option><option>SSD</option><option>MINIPC</option><option>GG</option>
+                <option>CASE</option><option>COOLER</option><option>SSD</option><option>MINIPC</option>
+                <option>GDT</option><option>DESKTOP</option><option>GG</option>
               </select>
               <select id="productFilterNpp">
                 <option value="">Tất cả NPP</option>
@@ -2284,7 +2287,8 @@
                 <select id="productFormLob" required>
                   <option value="">— Chọn LOB —</option>
                   <option>MB</option><option>VGA</option><option>MNT</option><option>PSU</option>
-                  <option>CASE</option><option>COOLER</option><option>SSD</option><option>MINIPC</option><option>GG</option>
+                  <option>CASE</option><option>COOLER</option><option>SSD</option><option>MINIPC</option>
+                  <option>GDT</option><option>DESKTOP</option><option>GG</option>
                 </select>
               </div>
               <div class="form-group">
@@ -4361,7 +4365,8 @@
     function lobBadgeHtml(lob) {
       const cls = { MB:'lob-mb', VGA:'lob-vga', MNT:'lob-mnt', PSU:'lob-psu',
         CASE:'lob-case', COOLER:'lob-cooler', SSD:'lob-ssd', MINIPC:'lob-minipc',
-        GG:'lob-gg', Unknown:'lob-unknown' }[lob] || 'lob-other';
+        GG:'lob-gg', GDT:'lob-gdt', DESKTOP:'lob-desktop', SERVER:'lob-other',
+        Unknown:'lob-unknown' }[lob] || 'lob-other';
       return `<span class="lob-badge ${cls}">${lob || '—'}</span>`;
     }
     const PRODUCTS_DISTY_LIST = ['DGW', 'SPC', 'KTC', 'NWH', 'MAI HOANG', 'AD', 'PSD', 'MEKO'];
@@ -5196,9 +5201,15 @@
       return [...map.values()];
     }
 
+    const LAPTOP_PATTERNS_DISTY = ['laptop', 'máy tính xách tay', 'notebook', 'xách tay'];
+    function isLaptopDistyItem(it) {
+      const n = (it.disty_name || '').toLowerCase();
+      return LAPTOP_PATTERNS_DISTY.some(p => n.includes(p));
+    }
+
     async function importDistySheet(disty, sheetName, rows) {
       const rule = DISTY_RULES[disty];
-      const items = dedupeDistyItemsByCode(rule.parser(rows));
+      const items = dedupeDistyItemsByCode(rule.parser(rows).filter(it => !isLaptopDistyItem(it)));
       if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };
 
       let fallbackWeekDate = null;

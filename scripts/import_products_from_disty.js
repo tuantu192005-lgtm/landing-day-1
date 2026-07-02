@@ -288,9 +288,15 @@ function dedupeByCode(items) {
   return [...map.values()];
 }
 
+const LAPTOP_PATTERNS_LC = ['laptop', 'máy tính xách tay', 'notebook', 'xách tay'];
+function isLaptopItem(it) {
+  const n = (it.disty_name || '').toLowerCase();
+  return LAPTOP_PATTERNS_LC.some(p => n.includes(p));
+}
+
 async function processSheet(disty, sheetName, rows) {
   const rule = DISTY_RULES[disty];
-  const rawItems = rule.parser(rows);
+  const rawItems = rule.parser(rows).filter(it => !isLaptopItem(it));
   const items = dedupeByCode(rawItems);
   console.log(`\n── NPP ${disty} (sheet "${sheetName}"): đọc được ${items.length} dòng hợp lệ ──`);
   if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };

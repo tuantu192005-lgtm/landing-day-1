@@ -9,6 +9,12 @@ const sb = createClient(SUPA_URL, SUPA_KEY, { auth: { autoRefreshToken: false, p
 
 const BATCH = 400;
 
+const LAPTOP_PATTERNS_LC = ['laptop', 'máy tính xách tay', 'notebook', 'xách tay'];
+function isLaptopName(name) {
+  const n = (name || '').toLowerCase();
+  return LAPTOP_PATTERNS_LC.some(p => n.includes(p));
+}
+
 function chunk(arr, n) {
   const out = [];
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
@@ -44,8 +50,9 @@ async function main() {
     return;
   }
 
-  const validRows = unmapped.filter(r => r.disty_code);
-  console.log(`Tìm thấy ${unmapped.length} dòng chưa map (${validRows.length} có disty_code hợp lệ).`);
+  const validRows = unmapped.filter(r => r.disty_code && !isLaptopName(r.disty_name));
+  const laptopSkipped = unmapped.filter(r => r.disty_code && isLaptopName(r.disty_name)).length;
+  console.log(`Tìm thấy ${unmapped.length} dòng chưa map (${validRows.length} hợp lệ, bỏ qua ${laptopSkipped} Laptop).`);
 
   // Dedupe theo disty_code để tránh conflict "ON CONFLICT DO UPDATE ... affect row twice"
   const deduped = new Map();
