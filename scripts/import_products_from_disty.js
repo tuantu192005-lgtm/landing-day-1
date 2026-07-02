@@ -110,10 +110,10 @@ function parseDGW(rows) {
       disty_code: String(code).trim(),
       disty_name: String(row[1] ?? '').trim(),
       lob: isEmpty(row[6]) ? null : String(row[6]).trim(),
-      opening: Number(row[2]) || 0,
-      sell_in: Number(row[3]) || 0,
-      sell_out: Number(row[4]) || 0,
-      closing: Number(row[5]) || 0
+      opening: Math.round(Number(row[2])) || 0,
+      sell_in: Math.round(Number(row[3])) || 0,
+      sell_out: Math.round(Number(row[4])) || 0,
+      closing: Math.round(Number(row[5])) || 0
     });
   }
   return out;
@@ -129,10 +129,10 @@ function parsePSD(rows) {
       disty_code: String(code).trim(),
       disty_name: String(row[1] ?? '').trim(),
       lob: null,
-      opening: Number(row[2]) || 0,
-      sell_in: Number(row[3]) || 0,
-      sell_out: Number(row[4]) || 0,
-      closing: Number(row[5]) || 0
+      opening: Math.round(Number(row[2])) || 0,
+      sell_in: Math.round(Number(row[3])) || 0,
+      sell_out: Math.round(Number(row[4])) || 0,
+      closing: Math.round(Number(row[5])) || 0
     });
   }
   return out;
@@ -144,15 +144,15 @@ function parseKTC(rows) {
     const row = rows[i];
     const code = row?.[0];
     if (isEmpty(code) || isLegendRow(code, row[1])) continue;
-    const hcmOpen = Number(row[2]) || 0;
-    const hcmBuyIn = Number(row[3]) || 0;
-    const hcmSellOut = Number(row[4]) || 0;
-    const hcmClose = Number(row[5]) || 0;
-    const hnOpen = Number(row[6]) || 0;
-    const hnBuyIn = Number(row[7]) || 0;
-    const hnSellOut = Number(row[8]) || 0;
-    const hnClose = Number(row[9]) || 0;
-    const totalClose = isEmpty(row[10]) ? hcmClose + hnClose : Number(row[10]);
+    const hcmOpen = Math.round(Number(row[2])) || 0;
+    const hcmBuyIn = Math.round(Number(row[3])) || 0;
+    const hcmSellOut = Math.round(Number(row[4])) || 0;
+    const hcmClose = Math.round(Number(row[5])) || 0;
+    const hnOpen = Math.round(Number(row[6])) || 0;
+    const hnBuyIn = Math.round(Number(row[7])) || 0;
+    const hnSellOut = Math.round(Number(row[8])) || 0;
+    const hnClose = Math.round(Number(row[9])) || 0;
+    const totalClose = isEmpty(row[10]) ? hcmClose + hnClose : Math.round(Number(row[10]));
     out.push({
       disty_code: String(code).trim(),
       disty_name: String(row[1] ?? '').trim(),
@@ -176,10 +176,10 @@ function parseMaiHoang(rows) {
       disty_code: String(code).trim(),
       disty_name: String(row[1] ?? '').trim(),
       lob: null,
-      opening: Number(row[2]) || 0,
-      sell_in: Number(row[6]) || 0,
-      sell_out: Number(row[7]) || 0,
-      closing: Number(row[8]) || 0
+      opening: Math.round(Number(row[2])) || 0,
+      sell_in: Math.round(Number(row[6])) || 0,
+      sell_out: Math.round(Number(row[7])) || 0,
+      closing: Math.round(Number(row[8])) || 0
     });
   }
   return out;
@@ -197,10 +197,10 @@ function parseSPC(rows) {
       disty_code: String(code).trim(),
       disty_name: String(name ?? '').trim(),
       lob: String(lob).trim(),
-      opening: Number(row[3]) || 0,
-      sell_in: Number(row[7]) || 0,
-      sell_out: Number(row[8]) || 0,
-      closing: Number(row[9]) || 0
+      opening: Math.round(Number(row[3])) || 0,
+      sell_in: Math.round(Number(row[7])) || 0,
+      sell_out: Math.round(Number(row[8])) || 0,
+      closing: Math.round(Number(row[9])) || 0
     });
   }
   return out;
@@ -218,10 +218,10 @@ function parseMEKO(rows) {
       disty_code: String(code).trim(),
       disty_name: String(name ?? '').trim(),
       lob: String(lob).trim(),
-      opening: Number(row[3]) || 0,
-      sell_in: Number(row[4]) || 0,
-      sell_out: Number(row[5]) || 0,
-      closing: Number(row[6]) || 0
+      opening: Math.round(Number(row[3])) || 0,
+      sell_in: Math.round(Number(row[4])) || 0,
+      sell_out: Math.round(Number(row[5])) || 0,
+      closing: Math.round(Number(row[6])) || 0
     });
   }
   return out;
@@ -240,7 +240,7 @@ function parseNWH(rows) {
       opening: 0,
       sell_in: 0,
       sell_out: 0,
-      closing: Number(row[3]) || 0,
+      closing: Math.round(Number(row[3])) || 0,
       rowDate: parseAnyDate(row[0])
     });
   }
@@ -260,7 +260,7 @@ function parseAD(rows) {
       opening: 0,
       sell_in: 0,
       sell_out: 0,
-      closing: Number(row[3]) || 0
+      closing: Math.round(Number(row[3])) || 0
     });
   }
   return out;
