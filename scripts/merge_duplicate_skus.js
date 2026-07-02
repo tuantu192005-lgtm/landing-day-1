@@ -23,6 +23,9 @@ export function normalizeModelName(name) {
   for (const s of [' - new', ' (new)']) {
     if (n.endsWith(s)) { n = n.slice(0, -s.length); break; }
   }
+  // Remove spaces around hyphens: 'H610M -E' → 'H610M-E'
+  n = n.replace(/\s*-\s*/g, '-');
+  // Collapse multiple spaces
   return n.trim().replace(/\s+/g, ' ');
 }
 
@@ -138,11 +141,48 @@ async function main() {
     process.stdout.write('.');
   }
 
-  console.log('\n');
-  console.log('════════ BÁO CÁO CUỐI ════════');
+  // ── Cập nhật cột normalized_name cho tất cả sản phẩm còn lại ──
+  console.log('\nCập nhật normalized_name trong DB...');
+  const afterProducts = await fetchAllProducts();
+  const byNorm = new Map();
+  for (const p of afterProducts) {
+    const norm = normalizeModelName(p.model_name);
+    if (!byNorm.has(norm)) byNorm.set(norm, []);
+    byNorm.get(norm).push(p.sku);
+  }
+  let updCount = 0;
+  let normColMissing = false;
+  for (const [norm, skus] of byNorm) {
+    for (let i = 0; i < skus.length; i += 400) {
+      const batch = skus.slice(i, i + 400);
+      const { error } = await sb.from('products_master')
+        .update({ normalized_name: norm })
+        .in('sku', batch);
+      if (error) {
+        if (error.message.includes('normalized_name')) {
+          normColMissing = true;
+          break;
+        }
+        throw new Error(`Lỗi update normalized_name: ` + error.message);
+      }
+    }
+    if (normColMissing) break;
+    updCount += skus.length;
+    process.stdout.write('u');
+  }
+  if (normColMissing) {
+    console.log('\n⚠  Cột normalized_name chưa tồn tại trong DB.');
+    console.log('   → Vào Supabase Dashboard → Settings → API → click "Reload" để refresh schema cache,');
+    console.log('     sau đó chạy lại script này.');
+  } else {
+    console.log(` done. Đã cập nhật ${updCount} dòng (${byNorm.size} giá trị norm phân biệt).`);
+  }
+
+  console.log('\n════════ BÁO CÁO CUỐI ════════');
   console.log(`Trước: ${beforeCount} sản phẩm`);
   console.log(`Sau:   ${beforeCount - merged} sản phẩm`);
   console.log(`Giảm:  ${merged} dòng trùng lặp đã gộp`);
+  console.log(`normalized_name: cập nhật ${updCount} dòng`);
 }
 
 main().catch(err => {

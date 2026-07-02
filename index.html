@@ -5217,6 +5217,7 @@
       ];
       for (const p of prefixes) { if (n.startsWith(p)) { n = n.slice(p.length); break; } }
       for (const s of [' - new', ' (new)']) { if (n.endsWith(s)) { n = n.slice(0, -s.length); break; } }
+      n = n.replace(/\s*-\s*/g, '-');
       return n.trim().replace(/\s+/g, ' ');
     }
 
