@@ -1271,6 +1271,65 @@
       font-weight: 700;
       text-align: right;
     }
+    /* ── compact products list table ── */
+    .products-table td, .products-table th { padding: 4px 8px; font-size: 12px; }
+    .products-table .sku-cell {
+      font-family: monospace; font-size: 11px; color: #374151;
+      max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .products-table tbody tr { cursor: pointer; }
+    .products-table tbody tr:hover td { background: #f0f4ff; }
+    /* LOB badges */
+    .lob-badge {
+      display: inline-block; padding: 1px 7px; border-radius: 4px;
+      font-size: 11px; font-weight: 700; color: #fff; letter-spacing: .02em;
+    }
+    .lob-mb      { background: #1a56db; }
+    .lob-vga     { background: #c81e1e; }
+    .lob-mnt     { background: #057a55; }
+    .lob-psu     { background: #b45309; }
+    .lob-case    { background: #6d28d9; }
+    .lob-cooler  { background: #0891b2; }
+    .lob-ssd     { background: #065f46; }
+    .lob-minipc  { background: #92400e; }
+    .lob-gg      { background: #1d4ed8; }
+    .lob-unknown { background: #e5e7eb; color: #6b7280; font-style: italic; }
+    .lob-other   { background: #6b7280; }
+    /* NPP mini pills */
+    .npp-pill {
+      display: inline-block; padding: 1px 5px; border-radius: 3px;
+      font-size: 10px; font-weight: 600; background: #e5f0fb; color: #1e4a7a;
+      margin: 1px 1px 1px 0; white-space: nowrap;
+    }
+    /* 2-column product detail layout */
+    .product-detail-grid {
+      display: grid;
+      grid-template-columns: 38% 1fr;
+      gap: 14px;
+      align-items: start;
+      margin-top: 10px;
+    }
+    @media (max-width: 900px) {
+      .product-detail-grid { grid-template-columns: 1fr; }
+    }
+    .product-info-card, .product-npp-card {
+      background: #fff;
+      border: 1px solid #e6eef9;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+    .product-info-card h4, .product-npp-card h4 {
+      font-size: 12px; font-weight: 700; color: var(--navy-strong);
+      margin: 0 0 8px 0; padding-bottom: 6px; border-bottom: 1px solid #e6eef9;
+    }
+    .product-info-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 4px 0; font-size: 12px; border-bottom: 1px solid #f4f7fb;
+    }
+    .product-info-row:last-child { border-bottom: none; }
+    .pir-label { color: #6b7280; font-size: 11px; white-space: nowrap; margin-right: 8px; }
+    .pir-value { font-weight: 600; color: #111827; text-align: right; word-break: break-word; }
 
     .msi-chart-row,
     .msi-progress-row,
@@ -2112,13 +2171,13 @@
               <table class="target-table products-table" id="productsTable">
                 <thead>
                   <tr>
-                    <th class="sortable-col" data-sort="sku">SKU</th>
+                    <th class="sortable-col" data-sort="sku" style="width:120px">SKU</th>
                     <th class="sortable-col" data-sort="model_name">Tên model</th>
-                    <th class="sortable-col" data-sort="lob">LOB</th>
-                    <th>NPP</th>
-                    <th class="kpi-col-num sortable-col" data-sort="sdp_price">Giá SDP</th>
-                    <th>Trạng thái</th>
-                    <th>Hành động</th>
+                    <th class="sortable-col" data-sort="lob" style="width:80px">LOB</th>
+                    <th style="width:200px">NPP</th>
+                    <th class="kpi-col-num sortable-col" data-sort="sdp_price" style="width:100px">Giá SDP</th>
+                    <th style="width:90px">Trạng thái</th>
+                    <th style="width:80px">Chi tiết</th>
                   </tr>
                 </thead>
                 <tbody id="productsTableBody"></tbody>
@@ -2135,68 +2194,71 @@
             <h3 id="productDetailTitle">—</h3>
             <button type="button" class="btn-secondary hidden" id="editProductBtn">Sửa sản phẩm</button>
           </div>
-          <p class="msi-panel-note" id="productDetailMeta">—</p>
 
-          <div class="msi-subtabs" id="productDetailSubtabs">
-            <button type="button" class="msi-subtab-btn active" data-subtab="productPricingPane">Chương trình giá</button>
-            <button type="button" class="msi-subtab-btn" data-subtab="productDistyPane">NPP phân phối</button>
-            <button type="button" class="msi-subtab-btn" data-subtab="productInventoryPane">Tồn kho</button>
-          </div>
-
-          <div id="productPricingPane" class="msi-subtab-pane">
-            <div class="msi-panel">
-              <div class="msi-kpi-detail-hd" style="margin-bottom:8px">
-                <h3>Chương trình giá</h3>
-                <div class="form-group" style="max-width:160px;margin:0">
-                  <label for="productPricingQuarter">Quý</label>
-                  <select id="productPricingQuarter"></select>
-                </div>
+          <div class="product-detail-grid">
+            <!-- CỘT TRÁI: thông tin cơ bản + NPP phân phối -->
+            <div>
+              <div class="product-info-card">
+                <h4>Thông tin sản phẩm</h4>
+                <div id="productInfoRows"></div>
               </div>
-              <div class="table-wrapper">
-                <table class="target-table products-pricing-table" id="productPricingTable">
-                  <thead>
-                    <tr>
-                      <th>NPP</th>
-                      <th>Đại lý</th>
-                      <th>Nhân viên</th>
-                      <th class="kpi-col-num">Hero</th>
-                      <th class="kpi-col-num">Extra 1</th>
-                      <th class="kpi-col-num">Extra 2</th>
-                      <th class="kpi-col-num">Extra 3</th>
-                      <th class="kpi-col-num">Extra 4</th>
-                      <th class="kpi-col-num">Net Price</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="productPricingTableBody"></tbody>
-                </table>
-              </div>
-              <div class="dashboard-actions hidden" id="productPricingActions" style="margin-top:14px">
-                <button type="button" class="btn-secondary" id="addPricingRowBtn">+ Thêm dòng</button>
-                <button type="button" class="btn-primary" id="savePricingBtn">Lưu tất cả</button>
-              </div>
-              <div class="login-error" id="productPricingMessage"></div>
-            </div>
-          </div>
-
-          <div id="productDistyPane" class="msi-subtab-pane hidden">
-            <div class="msi-panel">
-              <div class="table-wrapper">
-                <table class="target-table">
+              <div class="product-npp-card">
+                <h4>NPP phân phối</h4>
+                <table class="target-table" style="font-size:12px">
                   <thead><tr><th>NPP</th><th>Mã NPP</th><th>Tên NPP</th></tr></thead>
                   <tbody id="productDistyTableBody"></tbody>
                 </table>
               </div>
             </div>
-          </div>
 
-          <div id="productInventoryPane" class="msi-subtab-pane hidden">
-            <div class="msi-panel">
-              <div class="table-wrapper">
-                <table class="target-table">
-                  <thead><tr><th>NPP</th><th>Tuần gần nhất</th><th class="kpi-col-num">Closing</th></tr></thead>
-                  <tbody id="productInventoryTableBody"></tbody>
-                </table>
+            <!-- CỘT PHẢI: Chương trình giá + Tồn kho -->
+            <div>
+              <div class="msi-subtabs" id="productDetailSubtabs">
+                <button type="button" class="msi-subtab-btn active" data-subtab="productPricingPane">Chương trình giá</button>
+                <button type="button" class="msi-subtab-btn" data-subtab="productInventoryPane">Tồn kho</button>
+              </div>
+
+              <div id="productPricingPane" class="msi-subtab-pane">
+                <div class="msi-panel">
+                  <div class="msi-kpi-detail-hd" style="margin-bottom:8px">
+                    <h3 style="font-size:14px">Chương trình giá</h3>
+                    <div class="form-group" style="max-width:140px;margin:0">
+                      <label for="productPricingQuarter">Quý</label>
+                      <select id="productPricingQuarter"></select>
+                    </div>
+                  </div>
+                  <div class="table-wrapper">
+                    <table class="target-table products-pricing-table" id="productPricingTable">
+                      <thead>
+                        <tr>
+                          <th>NPP</th><th>Đại lý</th><th>Nhân viên</th>
+                          <th class="kpi-col-num">Hero</th>
+                          <th class="kpi-col-num">Extra 1</th>
+                          <th class="kpi-col-num">Extra 2</th>
+                          <th class="kpi-col-num">Extra 3</th>
+                          <th class="kpi-col-num">Extra 4</th>
+                          <th class="kpi-col-num">Net Price</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody id="productPricingTableBody"></tbody>
+                    </table>
+                  </div>
+                  <div class="dashboard-actions hidden" id="productPricingActions" style="margin-top:14px">
+                    <button type="button" class="btn-secondary" id="addPricingRowBtn">+ Thêm dòng</button>
+                    <button type="button" class="btn-primary" id="savePricingBtn">Lưu tất cả</button>
+                  </div>
+                  <div class="login-error" id="productPricingMessage"></div>
+                </div>
+              </div>
+
+              <div id="productInventoryPane" class="msi-subtab-pane hidden">
+                <div class="msi-panel">
+                  <table class="target-table" style="font-size:12px">
+                    <thead><tr><th>NPP</th><th>Tuần gần nhất</th><th class="kpi-col-num">Closing</th></tr></thead>
+                    <tbody id="productInventoryTableBody"></tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -4292,6 +4354,13 @@
 
     // ══════════════════ Tab "Sản phẩm" ══════════════════
     const PRODUCTS_PAGE_SIZE = 50;
+
+    function lobBadgeHtml(lob) {
+      const cls = { MB:'lob-mb', VGA:'lob-vga', MNT:'lob-mnt', PSU:'lob-psu',
+        CASE:'lob-case', COOLER:'lob-cooler', SSD:'lob-ssd', MINIPC:'lob-minipc',
+        GG:'lob-gg', Unknown:'lob-unknown' }[lob] || 'lob-other';
+      return `<span class="lob-badge ${cls}">${lob || '—'}</span>`;
+    }
     const PRODUCTS_DISTY_LIST = ['DGW', 'SPC', 'KTC', 'NWH', 'MAI HOANG', 'AD', 'PSD', 'MEKO'];
     const productsState = { page: 0, sortCol: 'sku', sortAsc: true, search: '', lob: '', npp: '', status: '' };
     let productsSearchDebounce = null;
@@ -4392,26 +4461,37 @@
 
       const isAdmin = isProductsAdmin();
       tbody.innerHTML = rows.map((p) => {
-        const nppList = nppBySku[p.sku] ? [...nppBySku[p.sku]].sort().join(', ') : '—';
-        return `<tr>
-          <td>${p.sku}</td>
-          <td>${p.model_name}</td>
-          <td>${p.lob}</td>
-          <td>${nppList}</td>
+        const nppBadges = nppBySku[p.sku]
+          ? [...nppBySku[p.sku]].sort().map(n => `<span class="npp-pill">${n}</span>`).join('')
+          : '—';
+        const statusHtml = p.is_active
+          ? '<span style="color:#057a55;font-weight:600;font-size:11px">● Đang bán</span>'
+          : '<span style="color:#9ca3af;font-size:11px">● Ngừng bán</span>';
+        return `<tr data-sku="${p.sku}">
+          <td class="sku-cell" title="${p.sku}">${p.sku}</td>
+          <td style="min-width:180px">${p.model_name}</td>
+          <td>${lobBadgeHtml(p.lob)}</td>
+          <td>${nppBadges}</td>
           <td class="kpi-col-num">${fmtQtyMsi(p.sdp_price)}</td>
-          <td>${p.is_active ? '🟢 Đang bán' : '⚪ Ngừng bán'}</td>
+          <td>${statusHtml}</td>
           <td>
-            <button type="button" class="btn-secondary product-detail-btn" data-sku="${p.sku}">Xem chi tiết</button>
-            ${isAdmin ? `<button type="button" class="btn-secondary product-delete-btn" data-sku="${p.sku}">Xóa</button>` : ''}
+            <button type="button" class="btn-secondary product-detail-btn" data-sku="${p.sku}" style="padding:2px 8px;font-size:11px">Xem</button>
+            ${isAdmin ? `<button type="button" class="btn-secondary product-delete-btn" data-sku="${p.sku}" style="padding:2px 8px;font-size:11px">Xóa</button>` : ''}
           </td>
         </tr>`;
       }).join('');
 
+      // click trên dòng (ngoài nút) → mở chi tiết
+      tbody.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const tr = e.target.closest('tr[data-sku]');
+        if (tr) openProductDetail(tr.dataset.sku);
+      });
       tbody.querySelectorAll('.product-detail-btn').forEach((btn) => {
         btn.addEventListener('click', () => openProductDetail(btn.dataset.sku));
       });
       tbody.querySelectorAll('.product-delete-btn').forEach((btn) => {
-        btn.addEventListener('click', () => deleteProduct(btn.dataset.sku));
+        btn.addEventListener('click', (e) => { e.stopPropagation(); deleteProduct(btn.dataset.sku); });
       });
 
       renderProductsPagination(count || 0);
@@ -4493,13 +4573,22 @@
       const { data, error } = await sb.from('products_master').select('*').eq('sku', sku).maybeSingle();
       if (error || !data) {
         document.getElementById('productDetailTitle').textContent = 'Không tìm thấy sản phẩm';
-        document.getElementById('productDetailMeta').textContent = error?.message || '';
+        const infoEl = document.getElementById('productInfoRows');
+        if (infoEl) infoEl.innerHTML = `<div class="product-info-row"><span class="pir-label">Lỗi</span><span class="pir-value">${error?.message || 'Không tìm thấy'}</span></div>`;
         return;
       }
       currentProductData = data;
       document.getElementById('productDetailTitle').textContent = `${data.sku} — ${data.model_name}`;
-      document.getElementById('productDetailMeta').textContent = `LOB: ${data.lob} · Giá SDP: ${fmtQtyMsi(data.sdp_price)} · ${data.is_active ? 'Đang bán' : 'Ngừng bán'}`;
       document.getElementById('editProductBtn')?.classList.toggle('hidden', !isProductsAdmin());
+      const infoRows = [
+        { label: 'SKU', value: `<span style="font-family:monospace;font-size:12px">${data.sku}</span>` },
+        { label: 'Tên model', value: data.model_name },
+        { label: 'LOB', value: lobBadgeHtml(data.lob) },
+        { label: 'Giá SDP', value: `<strong>${fmtQtyMsi(data.sdp_price)}</strong> đ` },
+        { label: 'Trạng thái', value: data.is_active ? '<span style="color:#057a55;font-weight:700">Đang bán</span>' : '<span style="color:#9ca3af">Ngừng bán</span>' },
+      ];
+      const infoEl = document.getElementById('productInfoRows');
+      if (infoEl) infoEl.innerHTML = infoRows.map(r => `<div class="product-info-row"><span class="pir-label">${r.label}</span><span class="pir-value">${r.value}</span></div>`).join('');
 
       switchProductSubtab('productPricingPane');
       initProductPricingQuarterDropdown();
