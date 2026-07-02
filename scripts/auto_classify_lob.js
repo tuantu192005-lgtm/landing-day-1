@@ -9,12 +9,15 @@ const sb = createClient(SUPA_URL, SUPA_KEY, { auth: { autoRefreshToken: false, p
 
 const LAPTOP_PATTERNS = ['laptop', 'máy tính xách tay', 'notebook', 'xách tay'];
 
-// Thứ tự ưu tiên: VGA > MB > PSU > CASE > DESKTOP > COOLER > MNT > SSD > MINIPC > GDT > GG > SERVER
-// DESKTOP trước COOLER: '(aio)' desktop không bị 'aio' của cooler bắt nhầm.
-// MINIPC trước GDT: '(mini server)' không bị 'server' của GDT bắt nhầm.
-// GDT đã bao gồm 'server'/'máy chủ' → thay thế SERVER cho hàng hóa thực tế.
+// Thứ tự ưu tiên: VGA > GDT > DESKTOP > MINIPC > MB > PSU > CASE > COOLER > MNT > SSD > GG > SERVER
+// GDT/DESKTOP/MINIPC kiểm tra TRƯỚC MB để AIO/PC không bị 'pro h','mag b' bắt nhầm.
+// DESKTOP trước COOLER để 'aio' desktop không bị cooler patterns bắt nhầm.
+// MINIPC trước GDT để '(mini server)' không bị 'server' của GDT bắt nhầm.
 const LOB_RULES = [
   ['VGA',     ['rtx', 'gtx', 'gt ', 'radeon', 'geforce', 'vga']],
+  ['GDT',     ['(pc)', 'máy chủ', 'server', 'g4101', 's2205']],
+  ['DESKTOP', ['(desktop)', '(dt)', '(aio)', 'aio', 'all-in-one', 'máy tính để bàn']],
+  ['MINIPC',  ['(mini server)', '(minipc)', 'cubi', 'mini pc', 'minipc', 'nuc']],
   ['MB',      ['h310','h410','h510','h610','b360','b460','b560','b660',
                 'b760','b850','z390','z490','z590','z690','z790','z890',
                 'x570','x670','x870','a320','a520','pro h','mag b','mpg z',
@@ -22,14 +25,11 @@ const LOB_RULES = [
   ['PSU',     ['mag a','mpg a','meg a','mag gf','mpg gf','mag gm',
                 'gold','watt','power','nguồn','psu']],
   ['CASE',    ['mag forge','mag pano','mpg gungnir','meg prospect','case','tower','vỏ']],
-  ['DESKTOP', ['(desktop)','(dt)','(aio)']],
   ['COOLER',  ['mag coreliquid','mag core','coreliquid','coreflow',
                 'cooler','tản nhiệt','aio','cpu fan']],
   ['MNT',     ['mp2','mag 2','mag 3','mag 4','g274','g275','g27q',
                 'g24','g32','pro mp','monitor','màn hình','lcd']],
   ['SSD',     ['ssd','spatium','datamag','nvme','m.2']],
-  ['MINIPC',  ['(mini server)','(minipc)','cubi','mini pc','minipc','nuc']],
-  ['GDT',     ['(pc)','máy chủ','server','g4101','s2205']],
   ['GG',      ['gaming gear','headset','mouse','keyboard','mousepad',
                 'controller','vigor','clutch','force']],
   ['SERVER',  ['máy chủ cũ']],
@@ -161,14 +161,41 @@ async function main() {
     console.log(' done.');
   }
 
+  // ── Phase 3: Sửa sản phẩm MB bị nhầm thành DESKTOP / GDT ──
+  console.log('\n══ Phase 3: Kiểm tra và sửa sản phẩm MB bị phân loại sai ══');
+  const mbProducts = await fetchByLob('MB');
+  console.log(`Kiểm tra ${mbProducts.length} sản phẩm hiện là MB...`);
+
+  const RETARGET_LOBS = new Set(['GDT', 'DESKTOP', 'MINIPC']);
+  const toFixMb = {};
+  for (const p of mbProducts) {
+    const newLob = classifyLob(p.model_name);
+    if (newLob && RETARGET_LOBS.has(newLob)) {
+      (toFixMb[newLob] ||= []).push(p.sku);
+    }
+  }
+
+  const totalFixedMb = Object.values(toFixMb).reduce((s, a) => s + a.length, 0);
+  if (!totalFixedMb) {
+    console.log('Không phát hiện sản phẩm MB nào bị phân loại sai.');
+  } else {
+    console.log(`Phát hiện ${totalFixedMb} sản phẩm MB cần sửa lại:`);
+    Object.entries(toFixMb).sort().forEach(([lob, skus]) =>
+      console.log(`  MB → ${lob.padEnd(8)} ${skus.length} sản phẩm`)
+    );
+    await batchUpdate(toFixMb);
+    console.log(' done.');
+  }
+
   // ── Báo cáo tổng ──
   console.log('\n══════════ BÁO CÁO ══════════');
   console.log(`Phase 0 — Laptop xoá: ${laptopSkus.length}`);
   console.log(`Phase 1 — Unknown đã classify: ${unknownProducts.length}`);
   console.log(`Phase 2 — MNT sai đã sửa: ${totalFixed}`);
-  if (totalFixed) {
-    Object.entries(toFix).sort().forEach(([lob, skus]) =>
-      console.log(`  ${skus.length} sản phẩm MNT → ${lob}`)
+  console.log(`Phase 3 — MB sai đã sửa: ${totalFixedMb}`);
+  if (totalFixedMb) {
+    Object.entries(toFixMb).sort().forEach(([lob, skus]) =>
+      console.log(`  ${skus.length} sản phẩm MB → ${lob}`)
     );
   }
 }

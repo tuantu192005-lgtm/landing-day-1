@@ -5207,7 +5207,38 @@
       return LAPTOP_PATTERNS_DISTY.some(p => n.includes(p));
     }
 
-    async function importDistySheet(disty, sheetName, rows) {
+    function normalizeModelName(name) {
+      if (!name) return '';
+      let n = name.toLowerCase().trim();
+      const prefixes = [
+        'màn hình lcd msi ', 'mainboard msi ', 'bo mạch chủ ',
+        'màn hình msi ', 'main msi ', 'vga msi ', 'lcd msi ',
+        'màn hình ', 'mainboard ', 'main ', 'msi ', 'msı '
+      ];
+      for (const p of prefixes) { if (n.startsWith(p)) { n = n.slice(p.length); break; } }
+      for (const s of [' - new', ' (new)']) { if (n.endsWith(s)) { n = n.slice(0, -s.length); break; } }
+      return n.trim().replace(/\s+/g, ' ');
+    }
+
+    async function buildNormToSkuMap() {
+      const map = new Map();
+      let from = 0;
+      const PG = 1000;
+      while (true) {
+        const { data, error } = await sb.from('products_master').select('sku, model_name').range(from, from + PG - 1);
+        if (error) throw new Error('Lỗi load normToSku: ' + error.message);
+        if (!data || !data.length) break;
+        for (const { sku, model_name } of data) {
+          const norm = normalizeModelName(model_name);
+          if (norm && !map.has(norm)) map.set(norm, sku);
+        }
+        if (data.length < PG) break;
+        from += PG;
+      }
+      return map;
+    }
+
+    async function importDistySheet(disty, sheetName, rows, normToSku) {
       const rule = DISTY_RULES[disty];
       const items = dedupeDistyItemsByCode(rule.parser(rows).filter(it => !isLaptopDistyItem(it)));
       if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };
@@ -5217,11 +5248,31 @@
         fallbackWeekDate = findWeekDateForDisty(rows, rule.headerRows) || new Date().toISOString().slice(0, 10);
       }
 
-      // 1. Upsert product_disty_codes — KHÔNG set sku, giữ mapping cũ nếu đã
-      // có (admin map tay), hoặc NULL nếu mã hoàn toàn mới.
+      // 1. Upsert product_disty_codes — giữ sku cũ nếu admin đã map.
       const codeRows = items.map((it) => ({ disty, disty_code: it.disty_code, disty_name: it.disty_name }));
       const { error: codeErr } = await sb.from('product_disty_codes').upsert(codeRows, { onConflict: 'disty,disty_code' });
       if (codeErr) throw new Error(`[${disty}] Lỗi upsert product_disty_codes: ${codeErr.message}`);
+
+      // 1b. Auto-link: nếu normalized_name khớp sản phẩm đã có → gán sku (chỉ khi IS NULL)
+      if (normToSku) {
+        const autoLinks = new Map(); // newSku → [disty_code, ...]
+        for (const it of items) {
+          const norm = normalizeModelName(it.disty_name);
+          const existing = normToSku.get(norm);
+          if (existing) {
+            if (!autoLinks.has(existing)) autoLinks.set(existing, []);
+            autoLinks.get(existing).push(it.disty_code);
+          }
+        }
+        for (const [sku, dcodes] of autoLinks) {
+          const { error } = await sb.from('product_disty_codes')
+            .update({ sku })
+            .eq('disty', disty)
+            .in('disty_code', dcodes)
+            .is('sku', null);
+          if (error) console.warn(`[${disty}] auto-link error: ${error.message}`);
+        }
+      }
 
       // 2. Tra lại sku đã map theo (disty, disty_code)
       const codes = items.map((it) => it.disty_code);
@@ -5270,6 +5321,10 @@
         const wb = XLSX.read(buf, { type: 'array' });
         console.log('[importProducts] Sheet names đọc được từ file:', wb.SheetNames);
 
+        // Load normalized_name → sku map once for auto-linking during import
+        if (msgEl) { msgEl.textContent = 'Đang load danh sách sản phẩm để khớp tên...'; msgEl.style.color = '#5e6f8a'; }
+        const normToSku = await buildNormToSkuMap();
+
         const report = [];
         const skippedSheets = [];
         for (const sheetName of wb.SheetNames) {
@@ -5280,7 +5335,7 @@
             console.log('[importProducts] 5 dòng đầu sheet DGW (raw):', rows.slice(0, 5));
           }
           console.log(`[importProducts] Sheet "${sheetName}" → NPP ${disty}, đọc thô ${rows.length} dòng.`);
-          report.push(await importDistySheet(disty, sheetName, rows));
+          report.push(await importDistySheet(disty, sheetName, rows, normToSku));
         }
 
         if (!report.length) {
