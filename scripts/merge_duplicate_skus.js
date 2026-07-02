@@ -185,7 +185,12 @@ async function main() {
   console.log(`normalized_name: cập nhật ${updCount} dòng`);
 }
 
-main().catch(err => {
-  console.error('\nLỗi không mong muốn:', err);
-  process.exit(1);
-});
+// Chỉ chạy khi gọi trực tiếp (node merge_duplicate_skus.js),
+// không chạy khi được import bởi script khác.
+const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('merge_duplicate_skus.js');
+if (isMain) {
+  main().catch(err => {
+    console.error('\nLỗi không mong muốn:', err);
+    process.exit(1);
+  });
+}
