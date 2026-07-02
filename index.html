@@ -2481,6 +2481,8 @@
       return { ...msiFilters };
     }
 
+    const TABS_NO_FILTER = new Set(['tab-products']);
+
     function initMsiTabs() {
       document.querySelectorAll('.msi-menu-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -2489,6 +2491,7 @@
           btn.classList.add('active');
           document.getElementById(btn.dataset.tab)?.classList.add('active');
           document.getElementById('msiMenu')?.classList.remove('open');
+          document.getElementById('msiFilterBar')?.classList.toggle('hidden', TABS_NO_FILTER.has(btn.dataset.tab));
           tabLoaders[btn.dataset.tab]?.();
         });
       });
