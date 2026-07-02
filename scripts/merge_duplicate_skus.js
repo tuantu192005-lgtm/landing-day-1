@@ -12,9 +12,18 @@ export function normalizeModelName(name) {
   let n = name.toLowerCase().trim();
   // Remove prefixes — longest first to prevent partial matches
   const prefixes = [
-    'màn hình lcd msi ', 'mainboard msi ', 'bo mạch chủ ',
-    'màn hình msi ', 'main msi ', 'vga msi ', 'lcd msi ',
-    'màn hình ', 'mainboard ', 'main ', 'msi ', 'msı '
+    // Dạng "(Category) MSI ..."
+    '(vga card) msi ', '(vga card) ',
+    '(main board) msi ', '(main board) ',
+    '(mainboard) msi ', '(mainboard) ',
+    // Tiếng Việt dài
+    'tấm mạch in đã lắp ráp msi ', 'tấm mạch in đã lắp ráp ',
+    'bảng mạch chính msi ', 'bảng mạch chính ',
+    'nguồn máy tính msi ', 'nguồn máy tính ',
+    'màn hình lcd msi ', 'màn hình msi ', 'lcd msi ',
+    'mainboard msi ', 'main msi ', 'vga msi ',
+    'bo mạch chủ ', 'màn hình ', 'mainboard ', 'main ',
+    'msi ', 'msı '
   ];
   for (const p of prefixes) {
     if (n.startsWith(p)) { n = n.slice(p.length); break; }
