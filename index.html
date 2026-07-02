@@ -2309,26 +2309,29 @@
               <div class="login-error" id="productFormMessage"></div>
             </form>
           </div>
-        <div id="mergeSkuView" class="hidden">
-          <div class="msi-kpi-detail-hd">
-            <button type="button" class="btn-secondary" id="mergeSkuBackBtn"><i class="fas fa-arrow-left"></i> Quay lại</button>
-            <h3>Gộp SKU</h3>
-          </div>
-          <div class="msi-panel" style="max-width:520px">
-            <p class="msi-panel-note">Gộp các SKU tạm (từ NPP) vào SKU chuẩn MSI. Các mã NPP sẽ được chuyển sang SKU chuẩn, SKU tạm sẽ bị xoá.</p>
+        <!-- Modal Gộp SKU — position:fixed, luôn nổi trên mọi content -->
+        <div id="mergeSkuModal" class="hidden" style="position:fixed;inset:0;background:rgba(15,23,42,.52);z-index:2000;display:flex;align-items:center;justify-content:center">
+          <div style="background:#fff;border-radius:10px;width:460px;max-width:94vw;padding:24px 28px;box-shadow:0 12px 40px rgba(0,0,0,.28)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <h3 style="margin:0;font-size:15px;color:#1a2b4c">Gộp SKU</h3>
+              <button id="mergeSkuClose" type="button" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 4px">×</button>
+            </div>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 16px">Chuyển toàn bộ mã NPP và tồn kho từ <strong>SKU nguồn</strong> sang <strong>SKU đích</strong>, sau đó xoá SKU nguồn.</p>
             <div class="form-group">
-              <label for="mergeSkuTarget">SKU giữ lại (SKU chuẩn MSI) *</label>
-              <input type="text" id="mergeSkuTarget" placeholder="VD: KATANA-15-B12UEK" />
+              <label style="font-size:12px;font-weight:600">SKU nguồn — sẽ bị xoá *</label>
+              <input type="text" id="mergeSkuSrc" placeholder="SKU cần gộp vào SKU khác" autocomplete="off" style="width:100%" />
+              <div id="mergeSkuSrcInfo" style="font-size:11px;min-height:16px;margin-top:3px;color:#6b7280"></div>
             </div>
             <div class="form-group">
-              <label for="mergeSkuSources">SKU cần gộp vào (mỗi dòng 1 SKU) *</label>
-              <textarea id="mergeSkuSources" rows="6" style="width:100%;resize:vertical" placeholder="VD:&#10;PC-001&#10;KTC-KATANA15&#10;MAI-HOANG-123"></textarea>
+              <label style="font-size:12px;font-weight:600">SKU đích — giữ lại *</label>
+              <input type="text" id="mergeSkuDst" placeholder="SKU chuẩn MSI giữ lại" autocomplete="off" style="width:100%" />
+              <div id="mergeSkuDstInfo" style="font-size:11px;min-height:16px;margin-top:3px;color:#6b7280"></div>
             </div>
-            <div class="dashboard-actions">
-              <button type="button" class="btn-primary" id="mergeSkuSubmitBtn">Gộp SKU</button>
-              <button type="button" class="btn-secondary" id="mergeSkuCancelBtn">Huỷ</button>
+            <div style="display:flex;gap:8px;margin-top:18px">
+              <button type="button" class="btn-primary" id="mergeSkuDoBtn">Gộp SKU</button>
+              <button type="button" class="btn-secondary" id="mergeSkuCloseBtn">Huỷ</button>
             </div>
-            <div class="login-error" id="mergeSkuMessage"></div>
+            <div id="mergeSkuModalMsg" style="margin-top:10px;font-size:13px;min-height:18px"></div>
           </div>
         </div>
       </section>
@@ -4383,7 +4386,7 @@
       document.getElementById('productsListView')?.classList.remove('hidden');
       document.getElementById('productDetailView')?.classList.add('hidden');
       document.getElementById('productFormView')?.classList.add('hidden');
-      document.getElementById('mergeSkuView')?.classList.add('hidden');
+      document.getElementById('mergeSkuModal')?.classList.add('hidden');
     }
 
     async function loadProductsTab() {
@@ -4576,7 +4579,7 @@
       document.getElementById('productsListView')?.classList.add('hidden');
       document.getElementById('productDetailView')?.classList.remove('hidden');
       document.getElementById('productFormView')?.classList.add('hidden');
-      document.getElementById('mergeSkuView')?.classList.add('hidden');
+      document.getElementById('mergeSkuModal')?.classList.add('hidden');
 
       const { data, error } = await sb.from('products_master').select('*').eq('sku', sku).maybeSingle();
       if (error || !data) {
@@ -4797,7 +4800,7 @@
       document.getElementById('productsListView')?.classList.add('hidden');
       document.getElementById('productDetailView')?.classList.add('hidden');
       document.getElementById('productFormView')?.classList.remove('hidden');
-      document.getElementById('mergeSkuView')?.classList.add('hidden');
+      document.getElementById('mergeSkuModal')?.classList.add('hidden');
       const msgEl = document.getElementById('productFormMessage');
       if (msgEl) msgEl.textContent = '';
 
@@ -4861,79 +4864,88 @@
 
     // ── Gộp SKU: gộp SKU tạm (từ NPP) vào SKU chuẩn MSI (admin only) ──
 
-    function openMergeSkuView() {
-      document.getElementById('productsListView')?.classList.add('hidden');
-      document.getElementById('productDetailView')?.classList.add('hidden');
-      document.getElementById('productFormView')?.classList.add('hidden');
-      document.getElementById('mergeSkuView')?.classList.remove('hidden');
-      const msgEl = document.getElementById('mergeSkuMessage');
-      if (msgEl) msgEl.textContent = '';
-      const targetInput = document.getElementById('mergeSkuTarget');
-      if (targetInput) targetInput.value = '';
-      const sourcesInput = document.getElementById('mergeSkuSources');
-      if (sourcesInput) sourcesInput.value = '';
+    function openMergeSkuModal() {
+      document.getElementById('mergeSkuSrc').value = '';
+      document.getElementById('mergeSkuDst').value = '';
+      document.getElementById('mergeSkuSrcInfo').textContent = '';
+      document.getElementById('mergeSkuDstInfo').textContent = '';
+      document.getElementById('mergeSkuModalMsg').textContent = '';
+      document.getElementById('mergeSkuModal')?.classList.remove('hidden');
+      document.getElementById('mergeSkuSrc')?.focus();
     }
 
-    async function doMergeSku() {
-      const msgEl = document.getElementById('mergeSkuMessage');
-      const targetSku = document.getElementById('mergeSkuTarget')?.value.trim();
-      const sourcesRaw = document.getElementById('mergeSkuSources')?.value || '';
-      const sourceSkus = sourcesRaw.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+    function closeMergeSkuModal() {
+      document.getElementById('mergeSkuModal')?.classList.add('hidden');
+    }
 
-      if (!targetSku) {
-        if (msgEl) { msgEl.textContent = 'Vui lòng nhập SKU giữ lại.'; msgEl.style.color = '#b30012'; }
-        return;
-      }
-      if (!sourceSkus.length) {
-        if (msgEl) { msgEl.textContent = 'Vui lòng nhập ít nhất 1 SKU cần gộp.'; msgEl.style.color = '#b30012'; }
-        return;
-      }
-      if (sourceSkus.includes(targetSku)) {
-        if (msgEl) { msgEl.textContent = 'SKU giữ lại không được nằm trong danh sách SKU cần gộp.'; msgEl.style.color = '#b30012'; }
-        return;
-      }
-
-      // Verify target exists
-      const { data: targetRow, error: targetErr } = await sb.from('products_master').select('sku,model_name').eq('sku', targetSku).maybeSingle();
-      if (targetErr || !targetRow) {
-        if (msgEl) { msgEl.textContent = `SKU "${targetSku}" không tồn tại trong hệ thống.`; msgEl.style.color = '#b30012'; }
-        return;
-      }
-
-      if (msgEl) { msgEl.textContent = `Đang gộp ${sourceSkus.length} SKU vào "${targetSku}"...`; msgEl.style.color = '#5e6f8a'; }
-
-      let successCount = 0;
-      const errors = [];
-
-      for (const sourceSku of sourceSkus) {
-        // 1. Chuyển tất cả mã NPP từ SKU tạm sang SKU chuẩn
-        const { error: e1 } = await sb.from('product_disty_codes').update({ sku: targetSku }).eq('sku', sourceSku);
-        if (e1) { errors.push(`${sourceSku}: ${e1.message}`); continue; }
-
-        // 2. Xoá SKU tạm khỏi products_master — CASCADE tự dọn disty_inventory + product_programs
-        const { error: e2 } = await sb.from('products_master').delete().eq('sku', sourceSku);
-        if (e2) { errors.push(`Xoá ${sourceSku}: ${e2.message}`); continue; }
-
-        successCount++;
-      }
-
-      if (errors.length) {
-        if (msgEl) {
-          msgEl.innerHTML = `Gộp ${successCount}/${sourceSkus.length} SKU thành công. Lỗi:<br>` +
-            errors.map(e => escapeHtmlForDistyReport(e)).join('<br>');
-          msgEl.style.color = '#b30012';
-        }
+    async function lookupSkuInfo(sku, infoElId) {
+      const el = document.getElementById(infoElId);
+      if (!el) return;
+      if (!sku) { el.textContent = ''; return; }
+      const { data } = await sb.from('products_master').select('model_name,lob').eq('sku', sku).maybeSingle();
+      if (!data) {
+        el.style.color = '#b30012'; el.textContent = `Không tìm thấy SKU "${sku}"`;
       } else {
-        showMsiToast(`Đã gộp ${successCount} SKU vào "${targetSku}"`);
-        showProductsListView();
-        await loadProductsList();
+        el.style.color = '#057a55'; el.textContent = `✓ ${data.model_name} (${data.lob})`;
       }
     }
 
-    document.getElementById('mergeSkuBtn')?.addEventListener('click', openMergeSkuView);
-    document.getElementById('mergeSkuBackBtn')?.addEventListener('click', showProductsListView);
-    document.getElementById('mergeSkuCancelBtn')?.addEventListener('click', showProductsListView);
-    document.getElementById('mergeSkuSubmitBtn')?.addEventListener('click', doMergeSku);
+    async function doMergeSkuModal() {
+      const msgEl = document.getElementById('mergeSkuModalMsg');
+      const srcSku = document.getElementById('mergeSkuSrc')?.value.trim();
+      const dstSku = document.getElementById('mergeSkuDst')?.value.trim();
+
+      if (!srcSku || !dstSku) {
+        msgEl.style.color = '#b30012'; msgEl.textContent = 'Vui lòng nhập cả SKU nguồn và SKU đích.'; return;
+      }
+      if (srcSku === dstSku) {
+        msgEl.style.color = '#b30012'; msgEl.textContent = 'SKU nguồn và SKU đích không được giống nhau.'; return;
+      }
+
+      msgEl.style.color = '#5e6f8a'; msgEl.textContent = 'Đang kiểm tra SKU...';
+
+      const [{ data: srcRow, error: e1 }, { data: dstRow, error: e2 }] = await Promise.all([
+        sb.from('products_master').select('sku,model_name').eq('sku', srcSku).maybeSingle(),
+        sb.from('products_master').select('sku,model_name').eq('sku', dstSku).maybeSingle()
+      ]);
+      if (e1 || !srcRow) { msgEl.style.color = '#b30012'; msgEl.textContent = `SKU nguồn "${srcSku}" không tồn tại.`; return; }
+      if (e2 || !dstRow) { msgEl.style.color = '#b30012'; msgEl.textContent = `SKU đích "${dstSku}" không tồn tại.`; return; }
+
+      // 1. Chuyển disty_inventory: xoá dòng trùng (cùng disty+week_date), rồi update sku
+      msgEl.textContent = 'Đang chuyển tồn kho...';
+      const { data: dstInv } = await sb.from('disty_inventory').select('disty,week_date').eq('sku', dstSku);
+      if (dstInv && dstInv.length) {
+        for (const { disty, week_date } of dstInv) {
+          await sb.from('disty_inventory').delete().eq('sku', srcSku).eq('disty', disty).eq('week_date', week_date);
+        }
+      }
+      const { error: invErr } = await sb.from('disty_inventory').update({ sku: dstSku }).eq('sku', srcSku);
+      if (invErr) { msgEl.style.color = '#b30012'; msgEl.textContent = `Lỗi chuyển tồn kho: ${invErr.message}`; return; }
+
+      // 2. Chuyển product_disty_codes
+      msgEl.textContent = 'Đang chuyển mã NPP...';
+      const { error: codeErr } = await sb.from('product_disty_codes').update({ sku: dstSku }).eq('sku', srcSku);
+      if (codeErr) { msgEl.style.color = '#b30012'; msgEl.textContent = `Lỗi chuyển mã NPP: ${codeErr.message}`; return; }
+
+      // 3. Xoá products_master nguồn (CASCADE dọn dư thừa nếu còn)
+      msgEl.textContent = 'Đang xoá SKU nguồn...';
+      const { error: delErr } = await sb.from('products_master').delete().eq('sku', srcSku);
+      if (delErr) { msgEl.style.color = '#b30012'; msgEl.textContent = `Lỗi xoá SKU nguồn: ${delErr.message}`; return; }
+
+      closeMergeSkuModal();
+      showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
+      await loadProductsList();
+    }
+
+    document.getElementById('mergeSkuBtn')?.addEventListener('click', openMergeSkuModal);
+    document.getElementById('mergeSkuClose')?.addEventListener('click', closeMergeSkuModal);
+    document.getElementById('mergeSkuCloseBtn')?.addEventListener('click', closeMergeSkuModal);
+    document.getElementById('mergeSkuDoBtn')?.addEventListener('click', doMergeSkuModal);
+    document.getElementById('mergeSkuModal')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeMergeSkuModal();
+    });
+    document.getElementById('mergeSkuSrc')?.addEventListener('blur', (e) => lookupSkuInfo(e.target.value.trim(), 'mergeSkuSrcInfo'));
+    document.getElementById('mergeSkuDst')?.addEventListener('blur', (e) => lookupSkuInfo(e.target.value.trim(), 'mergeSkuDstInfo'));
 
     // ── Import tồn kho từ Excel NPP — 8 NPP (DGW/SPC/KTC/NWH/MAI HOANG/AD/
     // PSD/MEKO), mỗi sheet trong file là 1 NPP. Logic giống hệt
