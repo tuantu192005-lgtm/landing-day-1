@@ -1260,6 +1260,18 @@
     .msi-subtab-pane.hidden {
       display: none;
     }
+    /* ── Mapping NPP ── */
+    #nppSkuDropdown .npp-sku-opt { padding:8px 12px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:12px; }
+    #nppSkuDropdown .npp-sku-opt:hover { background:#f0f4ff; }
+    .npp-map-input { border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px;width:160px; }
+    .npp-map-input:focus { outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.2); }
+    .npp-mapped-chip { background:#dcfce7;color:#166534;border-radius:4px;padding:2px 8px;font-size:11px;font-family:monospace;font-weight:700; }
+    .npp-unmapped-chip { background:#fef9c3;color:#854d0e;border-radius:4px;padding:2px 8px;font-size:11px; }
+    .mapping-modal-stats { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px; }
+    .mapping-stat-badge { padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600; }
+    .mapping-stat-total { background:#e0e7ff;color:#3730a3; }
+    .mapping-stat-mapped { background:#dcfce7;color:#166534; }
+    .mapping-stat-unmapped { background:#fef9c3;color:#854d0e; }
     .products-pricing-table input,
     .products-pricing-table select {
       width: 100%;
@@ -2171,6 +2183,7 @@
               <button type="button" class="btn-secondary hidden" id="importProductsBtn">Import từ Excel</button>
               <input type="file" id="importProductsInput" accept=".xlsx,.xls" class="hidden" />
               <button type="button" class="btn-secondary hidden" id="detectDupSkuBtn" style="color:#7c3aed;border-color:#7c3aed">🔍 Phát hiện SKU trùng</button>
+              <button type="button" class="btn-secondary hidden" id="mappingNppBtn" style="color:#0369a1;border-color:#0369a1">🔗 Mapping NPP</button>
             </div>
             <div class="table-wrapper">
               <table class="target-table products-table" id="productsTable">
@@ -2252,6 +2265,7 @@
               <div class="msi-subtabs" id="productDetailSubtabs">
                 <button type="button" class="msi-subtab-btn active" data-subtab="productPricingPane">Chương trình giá</button>
                 <button type="button" class="msi-subtab-btn" data-subtab="productInventoryPane">Tồn kho</button>
+                <button type="button" class="msi-subtab-btn" data-subtab="productNppCodesPane">NPP Codes</button>
               </div>
 
               <div id="productPricingPane" class="msi-subtab-pane">
@@ -2298,6 +2312,38 @@
                     <button type="button" id="viewDistyInvBtn" class="btn-secondary" style="font-size:12px">
                       Xem chi tiết tồn kho NPP →
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="productNppCodesPane" class="msi-subtab-pane hidden">
+                <div class="msi-panel">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                    <span style="font-size:12px;color:#5e6f8a" id="productNppCodesCount"></span>
+                    <button type="button" id="addNppCodeBtn" class="btn-secondary hidden" style="font-size:12px">+ Thêm mapping</button>
+                  </div>
+                  <div class="table-wrapper">
+                    <table class="target-table" style="font-size:12px">
+                      <thead><tr><th>NPP</th><th>Mã NPP</th><th>Tên model NPP</th><th>SKU chuẩn</th><th class="hidden" id="productNppAdminCols"></th></tr></thead>
+                      <tbody id="productNppCodesBody"></tbody>
+                    </table>
+                  </div>
+                  <div id="addNppCodeForm" class="hidden" style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+                      <div><label style="font-size:11px;color:#5e6f8a;display:block;margin-bottom:3px">NPP</label>
+                        <select id="addNppCodeDisty" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px">
+                          <option value="">-- Chọn --</option>
+                          <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option>
+                          <option>MAI HOANG</option><option>AD</option><option>PSD</option><option>MEKO</option>
+                        </select></div>
+                      <div><label style="font-size:11px;color:#5e6f8a;display:block;margin-bottom:3px">Mã NPP</label>
+                        <input type="text" id="addNppCodeCode" placeholder="VD: 912-V530-061" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px;width:150px" /></div>
+                      <div><label style="font-size:11px;color:#5e6f8a;display:block;margin-bottom:3px">Tên model</label>
+                        <input type="text" id="addNppCodeName" placeholder="Tên sản phẩm theo NPP" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px;width:200px" /></div>
+                      <button type="button" id="saveNppCodeBtn" class="btn-primary" style="font-size:12px">Lưu</button>
+                      <button type="button" id="cancelNppCodeBtn" class="btn-secondary" style="font-size:12px">Huỷ</button>
+                    </div>
+                    <div id="addNppCodeMsg" style="margin-top:8px;font-size:12px"></div>
                   </div>
                 </div>
               </div>
@@ -2505,6 +2551,54 @@
         <div id="dupDetectSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
         <div id="dupDetectResults"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Autocomplete dropdown dùng chung cho mapping NPP -->
+  <div id="nppSkuDropdown" style="display:none;position:fixed;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:10010;max-height:220px;overflow-y:auto;min-width:280px"></div>
+
+  <!-- Modal Mapping mã NPP → SKU chuẩn -->
+  <div id="mappingNppModal" class="hidden" style="position:fixed;inset:0;z-index:10003;background:rgba(10,26,60,.55);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:960px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(10,26,60,.3)">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-shrink:0">
+        <h2 style="margin:0;font-size:15px;font-weight:700;color:#1a2b4c;flex:1">🔗 Mapping mã NPP → SKU chuẩn MSI</h2>
+        <button type="button" id="closeMappingNppBtn" style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:#9ca3af;padding:0 4px">×</button>
+      </div>
+      <!-- Stats -->
+      <div class="mapping-modal-stats" id="mappingNppStats"></div>
+      <!-- Filter bar -->
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-shrink:0;flex-wrap:wrap;align-items:center">
+        <select id="mappingNppFilterDisty" style="border:1px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:13px">
+          <option value="">Tất cả NPP</option>
+          <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option>
+          <option>MAI HOANG</option><option>AD</option><option>PSD</option><option>MEKO</option>
+        </select>
+        <select id="mappingNppFilterStatus" style="border:1px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:13px">
+          <option value="">Tất cả</option>
+          <option value="unmapped">Chỉ chưa map</option>
+          <option value="mapped">Đã map</option>
+        </select>
+        <input type="text" id="mappingNppSearch" placeholder="Tìm mã / tên model..." style="border:1px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:13px;width:220px" />
+        <span id="mappingNppCountBadge" style="font-size:12px;color:#5e6f8a;margin-left:4px"></span>
+      </div>
+      <!-- Table (scrollable) -->
+      <div style="overflow-y:auto;flex:1;border:1px solid #e5e7eb;border-radius:8px">
+        <table class="target-table" style="font-size:12px;min-width:700px">
+          <thead style="position:sticky;top:0;background:#f8fafc;z-index:1">
+            <tr>
+              <th style="width:80px">NPP</th>
+              <th style="width:150px">Mã NPP</th>
+              <th>Tên model NPP</th>
+              <th style="width:180px">SKU chuẩn</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody id="mappingNppTableBody"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+      <!-- Pagination -->
+      <div id="mappingNppPagination" style="display:flex;gap:8px;padding:12px 0 0;align-items:center;flex-shrink:0"></div>
     </div>
   </div>
 
@@ -4705,6 +4799,8 @@
       document.getElementById('addProductBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('importProductsBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('detectDupSkuBtn')?.classList.toggle('hidden', !isAdmin);
+      document.getElementById('mappingNppBtn')?.classList.toggle('hidden', !isAdmin);
+      document.getElementById('addNppCodeBtn')?.classList.toggle('hidden', !isAdmin);
       showProductsListView();
       await loadProductsList();
     }
@@ -4924,6 +5020,7 @@
       await loadProductPricingPane();
       await loadProductDistyPane(sku);
       await loadProductInventoryPane(sku);
+      await loadProductNppCodesPane(sku);
     }
     document.getElementById('productDetailBackBtn')?.addEventListener('click', showProductsListView);
     document.getElementById('editProductBtn')?.addEventListener('click', () => {
@@ -5112,6 +5209,284 @@
       if (!rows.length) { tbody.innerHTML = '<tr><td colspan="3">Chưa có dữ liệu tồn kho.</td></tr>'; return; }
       tbody.innerHTML = rows.map((r) => `<tr><td>${r.disty}</td><td>${r.week_date}</td><td class="kpi-col-num">${fmtQtyMsi(r.closing)}</td></tr>`).join('');
     }
+
+    // ══ NPP CODES SUB-TAB (Product detail) ══════════════════════════════════
+
+    const he2 = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    async function loadProductNppCodesPane(sku) {
+      const tbody = document.getElementById('productNppCodesBody');
+      const countEl = document.getElementById('productNppCodesCount');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="4" style="padding:12px;color:#9ca3af">Đang tải...</td></tr>';
+      const { data, error } = await sb.from('product_disty_codes')
+        .select('disty, disty_code, disty_name, sku').eq('sku', sku).order('disty');
+      if (error) { tbody.innerHTML = `<tr><td colspan="4">Lỗi: ${error.message}</td></tr>`; return; }
+      if (!data?.length) { tbody.innerHTML = '<tr><td colspan="4" style="padding:12px;color:#9ca3af">Chưa có mã NPP nào map về SKU này.</td></tr>'; if (countEl) countEl.textContent = '0 mã NPP'; return; }
+      if (countEl) countEl.textContent = `${data.length} mã NPP từ ${[...new Set(data.map(r => r.disty))].join(', ')}`;
+      const isAdmin = isProductsAdmin();
+      tbody.innerHTML = data.map(r =>
+        `<tr>
+          <td>${he2(r.disty)}</td>
+          <td><code style="font-size:11px">${he2(r.disty_code)}</code></td>
+          <td style="font-size:11px;color:#374151">${he2(r.disty_name)}</td>
+          <td><span class="npp-mapped-chip">${he2(r.sku)}</span></td>
+          ${isAdmin ? `<td><button type="button" class="btn-secondary" style="font-size:10px;padding:2px 6px" data-del-disty="${he2(r.disty)}" data-del-code="${he2(r.disty_code)}">Xoá</button></td>` : '<td></td>'}
+        </tr>`
+      ).join('');
+      if (isAdmin) {
+        tbody.querySelectorAll('[data-del-disty]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            if (!confirm(`Xoá mapping ${btn.dataset.delDisty} : ${btn.dataset.delCode}?`)) return;
+            const { error: e } = await sb.from('product_disty_codes')
+              .delete().eq('disty', btn.dataset.delDisty).eq('disty_code', btn.dataset.delCode);
+            if (e) { showMsiToast('Lỗi: ' + e.message); return; }
+            showMsiToast('Đã xoá mapping');
+            loadProductNppCodesPane(sku);
+          });
+        });
+      }
+    }
+
+    // Add mapping form (sub-tab)
+    document.getElementById('addNppCodeBtn')?.addEventListener('click', () => {
+      document.getElementById('addNppCodeForm')?.classList.remove('hidden');
+    });
+    document.getElementById('cancelNppCodeBtn')?.addEventListener('click', () => {
+      document.getElementById('addNppCodeForm')?.classList.add('hidden');
+      document.getElementById('addNppCodeMsg').textContent = '';
+    });
+    document.getElementById('saveNppCodeBtn')?.addEventListener('click', async () => {
+      const disty = document.getElementById('addNppCodeDisty')?.value.trim();
+      const code  = document.getElementById('addNppCodeCode')?.value.trim();
+      const name  = document.getElementById('addNppCodeName')?.value.trim();
+      const msgEl = document.getElementById('addNppCodeMsg');
+      if (!disty || !code) { if (msgEl) { msgEl.textContent = 'Vui lòng điền NPP và Mã NPP.'; msgEl.style.color = '#b30012'; } return; }
+      if (!currentProductSku) return;
+      const { error } = await sb.from('product_disty_codes')
+        .upsert({ disty, disty_code: code, disty_name: name || null, sku: currentProductSku }, { onConflict: 'disty,disty_code' });
+      if (error) { if (msgEl) { msgEl.textContent = 'Lỗi: ' + error.message; msgEl.style.color = '#b30012'; } return; }
+      showMsiToast(`Đã thêm mapping ${disty}:${code} → ${currentProductSku}`);
+      document.getElementById('addNppCodeForm')?.classList.add('hidden');
+      loadProductNppCodesPane(currentProductSku);
+      loadProductDistyPane(currentProductSku);
+    });
+
+    // ══ MAPPING NPP MODAL (Admin) ══════════════════════════════════════════
+
+    let _mapAllRows = [], _mapPage = 0;
+    const MAP_PAGE_SIZE = 50;
+    let _nppAutoTarget = null, _nppAutoTimer = null;
+
+    function isUnmapped(r) { return !r.sku || r.sku === r.disty_code; }
+
+    async function openMappingNppModal() {
+      document.getElementById('mappingNppModal')?.classList.remove('hidden');
+      await loadMappingNppData();
+    }
+
+    async function loadMappingNppData() {
+      const tbody = document.getElementById('mappingNppTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">Đang tải...</td></tr>';
+      const { data, error } = await sb.from('product_disty_codes')
+        .select('disty, disty_code, disty_name, sku').order('disty').order('disty_code');
+      if (error) { if (tbody) tbody.innerHTML = `<tr><td colspan="5">Lỗi: ${error.message}</td></tr>`; return; }
+      _mapAllRows = data || [];
+      _mapPage = 0;
+      renderMappingStats(_mapAllRows);
+      applyMappingFilters();
+    }
+
+    function renderMappingStats(rows) {
+      const total = rows.length;
+      const mapped = rows.filter(r => !isUnmapped(r)).length;
+      const unmapped = total - mapped;
+      const el = document.getElementById('mappingNppStats');
+      if (el) el.innerHTML =
+        `<span class="mapping-stat-badge mapping-stat-total">Tổng: ${total} mã NPP</span>` +
+        `<span class="mapping-stat-badge mapping-stat-mapped">Đã map: ${mapped}</span>` +
+        `<span class="mapping-stat-badge mapping-stat-unmapped">Chưa map: ${unmapped}</span>`;
+    }
+
+    function applyMappingFilters() {
+      const disty  = document.getElementById('mappingNppFilterDisty')?.value || '';
+      const status = document.getElementById('mappingNppFilterStatus')?.value || '';
+      const q      = (document.getElementById('mappingNppSearch')?.value || '').toLowerCase();
+      let rows = _mapAllRows;
+      if (disty)  rows = rows.filter(r => r.disty === disty);
+      if (status === 'unmapped') rows = rows.filter(r => isUnmapped(r));
+      if (status === 'mapped')   rows = rows.filter(r => !isUnmapped(r));
+      if (q)      rows = rows.filter(r =>
+        (r.disty_code || '').toLowerCase().includes(q) ||
+        (r.disty_name || '').toLowerCase().includes(q) ||
+        (r.sku || '').toLowerCase().includes(q));
+      const badge = document.getElementById('mappingNppCountBadge');
+      if (badge) badge.textContent = `${rows.length} dòng`;
+      _mapPage = 0;
+      renderMappingTable(rows);
+    }
+
+    function renderMappingTable(rows) {
+      const total = rows.length, paginated = total > MAP_PAGE_SIZE;
+      const start = _mapPage * MAP_PAGE_SIZE;
+      const visible = paginated ? rows.slice(start, start + MAP_PAGE_SIZE) : rows;
+      const tbody = document.getElementById('mappingNppTableBody');
+      if (!tbody) return;
+      if (!visible.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">Không có dữ liệu</td></tr>'; renderMappingPagination(rows, []); return; }
+      tbody.innerHTML = visible.map(r => {
+        const unmapped = isUnmapped(r);
+        const skuCell = unmapped
+          ? `<input type="text" class="npp-map-input" placeholder="Gõ SKU / tên model..." data-disty="${he2(r.disty)}" data-code="${he2(r.disty_code)}" value="" autocomplete="off" />`
+          : `<span class="npp-mapped-chip">${he2(r.sku)}</span>`;
+        const editBtn = unmapped ? '' : `<button type="button" class="btn-secondary npp-remap-btn" style="font-size:10px;padding:2px 6px" data-disty="${he2(r.disty)}" data-code="${he2(r.disty_code)}">Sửa</button>`;
+        return `<tr data-disty="${he2(r.disty)}" data-code="${he2(r.disty_code)}">
+          <td style="font-weight:600">${he2(r.disty)}</td>
+          <td><code style="font-size:11px">${he2(r.disty_code)}</code></td>
+          <td style="font-size:11px;color:#374151">${he2(r.disty_name || '—')}</td>
+          <td id="map-sku-cell-${he2(r.disty)}-${he2(r.disty_code).replace(/[^a-z0-9]/gi,'_')}">${skuCell}</td>
+          <td>${editBtn}</td>
+        </tr>`;
+      }).join('');
+      renderMappingPagination(rows, visible);
+      // Attach input events
+      tbody.querySelectorAll('.npp-map-input').forEach(input => {
+        input.addEventListener('focus', () => { _nppAutoTarget = { disty: input.dataset.disty, code: input.dataset.code, input }; });
+        input.addEventListener('input', () => {
+          _nppAutoTarget = { disty: input.dataset.disty, code: input.dataset.code, input };
+          clearTimeout(_nppAutoTimer);
+          _nppAutoTimer = setTimeout(() => searchNppSku(input.value.trim()), 280);
+        });
+      });
+      // Re-map button → replace chip with input
+      tbody.querySelectorAll('.npp-remap-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const row = btn.closest('tr');
+          const cellId = `map-sku-cell-${btn.dataset.disty}-${btn.dataset.code.replace(/[^a-z0-9]/gi,'_')}`;
+          const cell = document.getElementById(cellId);
+          if (!cell) return;
+          cell.innerHTML = `<input type="text" class="npp-map-input" placeholder="Gõ SKU / tên model..." data-disty="${he2(btn.dataset.disty)}" data-code="${he2(btn.dataset.code)}" value="" autocomplete="off" />`;
+          const inp = cell.querySelector('input');
+          inp.focus();
+          inp.addEventListener('focus', () => { _nppAutoTarget = { disty: inp.dataset.disty, code: inp.dataset.code, input: inp }; });
+          inp.addEventListener('input', () => {
+            _nppAutoTarget = { disty: inp.dataset.disty, code: inp.dataset.code, input: inp };
+            clearTimeout(_nppAutoTimer);
+            _nppAutoTimer = setTimeout(() => searchNppSku(inp.value.trim()), 280);
+          });
+          btn.remove();
+        });
+      });
+    }
+
+    function renderMappingPagination(allRows, visible) {
+      const el = document.getElementById('mappingNppPagination');
+      if (!el) return;
+      const total = allRows.length;
+      if (total <= MAP_PAGE_SIZE) { el.innerHTML = ''; return; }
+      const pages = Math.ceil(total / MAP_PAGE_SIZE);
+      const start = _mapPage * MAP_PAGE_SIZE + 1;
+      const end = Math.min((_mapPage + 1) * MAP_PAGE_SIZE, total);
+      el.innerHTML =
+        `<button class="btn-secondary map-page-btn" data-dir="-1" ${_mapPage === 0 ? 'disabled' : ''} style="font-size:12px;padding:4px 10px">← Trước</button>` +
+        `<span style="font-size:12px;color:#5e6f8a">Trang ${_mapPage + 1}/${pages} (${start}–${end} / ${total})</span>` +
+        `<button class="btn-secondary map-page-btn" data-dir="1" ${_mapPage >= pages - 1 ? 'disabled' : ''} style="font-size:12px;padding:4px 10px">Sau →</button>`;
+    }
+
+    async function searchNppSku(q) {
+      const dd = document.getElementById('nppSkuDropdown');
+      if (!dd || !q || q.length < 1) { if (dd) dd.style.display = 'none'; return; }
+      const { data } = await sb.from('products_master')
+        .select('sku, model_name').or(`sku.ilike.%${q}%,model_name.ilike.%${q}%`).limit(10);
+      if (!data?.length) {
+        dd.innerHTML = '<div style="padding:8px 12px;color:#9ca3af;font-size:12px">Không tìm thấy</div>';
+      } else {
+        dd.innerHTML = data.map(p =>
+          `<div class="npp-sku-opt" data-sku="${he2(p.sku)}"><strong style="font-size:11px;font-family:monospace">${he2(p.sku)}</strong> — <span>${he2(p.model_name)}</span></div>`
+        ).join('');
+      }
+      if (_nppAutoTarget?.input) {
+        const rect = _nppAutoTarget.input.getBoundingClientRect();
+        dd.style.left = rect.left + 'px';
+        dd.style.top  = (rect.bottom + 2) + 'px';
+        dd.style.minWidth = Math.max(rect.width, 280) + 'px';
+      }
+      dd.style.display = 'block';
+    }
+
+    async function saveMappingNpp(disty, distyCode, newSku) {
+      const { error: e1 } = await sb.from('product_disty_codes')
+        .update({ sku: newSku }).eq('disty', disty).eq('disty_code', distyCode);
+      if (e1) throw new Error(e1.message);
+      await sb.from('disty_inventory')
+        .update({ sku: newSku }).eq('disty', disty).eq('disty_code', distyCode);
+      // Update local state
+      const row = _mapAllRows.find(r => r.disty === disty && r.disty_code === distyCode);
+      if (row) row.sku = newSku;
+      renderMappingStats(_mapAllRows);
+    }
+
+    // Autocomplete click handler
+    document.getElementById('nppSkuDropdown')?.addEventListener('click', async (e) => {
+      const opt = e.target.closest('.npp-sku-opt');
+      if (!opt || !_nppAutoTarget) return;
+      const newSku = opt.dataset.sku;
+      const { disty, code, input } = _nppAutoTarget;
+      document.getElementById('nppSkuDropdown').style.display = 'none';
+      _nppAutoTarget = null;
+      try {
+        await saveMappingNpp(disty, code, newSku);
+        // Replace input with chip in modal table
+        const cellId = `map-sku-cell-${disty}-${code.replace(/[^a-z0-9]/gi,'_')}`;
+        const cell = document.getElementById(cellId);
+        if (cell) cell.innerHTML = `<span class="npp-mapped-chip">${he2(newSku)}</span>`;
+        showMsiToast(`✓ Đã map ${code} → ${newSku}`);
+      } catch (err) {
+        showMsiToast('Lỗi: ' + err.message);
+      }
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#nppSkuDropdown') && !e.target.classList.contains('npp-map-input')) {
+        document.getElementById('nppSkuDropdown').style.display = 'none';
+      }
+    });
+
+    // Modal open/close
+    document.getElementById('mappingNppBtn')?.addEventListener('click', openMappingNppModal);
+    document.getElementById('closeMappingNppBtn')?.addEventListener('click', () => {
+      document.getElementById('mappingNppModal')?.classList.add('hidden');
+      document.getElementById('nppSkuDropdown').style.display = 'none';
+    });
+
+    // Modal filters
+    ['mappingNppFilterDisty','mappingNppFilterStatus'].forEach(id =>
+      document.getElementById(id)?.addEventListener('change', applyMappingFilters)
+    );
+    document.getElementById('mappingNppSearch')?.addEventListener('input', () => {
+      clearTimeout(_nppAutoTimer);
+      _nppAutoTimer = setTimeout(applyMappingFilters, 300);
+    });
+
+    // Modal pagination
+    document.getElementById('mappingNppPagination')?.addEventListener('click', e => {
+      const btn = e.target.closest('.map-page-btn');
+      if (!btn || btn.disabled) return;
+      const disty  = document.getElementById('mappingNppFilterDisty')?.value || '';
+      const status = document.getElementById('mappingNppFilterStatus')?.value || '';
+      const q      = (document.getElementById('mappingNppSearch')?.value || '').toLowerCase();
+      let rows = _mapAllRows;
+      if (disty)  rows = rows.filter(r => r.disty === disty);
+      if (status === 'unmapped') rows = rows.filter(r => isUnmapped(r));
+      if (status === 'mapped')   rows = rows.filter(r => !isUnmapped(r));
+      if (q)      rows = rows.filter(r =>
+        (r.disty_code || '').toLowerCase().includes(q) ||
+        (r.disty_name || '').toLowerCase().includes(q) ||
+        (r.sku || '').toLowerCase().includes(q));
+      _mapPage += parseInt(btn.dataset.dir, 10);
+      renderMappingTable(rows);
+      document.getElementById('mappingNppTableBody')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
     // ── Form thêm/sửa sản phẩm (admin only) ──
     function openProductForm(sku) {
