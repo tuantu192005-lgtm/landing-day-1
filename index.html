@@ -5272,7 +5272,7 @@
       return { total: all.length, level1, level2, level3 };
     }
 
-    function renderDupSection(emoji, label, colorKey, pairs) {
+    function renderDupSection(emoji, label, colorKey, pairs, levelId) {
       const he = escapeHtmlForDistyReport;
       const border    = { red: '#fca5a5', yellow: '#fcd34d', blue: '#93c5fd' }[colorKey];
       const bg        = { red: '#fef2f2', yellow: '#fffbeb', blue: '#eff6ff' }[colorKey];
@@ -5313,9 +5313,9 @@
         </div>`;
       }).join('');
 
-      return `<details open style="border:1px solid ${border};border-radius:8px;overflow:hidden;margin-bottom:12px">
+      return `<details open data-dup-level="${levelId}" style="border:1px solid ${border};border-radius:8px;overflow:hidden;margin-bottom:12px">
         <summary style="cursor:pointer;padding:10px 14px;background:${bg};font-weight:600;font-size:13px;color:${textColor};user-select:none;list-style:none">
-          ${emoji} ${label} — ${pairs.length} cặp
+          ${emoji} ${label} — <span class="dup-section-count">${pairs.length} cặp</span>
         </summary>
         <div>${rows || `<div style="padding:12px;color:#9ca3af;font-size:12px;text-align:center">Không có cặp nào.</div>`}</div>
       </details>`;
@@ -5339,16 +5339,16 @@
 
         statusEl.style.display = 'none';
         summaryEl.innerHTML = [
-          `<span style="padding:6px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600">🔴 Chắc chắn trùng: ${level1.length} cặp</span>`,
-          `<span style="padding:6px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e;font-weight:600">🟡 Có thể trùng: ${level2.length} cặp</span>`,
-          `<span style="padding:6px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;font-size:12px;color:#1e40af;font-weight:600">🔵 Nghi ngờ: ${level3.length} cặp</span>`,
+          `<span id="dupBadge1" style="padding:6px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600">🔴 Chắc chắn trùng: ${level1.length} cặp</span>`,
+          `<span id="dupBadge2" style="padding:6px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e;font-weight:600">🟡 Có thể trùng: ${level2.length} cặp</span>`,
+          `<span id="dupBadge3" style="padding:6px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;font-size:12px;color:#1e40af;font-weight:600">🔵 Nghi ngờ: ${level3.length} cặp</span>`,
           `<span style="padding:6px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;color:#6b7280">${total} sản phẩm đã phân tích</span>`,
         ].join('');
 
         let html = '';
-        if (level1.length) html += renderDupSection('🔴', 'Trùng chính xác (normalized name)', 'red',    level1);
-        if (level2.length) html += renderDupSection('🟡', 'Có thể trùng (≥85% token khớp)',   'yellow', level2);
-        if (level3.length) html += renderDupSection('🔵', 'Nghi ngờ trùng (SKU tiền tố)',      'blue',   level3);
+        if (level1.length) html += renderDupSection('🔴', 'Trùng chính xác (normalized name)', 'red',    level1, 1);
+        if (level2.length) html += renderDupSection('🟡', 'Có thể trùng (≥85% token khớp)',   'yellow', level2, 2);
+        if (level3.length) html += renderDupSection('🔵', 'Nghi ngờ trùng (SKU tiền tố)',      'blue',   level3, 3);
         if (!totalPairs)   html  = '<div style="padding:32px;text-align:center;color:#059669;font-size:14px;font-weight:600">✅ Không phát hiện SKU trùng lặp nào!</div>';
         resultsEl.innerHTML = html;
         contentEl?.classList.remove('hidden');
@@ -5356,6 +5356,19 @@
         statusEl.innerHTML = `<span style="color:#b30012">Lỗi phân tích: ${err.message}</span>`;
       }
     });
+
+    function refreshDupCounts() {
+      for (const [lvl, badgeId] of [['1','dupBadge1'],['2','dupBadge2'],['3','dupBadge3']]) {
+        const details = document.querySelector(`[data-dup-level="${lvl}"]`);
+        const cnt = details ? details.querySelectorAll('.dup-row').length : 0;
+        // update inline section count
+        const countEl = details?.querySelector('.dup-section-count');
+        if (countEl) countEl.textContent = cnt + ' cặp';
+        // update top badge
+        const badge = document.getElementById(badgeId);
+        if (badge) badge.textContent = badge.textContent.replace(/\d+ cặp/, cnt + ' cặp');
+      }
+    }
 
     document.getElementById('closeDupDetectBtn')?.addEventListener('click', () => {
       document.getElementById('dupDetectModal')?.classList.add('hidden');
@@ -5372,6 +5385,7 @@
         try {
           await mergeProducts(srcSku, dstSku);
           row?.remove();
+          refreshDupCounts();
           showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
         } catch (err) {
           mergeBtn.disabled = false; mergeBtn.textContent = '⚠ Lỗi';
@@ -5385,6 +5399,7 @@
         const idx = pairKey.lastIndexOf(':');
         dupAddIgnored(pairKey.slice(0, idx), pairKey.slice(idx + 1));
         ignBtn.closest('.dup-row')?.remove();
+        refreshDupCounts();
       }
     });
 
