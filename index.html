@@ -2617,6 +2617,7 @@
         });
       });
       document.getElementById('diInvSearch')?.addEventListener('input', () => {
+        _diFilterNorm = null; // user tự gõ → bỏ filter normalized_name
         _diFilters.search = document.getElementById('diInvSearch')?.value.trim() || '';
         _diPage = 0;
         applyDiFiltersAndRender();
@@ -2627,10 +2628,11 @@
         _diPage += parseInt(btn.dataset.dir, 10);
         applyDiFiltersAndRender();
       });
-      document.getElementById('diInvRefreshBtn')?.addEventListener('click', () => loadInventoryTab());
+      document.getElementById('diInvRefreshBtn')?.addEventListener('click', () => { _diFilterNorm = null; loadInventoryTab(); });
       document.getElementById('viewDistyInvBtn')?.addEventListener('click', () => {
         const sku = document.getElementById('productDetailTitle')?.dataset.sku || '';
-        if (sku) switchToDistyInventory(sku);
+        const normalizedName = currentProductData?.normalized_name || '';
+        if (sku) switchToDistyInventory(sku, normalizedName);
       });
     }
 
@@ -4442,6 +4444,7 @@
     // ── Disty Inventory tab ──────────────────────────────────────────────────
     let _diAllRows = [], _diFilters = { search: '', lob: '', npp: '', status: '' };
     let _diPage = 0, _diChartQty = null, _diChartAge = null;
+    let _diFilterNorm = null; // set khi navigate từ product detail, filter theo normalized_name
     const DI_PAGE_SIZE = 50;
 
     async function loadInventoryTab() {
@@ -4501,7 +4504,7 @@
         console.log('[DI] unique SKUs in inventory:', skuArr.length);
         for (let i = 0; i < skuArr.length; i += 500) {
           const { data } = await sb.from('products_master')
-            .select('sku, model_name, lob').in('sku', skuArr.slice(i, i + 500));
+            .select('sku, model_name, lob, normalized_name').in('sku', skuArr.slice(i, i + 500));
           for (const p of data || []) productMap[p.sku] = p;
         }
         console.log('[DI] productMap entries (matched SKUs):', Object.keys(productMap).length);
@@ -4524,6 +4527,7 @@
           }
           return {
             sku: r.sku, model_name: pm.model_name || '—', lob: pm.lob || '—',
+            normalized_name: pm.normalized_name || '',
             disty: r.disty, closing: now, week_date: latestWeek, code, label,
             ratio: (old > 0) ? now / old : null
           };
@@ -4544,7 +4548,8 @@
     function applyDiFiltersAndRender() {
       let rows = _diAllRows;
       const q = (_diFilters.search || '').toLowerCase();
-      if (q)                  rows = rows.filter(r => r.sku.toLowerCase().includes(q) || r.model_name.toLowerCase().includes(q));
+      if (_diFilterNorm)      rows = rows.filter(r => r.normalized_name === _diFilterNorm);
+      else if (q)             rows = rows.filter(r => r.sku.toLowerCase().includes(q) || r.model_name.toLowerCase().includes(q) || r.normalized_name.includes(q));
       if (_diFilters.lob)     rows = rows.filter(r => r.lob === _diFilters.lob);
       if (_diFilters.npp)     rows = rows.filter(r => r.disty === _diFilters.npp);
       if (_diFilters.status)  rows = rows.filter(r => r.code === _diFilters.status);
@@ -4650,14 +4655,15 @@
       openProductDetail(sku);
     }
 
-    function switchToDistyInventory(sku) {
+    function switchToDistyInventory(sku, normalizedName) {
       document.querySelectorAll('.msi-menu-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.msi-tab-pane').forEach(p => p.classList.remove('active'));
       document.querySelector('[data-tab="tab-disty-inventory"]')?.classList.add('active');
       document.getElementById('tab-disty-inventory')?.classList.add('active');
       document.getElementById('msiFilterBar')?.classList.add('hidden');
+      _diFilterNorm = normalizedName || null;
       const searchEl = document.getElementById('diInvSearch');
-      if (searchEl) searchEl.value = sku;
+      if (searchEl) searchEl.value = sku; // hiện sku để user nhận ra sản phẩm
       _diFilters = { search: sku, lob: '', npp: '', status: '' };
       _diPage = 0;
       loadInventoryTab();
