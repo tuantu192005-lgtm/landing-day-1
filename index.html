@@ -4447,20 +4447,22 @@
           .select('week_date').order('week_date', { ascending: false }).limit(200);
         console.log('[DI] week query error:', wkErr, '| wkData length:', wkData?.length, '| first 3:', wkData?.slice(0,3));
         if (wkErr) throw new Error(wkErr.message);
+        // latestWeek lấy trực tiếp từ row đầu tiên (đã ORDER DESC) — giữ nguyên format DB
+        const latestWeek = wkData[0]?.week_date;
         const weeks = [...new Set((wkData || []).map(r => r.week_date))];
         console.log('[DI] distinct weeks:', weeks);
-        if (!weeks.length) {
+        if (!latestWeek || !weeks.length) {
           if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.<br><small style="color:#9ca3af">Hãy import file Excel NPP trước trong tab Import.</small></td></tr>';
           return;
         }
-        const latestWeek = weeks[0], compareWeek = weeks[4] || null;
+        const compareWeek = weeks[4] || null;
         console.log('[DI] latestWeek:', latestWeek, '| compareWeek:', compareWeek);
 
-        // 2. Fetch current week (all rows, paginated)
+        // 2. Fetch current week (all rows, paginated) — không lọc sku IS NOT NULL để lấy tất cả dòng
         const currentRows = [];
         for (let from = 0; ; from += 1000) {
           const { data, error } = await sb.from('disty_inventory')
-            .select('sku, disty, closing').eq('week_date', latestWeek).not('sku', 'is', null)
+            .select('sku, disty, closing').eq('week_date', latestWeek)
             .range(from, from + 999);
           if (error) throw new Error(error.message);
           if (!data?.length) break;
@@ -4474,10 +4476,10 @@
         if (compareWeek) {
           for (let from = 0; ; from += 1000) {
             const { data } = await sb.from('disty_inventory')
-              .select('sku, disty, closing').eq('week_date', compareWeek).not('sku', 'is', null)
+              .select('sku, disty, closing').eq('week_date', compareWeek)
               .range(from, from + 999);
             if (!data?.length) break;
-            for (const r of data) compareMap[`${r.sku}:${r.disty}`] = r.closing ?? 0;
+            for (const r of data) if (r.sku) compareMap[`${r.sku}:${r.disty}`] = r.closing ?? 0;
             if (data.length < 1000) break;
           }
         }
