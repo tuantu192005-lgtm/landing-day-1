@@ -5166,6 +5166,8 @@
       localStorage.setItem(DUP_IGNORED_KEY, JSON.stringify([...s]));
     }
     function dupStripSku(sku) { return sku.toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+    const DUP_L2_PAGE_SIZE = 50;
+    let _dupL2All = [], _dupL2Page = 0;
 
     async function runDupDetection() {
       const ignored = dupGetIgnored();
@@ -5247,7 +5249,6 @@
           }
       }
       level2.sort((x, y) => y.sim - x.sim);
-      if (level2.length > 50) level2.length = 50;
 
       // Level 3: stripped-SKU is prefix of other, same LOB, length ratio >= 60%
       const level3 = [];
@@ -5273,13 +5274,23 @@
     }
 
     function renderDupSection(emoji, label, colorKey, pairs, levelId) {
-      const he = escapeHtmlForDistyReport;
       const border    = { red: '#fca5a5', yellow: '#fcd34d', blue: '#93c5fd' }[colorKey];
       const bg        = { red: '#fef2f2', yellow: '#fffbeb', blue: '#eff6ff' }[colorKey];
       const textColor = { red: '#991b1b', yellow: '#92400e', blue: '#1e40af' }[colorKey];
       const simBg     = { red: '#fee2e2', yellow: '#fef3c7', blue: '#dbeafe' }[colorKey];
+      return `<details open data-dup-level="${levelId}" style="border:1px solid ${border};border-radius:8px;overflow:hidden;margin-bottom:12px">
+        <summary style="cursor:pointer;padding:10px 14px;background:${bg};font-weight:600;font-size:13px;color:${textColor};user-select:none;list-style:none">
+          ${emoji} ${label} — <span class="dup-section-count">${pairs.length} cặp</span>
+        </summary>
+        <div class="dup-rows-container">${_renderDupRowsHtml(pairs, textColor, simBg)}</div>
+        <div class="dup-pagination" style="display:none;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid #f1f5f9;background:#fafafa"></div>
+      </details>`;
+    }
 
-      const rows = pairs.map(({ a, b, sim }) => {
+    function _renderDupRowsHtml(pairs, textColor, simBg) {
+      const he = escapeHtmlForDistyReport;
+      if (!pairs.length) return '<div style="padding:12px;color:#9ca3af;font-size:12px;text-align:center">Không có cặp nào.</div>';
+      return pairs.map(({ a, b, sim }) => {
         const pairKey = [a.sku, b.sku].sort().join(':');
         const pct = sim >= 1 ? '100%' : Math.round(sim * 100) + '%';
         return `<div class="dup-row" data-pair="${he(pairKey)}"
@@ -5312,13 +5323,49 @@
           </div>
         </div>`;
       }).join('');
+    }
 
-      return `<details open data-dup-level="${levelId}" style="border:1px solid ${border};border-radius:8px;overflow:hidden;margin-bottom:12px">
-        <summary style="cursor:pointer;padding:10px 14px;background:${bg};font-weight:600;font-size:13px;color:${textColor};user-select:none;list-style:none">
-          ${emoji} ${label} — <span class="dup-section-count">${pairs.length} cặp</span>
-        </summary>
-        <div>${rows || `<div style="padding:12px;color:#9ca3af;font-size:12px;text-align:center">Không có cặp nào.</div>`}</div>
-      </details>`;
+    function renderDupLevel2Page() {
+      const details = document.querySelector('[data-dup-level="2"]');
+      if (!details) return;
+      const total     = _dupL2All.length;
+      const paginated = total > 100;
+      const start     = paginated ? _dupL2Page * DUP_L2_PAGE_SIZE : 0;
+      const end       = paginated ? Math.min(start + DUP_L2_PAGE_SIZE, total) : total;
+      const visible   = paginated ? _dupL2All.slice(start, end) : _dupL2All;
+
+      const rowContainer = details.querySelector('.dup-rows-container');
+      const paginationEl = details.querySelector('.dup-pagination');
+      const countEl      = details.querySelector('.dup-section-count');
+
+      if (rowContainer) rowContainer.innerHTML = _renderDupRowsHtml(visible, '#92400e', '#fef3c7');
+
+      if (countEl) {
+        countEl.textContent = paginated
+          ? `${total} cặp (đang hiện ${start + 1}–${end})`
+          : `${total} cặp`;
+      }
+
+      if (paginationEl) {
+        if (paginated) {
+          const totalPages = Math.ceil(total / DUP_L2_PAGE_SIZE);
+          const prevDis = _dupL2Page === 0 ? 'disabled' : '';
+          const nextDis = end >= total   ? 'disabled' : '';
+          paginationEl.style.display = 'flex';
+          paginationEl.innerHTML = `
+            <button class="dup-page-btn" data-dir="-1" ${prevDis}
+              style="padding:5px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:#fff;color:#374151">← Trang trước</button>
+            <span style="font-size:12px;color:#6b7280;flex:1;text-align:center">Trang ${_dupL2Page + 1} / ${totalPages}</span>
+            <button class="dup-page-btn" data-dir="1" ${nextDis}
+              style="padding:5px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:#fff;color:#374151">Trang sau →</button>
+          `;
+        } else {
+          paginationEl.style.display = 'none';
+        }
+      }
+
+      const badge = document.getElementById('dupBadge2');
+      if (badge) badge.textContent = `🟡 Có thể trùng: ${total} cặp`;
     }
 
     document.getElementById('detectDupSkuBtn')?.addEventListener('click', async () => {
@@ -5351,6 +5398,8 @@
         if (level3.length) html += renderDupSection('🔵', 'Nghi ngờ trùng (SKU tiền tố)',      'blue',   level3, 3);
         if (!totalPairs)   html  = '<div style="padding:32px;text-align:center;color:#059669;font-size:14px;font-weight:600">✅ Không phát hiện SKU trùng lặp nào!</div>';
         resultsEl.innerHTML = html;
+        _dupL2All = level2; _dupL2Page = 0;
+        if (level2.length > 100) renderDupLevel2Page();
         contentEl?.classList.remove('hidden');
       } catch (err) {
         statusEl.innerHTML = `<span style="color:#b30012">Lỗi phân tích: ${err.message}</span>`;
@@ -5359,12 +5408,16 @@
 
     function refreshDupCounts() {
       for (const [lvl, badgeId] of [['1','dupBadge1'],['2','dupBadge2'],['3','dupBadge3']]) {
+        if (lvl === '2') {
+          // Level 2 may be paginated: use _dupL2All for accurate total, let renderDupLevel2Page handle section count
+          const badge = document.getElementById(badgeId);
+          if (badge) badge.textContent = `🟡 Có thể trùng: ${_dupL2All.length} cặp`;
+          continue;
+        }
         const details = document.querySelector(`[data-dup-level="${lvl}"]`);
         const cnt = details ? details.querySelectorAll('.dup-row').length : 0;
-        // update inline section count
         const countEl = details?.querySelector('.dup-section-count');
         if (countEl) countEl.textContent = cnt + ' cặp';
-        // update top badge
         const badge = document.getElementById(badgeId);
         if (badge) badge.textContent = badge.textContent.replace(/\d+ cặp/, cnt + ' cặp');
       }
@@ -5374,8 +5427,16 @@
       document.getElementById('dupDetectModal')?.classList.add('hidden');
     });
 
-    // Delegate merge & ignore clicks inside modal
+    // Delegate merge, ignore, and pagination clicks inside modal
     document.getElementById('dupDetectModal')?.addEventListener('click', async (e) => {
+      const pageBtn = e.target.closest('.dup-page-btn');
+      if (pageBtn && !pageBtn.disabled) {
+        const dir = parseInt(pageBtn.dataset.dir, 10);
+        const maxPage = Math.ceil(_dupL2All.length / DUP_L2_PAGE_SIZE) - 1;
+        _dupL2Page = Math.max(0, Math.min(_dupL2Page + dir, maxPage));
+        renderDupLevel2Page();
+        return;
+      }
       const mergeBtn = e.target.closest('.dup-merge-btn');
       if (mergeBtn && !mergeBtn.disabled) {
         const srcSku = mergeBtn.dataset.src, dstSku = mergeBtn.dataset.dst;
@@ -5384,12 +5445,21 @@
         mergeBtn.disabled = true; mergeBtn.textContent = '⌛ Đang gộp...';
         try {
           await mergeProducts(srcSku, dstSku);
-          // Remove every pair that references srcSku (it no longer exists)
+          // Remove from _dupL2All (srcSku no longer exists)
+          _dupL2All = _dupL2All.filter(({ a, b }) => a.sku !== srcSku && b.sku !== srcSku);
+          // Clamp page if last page is now empty
+          if (_dupL2All.length > 100) {
+            const maxPage = Math.ceil(_dupL2All.length / DUP_L2_PAGE_SIZE) - 1;
+            if (_dupL2Page > maxPage) _dupL2Page = maxPage;
+          }
+          // Remove DOM rows for all levels that reference srcSku
           document.querySelectorAll('.dup-row').forEach(r => {
             const pk = r.dataset.pair || '';
             const idx = pk.lastIndexOf(':');
             if (pk.slice(0, idx) === srcSku || pk.slice(idx + 1) === srcSku) r.remove();
           });
+          // Re-render level 2 (handles pagination + count update)
+          renderDupLevel2Page();
           refreshDupCounts();
           showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
         } catch (err) {
@@ -5403,7 +5473,9 @@
         const pairKey = ignBtn.dataset.pair;
         const idx = pairKey.lastIndexOf(':');
         dupAddIgnored(pairKey.slice(0, idx), pairKey.slice(idx + 1));
+        _dupL2All = _dupL2All.filter(({ a, b }) => [a.sku, b.sku].sort().join(':') !== pairKey);
         ignBtn.closest('.dup-row')?.remove();
+        renderDupLevel2Page();
         refreshDupCounts();
       }
     });
