@@ -5384,7 +5384,12 @@
         mergeBtn.disabled = true; mergeBtn.textContent = '⌛ Đang gộp...';
         try {
           await mergeProducts(srcSku, dstSku);
-          row?.remove();
+          // Remove every pair that references srcSku (it no longer exists)
+          document.querySelectorAll('.dup-row').forEach(r => {
+            const pk = r.dataset.pair || '';
+            const idx = pk.lastIndexOf(':');
+            if (pk.slice(0, idx) === srcSku || pk.slice(idx + 1) === srcSku) r.remove();
+          });
           refreshDupCounts();
           showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
         } catch (err) {
