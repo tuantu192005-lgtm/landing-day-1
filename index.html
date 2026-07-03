@@ -1710,6 +1710,8 @@
       z-index: 9999;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
       pointer-events: none;
+      line-height: 1.6;
+      text-align: center;
     }
 
     .msi-toast.show {
@@ -4132,13 +4134,21 @@
       }
     }
 
-    function showMsiToast(message) {
+    function showMsiToast(message, duration = 2500) {
       const el = document.getElementById('msiToast');
       if (!el) return;
       el.textContent = message;
       el.classList.add('show');
       clearTimeout(el._hideTimer);
-      el._hideTimer = setTimeout(() => el.classList.remove('show'), 2500);
+      el._hideTimer = setTimeout(() => el.classList.remove('show'), duration);
+    }
+    function showMsiToastHtml(html, duration = 2500) {
+      const el = document.getElementById('msiToast');
+      if (!el) return;
+      el.innerHTML = html;
+      el.classList.add('show');
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(() => el.classList.remove('show'), duration);
     }
 
     function showAnnualTargetView() {
@@ -6304,12 +6314,23 @@
           results.push(await saveDistySheetData(p, pending.normToSku));
         }
         window._importPending = null;
-        const totalRead = results.reduce((s, r) => s + r.read, 0);
+        const totalRead    = results.reduce((s, r) => s + r.read, 0);
+        const totalMapped  = results.reduce((s, r) => s + r.mapped, 0);
+        const totalUnmapped = totalRead - totalMapped;
+        const nppCount     = results.filter(r => r.read > 0).length;
         if (msgEl) {
           msgEl.innerHTML = results.map(r => `${escapeHtmlForDistyReport(r.disty)}: ${r.read} dòng — map ${r.mapped} — chưa map ${r.unmapped}`).join('<br>');
           msgEl.style.color = '#1a2b4c';
         }
-        showMsiToast(`Đã import ${totalRead} dòng tồn kho từ ${results.length} NPP`);
+        const skuLine = totalUnmapped > 0
+          ? `${totalMapped}/${totalRead} mã đã link SKU &nbsp;·&nbsp; <span style="color:#fde68a">${totalUnmapped} chưa map</span>`
+          : `Tất cả ${totalMapped} mã đã link SKU ✓`;
+        showMsiToastHtml(
+          `<strong>✅ Import thành công!</strong><br>` +
+          `Đã cập nhật <strong>${totalRead}</strong> dòng tồn kho từ <strong>${nppCount}</strong> NPP.<br>` +
+          `<span style="font-size:0.82rem;font-weight:400">${skuLine}</span>`,
+          5000
+        );
         productsState.page = 0;
         await loadProductsList();
       } catch (err) {
