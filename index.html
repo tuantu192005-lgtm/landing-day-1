@@ -2168,6 +2168,7 @@
               <button type="button" class="btn-primary hidden" id="addProductBtn">+ Thêm sản phẩm</button>
               <button type="button" class="btn-secondary hidden" id="importProductsBtn">Import từ Excel</button>
               <input type="file" id="importProductsInput" accept=".xlsx,.xls" class="hidden" />
+              <button type="button" class="btn-secondary hidden" id="detectDupSkuBtn" style="color:#7c3aed;border-color:#7c3aed">🔍 Phát hiện SKU trùng</button>
             </div>
             <div class="table-wrapper">
               <table class="target-table products-table" id="productsTable">
@@ -2448,6 +2449,21 @@
       <div style="display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn-primary" id="mergeSuggestYesBtn" style="padding:9px 20px;font-size:13px">Gộp luôn</button>
         <button type="button" class="btn-secondary" id="mergeSuggestNoBtn" style="padding:9px 20px;font-size:13px">Không, chỉ lưu tên mới</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal phát hiện SKU trùng lặp -->
+  <div id="dupDetectModal" class="hidden" style="position:fixed;inset:0;z-index:10002;background:rgba(10,26,60,0.55);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:940px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(10,26,60,0.3)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-shrink:0">
+        <h2 style="margin:0;font-size:15px;font-weight:700;color:#1a2b4c;flex:1">Phát hiện SKU trùng lặp</h2>
+        <button type="button" id="closeDupDetectBtn" style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:#9ca3af;padding:0 4px">×</button>
+      </div>
+      <div id="dupDetectStatus" style="padding:20px;text-align:center;font-size:13px;display:none"></div>
+      <div id="dupDetectContent" class="hidden">
+        <div id="dupDetectSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
+        <div id="dupDetectResults"></div>
       </div>
     </div>
   </div>
@@ -4426,6 +4442,7 @@
       const isAdmin = isProductsAdmin();
       document.getElementById('addProductBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('importProductsBtn')?.classList.toggle('hidden', !isAdmin);
+      document.getElementById('detectDupSkuBtn')?.classList.toggle('hidden', !isAdmin);
       showProductsListView();
       await loadProductsList();
     }
@@ -5134,6 +5151,228 @@
       document.getElementById('mergeSuggestModal')?.classList.add('hidden');
       _mergeSuggestSrc = null; _mergeSuggestDst = null;
       if (sku) await openProductDetail(sku);
+    });
+
+    // ── Phát hiện SKU trùng lặp (admin only) ─────────────────────────────────
+
+    const DUP_IGNORED_KEY = 'sku_dup_ignored_v1';
+    function dupGetIgnored() {
+      try { return new Set(JSON.parse(localStorage.getItem(DUP_IGNORED_KEY) || '[]')); }
+      catch { return new Set(); }
+    }
+    function dupAddIgnored(skuA, skuB) {
+      const key = [skuA, skuB].sort().join(':');
+      const s = dupGetIgnored(); s.add(key);
+      localStorage.setItem(DUP_IGNORED_KEY, JSON.stringify([...s]));
+    }
+    function dupStripSku(sku) { return sku.toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+    async function runDupDetection() {
+      const ignored = dupGetIgnored();
+      const isPairOk = (a, b) => !ignored.has([a, b].sort().join(':'));
+
+      // Fetch all products, paginate 1000-row chunks
+      const all = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await sb.from('products_master')
+          .select('sku,model_name,lob').range(from, from + 999);
+        if (error) throw new Error(error.message);
+        if (!data?.length) break;
+        for (const p of data) {
+          const norm = normalizeModelName(p.model_name);
+          const toks = new Set(norm.split(/[\s\-]+/).filter(Boolean));
+          all.push({ sku: p.sku, model_name: p.model_name, lob: p.lob, norm, toks });
+        }
+        if (data.length < 1000) break;
+        from += 1000;
+      }
+
+      // Level 1: exact normalized_name match (across all LOBs)
+      const normMap = new Map();
+      for (const p of all) {
+        if (!p.norm) continue;
+        if (!normMap.has(p.norm)) normMap.set(p.norm, []);
+        normMap.get(p.norm).push(p);
+      }
+      const level1 = []; const usedL1 = new Set();
+      for (const [, grp] of normMap) {
+        if (grp.length < 2) continue;
+        for (let i = 0; i < grp.length; i++)
+          for (let j = i + 1; j < grp.length; j++) {
+            const a = grp[i], b = grp[j];
+            if (!isPairOk(a.sku, b.sku)) continue;
+            level1.push({ a, b, sim: 1.0 });
+            usedL1.add([a.sku, b.sku].sort().join(':'));
+          }
+      }
+
+      // Group by LOB for levels 2 & 3
+      const byLob = new Map();
+      for (const p of all) {
+        if (!byLob.has(p.lob)) byLob.set(p.lob, []);
+        byLob.get(p.lob).push(p);
+      }
+
+      // Level 2: token overlap >= 85%, same LOB, norms different
+      const level2 = []; const usedL2 = new Set();
+      for (const [, prods] of byLob) {
+        if (prods.length < 2) continue;
+        for (let i = 0; i < prods.length; i++)
+          for (let j = i + 1; j < prods.length; j++) {
+            const a = prods[i], b = prods[j];
+            const key = [a.sku, b.sku].sort().join(':');
+            if (usedL1.has(key) || !isPairOk(a.sku, b.sku)) continue;
+            if (!a.norm || !b.norm || a.norm === b.norm) continue;
+            const ta = a.toks, tb = b.toks;
+            const shorter = ta.size <= tb.size ? ta : tb;
+            const longer  = ta.size <= tb.size ? tb : ta;
+            if (shorter.size < 2) continue;
+            let shared = 0;
+            for (const t of shorter) if (longer.has(t)) shared++;
+            const overlap = shared / shorter.size;
+            if (overlap >= 0.85) { level2.push({ a, b, sim: overlap }); usedL2.add(key); }
+          }
+      }
+      level2.sort((x, y) => y.sim - x.sim);
+
+      // Level 3: stripped-SKU is prefix of other, same LOB, length ratio >= 60%
+      const level3 = [];
+      for (const [, prods] of byLob) {
+        if (prods.length < 2) continue;
+        for (let i = 0; i < prods.length; i++)
+          for (let j = i + 1; j < prods.length; j++) {
+            const a = prods[i], b = prods[j];
+            const key = [a.sku, b.sku].sort().join(':');
+            if (usedL1.has(key) || usedL2.has(key) || !isPairOk(a.sku, b.sku)) continue;
+            const sa = dupStripSku(a.sku), sb = dupStripSku(b.sku);
+            if (sa === sb || sa.length < 4 || sb.length < 4) continue;
+            const isAShort = sa.length <= sb.length;
+            const short = isAShort ? sa : sb, long = isAShort ? sb : sa;
+            const pa = isAShort ? a : b, pb = isAShort ? b : a;
+            if (short.length / long.length < 0.60) continue;
+            if (long.startsWith(short)) level3.push({ a: pa, b: pb, sim: short.length / long.length });
+          }
+      }
+      level3.sort((x, y) => y.sim - x.sim);
+
+      return { total: all.length, level1, level2, level3 };
+    }
+
+    function renderDupSection(emoji, label, colorKey, pairs) {
+      const he = escapeHtmlForDistyReport;
+      const border    = { red: '#fca5a5', yellow: '#fcd34d', blue: '#93c5fd' }[colorKey];
+      const bg        = { red: '#fef2f2', yellow: '#fffbeb', blue: '#eff6ff' }[colorKey];
+      const textColor = { red: '#991b1b', yellow: '#92400e', blue: '#1e40af' }[colorKey];
+      const simBg     = { red: '#fee2e2', yellow: '#fef3c7', blue: '#dbeafe' }[colorKey];
+
+      const rows = pairs.map(({ a, b, sim }) => {
+        const pairKey = [a.sku, b.sku].sort().join(':');
+        const pct = sim >= 1 ? '100%' : Math.round(sim * 100) + '%';
+        return `<div class="dup-row" data-pair="${he(pairKey)}"
+            style="display:grid;grid-template-columns:1fr 20px 1fr 128px;gap:5px 8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;align-items:start">
+          <div>
+            <code style="font-size:11px;font-weight:700;color:#1a2b4c">${he(a.sku)}</code>
+            <div style="font-size:11px;color:#6b7280;word-break:break-word;margin-top:2px">${he(a.model_name)}</div>
+            <div style="margin-top:3px">${lobBadgeHtml(a.lob)}</div>
+          </div>
+          <div style="text-align:center;color:#d1d5db;padding-top:6px">⇄</div>
+          <div>
+            <code style="font-size:11px;font-weight:700;color:#1a2b4c">${he(b.sku)}</code>
+            <div style="font-size:11px;color:#6b7280;word-break:break-word;margin-top:2px">${he(b.model_name)}</div>
+            <div style="margin-top:3px">${lobBadgeHtml(b.lob)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">
+            <div style="text-align:center;font-size:10px;font-weight:700;color:${textColor};background:${simBg};border-radius:4px;padding:2px 0">${pct} khớp</div>
+            <button class="dup-merge-btn" data-src="${he(b.sku)}" data-dst="${he(a.sku)}" data-pair="${he(pairKey)}"
+              style="font-size:10px;padding:3px 6px;background:#f0f9ff;border:1px solid #7dd3fc;border-radius:4px;cursor:pointer;color:#0369a1;text-align:left;line-height:1.35">
+              ✓ Giữ <b>${he(a.sku)}</b>
+            </button>
+            <button class="dup-merge-btn" data-src="${he(a.sku)}" data-dst="${he(b.sku)}" data-pair="${he(pairKey)}"
+              style="font-size:10px;padding:3px 6px;background:#f0f9ff;border:1px solid #7dd3fc;border-radius:4px;cursor:pointer;color:#0369a1;text-align:left;line-height:1.35">
+              ✓ Giữ <b>${he(b.sku)}</b>
+            </button>
+            <button class="dup-ignore-btn" data-pair="${he(pairKey)}"
+              style="font-size:10px;padding:3px 6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;color:#9ca3af;text-align:center">
+              Bỏ qua
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+
+      return `<details open style="border:1px solid ${border};border-radius:8px;overflow:hidden;margin-bottom:12px">
+        <summary style="cursor:pointer;padding:10px 14px;background:${bg};font-weight:600;font-size:13px;color:${textColor};user-select:none;list-style:none">
+          ${emoji} ${label} — ${pairs.length} cặp
+        </summary>
+        <div>${rows || `<div style="padding:12px;color:#9ca3af;font-size:12px;text-align:center">Không có cặp nào.</div>`}</div>
+      </details>`;
+    }
+
+    document.getElementById('detectDupSkuBtn')?.addEventListener('click', async () => {
+      const modal     = document.getElementById('dupDetectModal');
+      const statusEl  = document.getElementById('dupDetectStatus');
+      const contentEl = document.getElementById('dupDetectContent');
+      const summaryEl = document.getElementById('dupDetectSummary');
+      const resultsEl = document.getElementById('dupDetectResults');
+
+      modal?.classList.remove('hidden');
+      contentEl?.classList.add('hidden');
+      statusEl.innerHTML = '<span style="color:#5e6f8a">⏳ Đang tải và phân tích dữ liệu sản phẩm...</span>';
+      statusEl.style.display = '';
+
+      try {
+        const { total, level1, level2, level3 } = await runDupDetection();
+        const totalPairs = level1.length + level2.length + level3.length;
+
+        statusEl.style.display = 'none';
+        summaryEl.innerHTML = [
+          `<span style="padding:6px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;color:#991b1b;font-weight:600">🔴 Chắc chắn trùng: ${level1.length} cặp</span>`,
+          `<span style="padding:6px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;font-size:12px;color:#92400e;font-weight:600">🟡 Có thể trùng: ${level2.length} cặp</span>`,
+          `<span style="padding:6px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;font-size:12px;color:#1e40af;font-weight:600">🔵 Nghi ngờ: ${level3.length} cặp</span>`,
+          `<span style="padding:6px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;color:#6b7280">${total} sản phẩm đã phân tích</span>`,
+        ].join('');
+
+        let html = '';
+        if (level1.length) html += renderDupSection('🔴', 'Trùng chính xác (normalized name)', 'red',    level1);
+        if (level2.length) html += renderDupSection('🟡', 'Có thể trùng (≥85% token khớp)',   'yellow', level2);
+        if (level3.length) html += renderDupSection('🔵', 'Nghi ngờ trùng (SKU tiền tố)',      'blue',   level3);
+        if (!totalPairs)   html  = '<div style="padding:32px;text-align:center;color:#059669;font-size:14px;font-weight:600">✅ Không phát hiện SKU trùng lặp nào!</div>';
+        resultsEl.innerHTML = html;
+        contentEl?.classList.remove('hidden');
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:#b30012">Lỗi phân tích: ${err.message}</span>`;
+      }
+    });
+
+    document.getElementById('closeDupDetectBtn')?.addEventListener('click', () => {
+      document.getElementById('dupDetectModal')?.classList.add('hidden');
+    });
+
+    // Delegate merge & ignore clicks inside modal
+    document.getElementById('dupDetectModal')?.addEventListener('click', async (e) => {
+      const mergeBtn = e.target.closest('.dup-merge-btn');
+      if (mergeBtn && !mergeBtn.disabled) {
+        const srcSku = mergeBtn.dataset.src, dstSku = mergeBtn.dataset.dst;
+        if (!confirm(`Gộp "${srcSku}" vào "${dstSku}"?\n\n• Toàn bộ tồn kho + mã NPP của "${srcSku}" chuyển sang "${dstSku}"\n• SKU "${srcSku}" sẽ bị xoá`)) return;
+        const row = mergeBtn.closest('.dup-row');
+        mergeBtn.disabled = true; mergeBtn.textContent = '⌛ Đang gộp...';
+        try {
+          await mergeProducts(srcSku, dstSku);
+          row?.remove();
+          showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
+        } catch (err) {
+          mergeBtn.disabled = false; mergeBtn.textContent = '⚠ Lỗi';
+          showMsiToast('Lỗi gộp: ' + err.message);
+        }
+        return;
+      }
+      const ignBtn = e.target.closest('.dup-ignore-btn');
+      if (ignBtn) {
+        const pairKey = ignBtn.dataset.pair;
+        const idx = pairKey.lastIndexOf(':');
+        dupAddIgnored(pairKey.slice(0, idx), pairKey.slice(idx + 1));
+        ignBtn.closest('.dup-row')?.remove();
+      }
     });
 
     // ── Import tồn kho từ Excel NPP — 8 NPP (DGW/SPC/KTC/NWH/MAI HOANG/AD/
