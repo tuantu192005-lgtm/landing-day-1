@@ -2292,6 +2292,11 @@
                     <thead><tr><th>NPP</th><th>Tuần gần nhất</th><th class="kpi-col-num">Closing</th></tr></thead>
                     <tbody id="productInventoryTableBody"></tbody>
                   </table>
+                  <div style="margin-top:12px;text-align:right">
+                    <button type="button" id="viewDistyInvBtn" class="btn-secondary" style="font-size:12px">
+                      Xem chi tiết tồn kho NPP →
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2343,30 +2348,63 @@
       </section>
 
       <section class="msi-tab-pane" id="tab-disty-inventory">
-        <div class="msi-panel">
-          <h3>Tồn kho theo NPP</h3>
-          <p class="msi-panel-note">
-            <span class="inv-status out">🔴 Hết</span> ·
-            <span class="inv-status low">🟡 Sắp hết</span> ·
-            <span class="inv-status ok">🟢 Còn</span> ·
-            dòng nền <span class="inv-legend-low">đỏ</span> = tồn ≤ safety stock,
-            nền <span class="inv-legend-over">cam</span> = tồn > 3× safety stock.
-          </p>
+        <!-- Filter bar riêng -->
+        <div style="display:flex;gap:10px;align-items:center;padding:12px 0;flex-wrap:wrap">
+          <input type="text" id="diInvSearch" placeholder="Tìm SKU / tên model..."
+            style="flex:1;min-width:180px;max-width:260px;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px" />
+          <select id="diInvLob" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff">
+            <option value="">Tất cả LOB</option>
+            <option>VGA</option><option>MB</option><option>MNT</option><option>PSU</option>
+            <option>CASE</option><option>COOLER</option><option>SSD</option><option>GG</option>
+            <option>DESKTOP</option><option>MINIPC</option><option>GDT</option><option>SERVER</option>
+          </select>
+          <select id="diInvNpp" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff">
+            <option value="">Tất cả NPP</option>
+            <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option>
+            <option>MAI HOANG</option><option>AD</option><option>PSD</option><option>MEKO</option>
+          </select>
+          <select id="diInvStatus" style="padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff">
+            <option value="">Tất cả trạng thái</option>
+            <option value="old">🔴 Tồn lâu</option>
+            <option value="watch">🟡 Cần theo dõi</option>
+            <option value="normal">🟢 Bình thường</option>
+            <option value="new">⚪ Mới</option>
+          </select>
+          <span id="diInvCountBadge" style="font-size:12px;color:#6b7280;white-space:nowrap"></span>
+          <button type="button" id="diInvRefreshBtn"
+            style="padding:7px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;color:#374151">↺ Tải lại</button>
+        </div>
+
+        <!-- Bảng tồn kho -->
+        <div class="msi-panel" style="margin-bottom:16px">
           <div class="table-wrapper">
-            <table class="target-table inventory-table">
+            <table class="target-table" style="font-size:12px">
               <thead>
                 <tr>
-                  <th>SKU</th>
-                  <th>Tên</th>
-                  <th>Category</th>
-                  <th>Kho/NPP</th>
-                  <th class="kpi-col-num">Tồn kho</th>
-                  <th class="kpi-col-num">Safety Stock</th>
-                  <th>Trạng thái</th>
+                  <th style="width:120px">SKU</th>
+                  <th>Tên model</th>
+                  <th style="width:70px">LOB</th>
+                  <th style="width:90px">NPP</th>
+                  <th class="kpi-col-num" style="width:100px">Closing</th>
+                  <th style="width:100px">Tuần BG</th>
+                  <th style="width:130px">Cảnh báo</th>
                 </tr>
               </thead>
-              <tbody id="inventoryTableBody"></tbody>
+              <tbody id="diInvTableBody"></tbody>
             </table>
+          </div>
+          <div id="diInvPagination" style="display:flex;gap:8px;padding:10px 0;align-items:center"></div>
+        </div>
+
+        <!-- 2 biểu đồ -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="msi-panel">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:600;color:#1a2b4c">Top 10 SKU tồn nhiều nhất</h4>
+            <div style="position:relative;height:260px"><canvas id="diChartTop10Qty"></canvas></div>
+          </div>
+          <div class="msi-panel">
+            <h4 style="margin:0 0 12px;font-size:13px;font-weight:600;color:#1a2b4c">Top 10 SKU tồn lâu nhất</h4>
+            <div style="position:relative;height:260px"><canvas id="diChartTop10Age"></canvas></div>
           </div>
         </div>
       </section>
@@ -2535,7 +2573,7 @@
       return { ...msiFilters };
     }
 
-    const TABS_NO_FILTER = new Set(['tab-products']);
+    const TABS_NO_FILTER = new Set(['tab-products', 'tab-disty-inventory']);
 
     function initMsiTabs() {
       document.querySelectorAll('.msi-menu-btn').forEach((btn) => {
@@ -2564,6 +2602,33 @@
           document.dispatchEvent(new CustomEvent('msi:filters-changed', { detail: getMsiFilters() }));
           reloadActiveTab();
         });
+      });
+
+      // Disty Inventory local filters
+      ['diInvLob', 'diInvNpp', 'diInvStatus'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', () => {
+          _diFilters.lob    = document.getElementById('diInvLob')?.value    || '';
+          _diFilters.npp    = document.getElementById('diInvNpp')?.value    || '';
+          _diFilters.status = document.getElementById('diInvStatus')?.value || '';
+          _diPage = 0;
+          applyDiFiltersAndRender();
+        });
+      });
+      document.getElementById('diInvSearch')?.addEventListener('input', () => {
+        _diFilters.search = document.getElementById('diInvSearch')?.value.trim() || '';
+        _diPage = 0;
+        applyDiFiltersAndRender();
+      });
+      document.getElementById('diInvPagination')?.addEventListener('click', e => {
+        const btn = e.target.closest('.di-page-btn');
+        if (!btn || btn.disabled) return;
+        _diPage += parseInt(btn.dataset.dir, 10);
+        applyDiFiltersAndRender();
+      });
+      document.getElementById('diInvRefreshBtn')?.addEventListener('click', () => loadInventoryTab());
+      document.getElementById('viewDistyInvBtn')?.addEventListener('click', () => {
+        const sku = document.getElementById('productDetailTitle')?.dataset.sku || '';
+        if (sku) switchToDistyInventory(sku);
       });
     }
 
@@ -4364,49 +4429,219 @@
       CASE: 'chassis', COOLER: 'cooling', SSD: 'ssd'
     };
 
+    // ── Disty Inventory tab ──────────────────────────────────────────────────
+    let _diAllRows = [], _diFilters = { search: '', lob: '', npp: '', status: '' };
+    let _diPage = 0, _diChartQty = null, _diChartAge = null;
+    const DI_PAGE_SIZE = 50;
+
     async function loadInventoryTab() {
-      const tbody = document.getElementById('inventoryTableBody');
-      if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="7">Đang tải...</td></tr>';
+      _diAllRows = []; _diPage = 0;
+      const tbody = document.getElementById('diInvTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#5e6f8a">⏳ Đang tải dữ liệu...</td></tr>';
+      const countEl = document.getElementById('diInvCountBadge');
+      if (countEl) countEl.textContent = '';
 
-      let query = sb.from('inventory').select('stock_on_hand, safety_stock, warehouse, products(sku, name, category)');
-      if (msiFilters.npp) query = query.eq('warehouse', msiFilters.npp);
+      try {
+        // 1. Get distinct recent week_dates
+        const { data: wkData, error: wkErr } = await sb.from('disty_inventory')
+          .select('week_date').order('week_date', { ascending: false }).limit(200);
+        if (wkErr) throw new Error(wkErr.message);
+        const weeks = [...new Set((wkData || []).map(r => r.week_date))];
+        if (!weeks.length) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.</td></tr>';
+          return;
+        }
+        const latestWeek = weeks[0], compareWeek = weeks[4] || null;
 
-      const { data, error } = await query.order('stock_on_hand', { ascending: false });
-      if (error) {
-        console.warn('[loadInventoryTab]', error.message);
-        tbody.innerHTML = '<tr><td colspan="7">Lỗi tải dữ liệu tồn kho.</td></tr>';
-        return;
+        // 2. Fetch current week (all rows, paginated)
+        const currentRows = [];
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await sb.from('disty_inventory')
+            .select('sku, disty, closing').eq('week_date', latestWeek).not('sku', 'is', null)
+            .range(from, from + 999);
+          if (error) throw new Error(error.message);
+          if (!data?.length) break;
+          currentRows.push(...data);
+          if (data.length < 1000) break;
+        }
+
+        // 3. Fetch 4-weeks-ago closing for comparison
+        const compareMap = {};
+        if (compareWeek) {
+          for (let from = 0; ; from += 1000) {
+            const { data } = await sb.from('disty_inventory')
+              .select('sku, disty, closing').eq('week_date', compareWeek).not('sku', 'is', null)
+              .range(from, from + 999);
+            if (!data?.length) break;
+            for (const r of data) compareMap[`${r.sku}:${r.disty}`] = r.closing ?? 0;
+            if (data.length < 1000) break;
+          }
+        }
+
+        // 4. Fetch products_master info
+        const productMap = {};
+        const skuArr = [...new Set(currentRows.map(r => r.sku))];
+        for (let i = 0; i < skuArr.length; i += 500) {
+          const { data } = await sb.from('products_master')
+            .select('sku, model_name, lob').in('sku', skuArr.slice(i, i + 500));
+          for (const p of data || []) productMap[p.sku] = p;
+        }
+
+        // 5. Build + classify rows
+        const SO = { old: 0, watch: 1, normal: 2, new: 3 };
+        _diAllRows = currentRows.map(r => {
+          const pm = productMap[r.sku];
+          if (!pm) return null;
+          const now = r.closing ?? 0;
+          const old = compareMap[`${r.sku}:${r.disty}`];
+          let code, label;
+          if (old === undefined)   { code = 'new';    label = '⚪ Mới'; }
+          else if (old <= 0)       { code = 'normal'; label = '🟢 Bình thường'; }
+          else {
+            const ratio = now / old;
+            if (ratio >= 0.80)      { code = 'old';    label = '🔴 Tồn lâu'; }
+            else if (ratio >= 0.70) { code = 'watch';  label = '🟡 Cần theo dõi'; }
+            else                    { code = 'normal'; label = '🟢 Bình thường'; }
+          }
+          return {
+            sku: r.sku, model_name: pm.model_name || '—', lob: pm.lob || '—',
+            disty: r.disty, closing: now, week_date: latestWeek, code, label,
+            ratio: (old > 0) ? now / old : null
+          };
+        }).filter(Boolean).sort((a, b) => {
+          const sd = (SO[a.code] || 0) - (SO[b.code] || 0);
+          return sd !== 0 ? sd : b.closing - a.closing;
+        });
+
+        applyDiFiltersAndRender();
+      } catch (err) {
+        const tb = document.getElementById('diInvTableBody');
+        if (tb) tb.innerHTML = `<tr><td colspan="7" style="color:#b30012;padding:16px">Lỗi: ${err.message}</td></tr>`;
       }
-
-      let rows = data || [];
-      if (msiFilters.lob) {
-        const cat = LOB_TO_CATEGORY[msiFilters.lob];
-        rows = cat ? rows.filter((r) => r.products?.category?.toLowerCase() === cat) : [];
-      }
-
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Không có dữ liệu tồn kho phù hợp.</div></td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map((r) => {
-        const qty = r.stock_on_hand ?? 0;
-        const min = r.safety_stock ?? 0;
-        const statusClass = qty === 0 ? 'out' : qty <= min ? 'low' : 'ok';
-        const statusLabel = qty === 0 ? '🔴 Hết' : qty <= min ? '🟡 Sắp hết' : '🟢 Còn';
-        const rowClass = qty <= min ? 'inv-row-low' : (min > 0 && qty > min * 3) ? 'inv-row-over' : '';
-        return `<tr class="${rowClass}">
-          <td>${r.products?.sku ?? '—'}</td>
-          <td>${r.products?.name ?? '—'}</td>
-          <td>${r.products?.category ?? '—'}</td>
-          <td>${r.warehouse ?? '—'}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(qty)}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(min)}</td>
-          <td><span class="inv-status ${statusClass}">${statusLabel}</span></td>
-        </tr>`;
-      }).join('');
     }
+
+    function applyDiFiltersAndRender() {
+      let rows = _diAllRows;
+      const q = (_diFilters.search || '').toLowerCase();
+      if (q)                  rows = rows.filter(r => r.sku.toLowerCase().includes(q) || r.model_name.toLowerCase().includes(q));
+      if (_diFilters.lob)     rows = rows.filter(r => r.lob === _diFilters.lob);
+      if (_diFilters.npp)     rows = rows.filter(r => r.disty === _diFilters.npp);
+      if (_diFilters.status)  rows = rows.filter(r => r.code === _diFilters.status);
+
+      const countEl = document.getElementById('diInvCountBadge');
+      if (countEl) countEl.textContent = `${rows.length} dòng`;
+
+      const total = rows.length, totalPages = Math.max(1, Math.ceil(total / DI_PAGE_SIZE));
+      if (_diPage >= totalPages) _diPage = totalPages - 1;
+      const pageRows = rows.slice(_diPage * DI_PAGE_SIZE, (_diPage + 1) * DI_PAGE_SIZE);
+
+      // Render table rows
+      const tbody = document.getElementById('diInvTableBody');
+      if (tbody) {
+        if (!pageRows.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9ca3af">Không có dữ liệu phù hợp với bộ lọc.</td></tr>';
+        } else {
+          const he = escapeHtmlForDistyReport;
+          tbody.innerHTML = pageRows.map(r => {
+            const bg = r.code === 'old' ? '#fff5f5' : r.code === 'watch' ? '#fffbeb' : '';
+            return `<tr style="cursor:pointer${bg ? ';background:' + bg : ''}" onclick="switchToProductDetail('${he(r.sku)}')">
+              <td><code style="font-size:11px;font-weight:600">${he(r.sku)}</code></td>
+              <td style="font-size:12px">${he(r.model_name)}</td>
+              <td>${lobBadgeHtml(r.lob)}</td>
+              <td style="font-size:11px;color:#374151">${he(r.disty)}</td>
+              <td class="kpi-col-num" style="font-size:12px">${fmtQtyMsi(r.closing)}</td>
+              <td style="font-size:11px;color:#6b7280">${r.week_date}</td>
+              <td style="font-size:12px">${r.label}</td>
+            </tr>`;
+          }).join('');
+        }
+      }
+
+      // Render pagination
+      const pagEl = document.getElementById('diInvPagination');
+      if (pagEl) {
+        if (totalPages <= 1) { pagEl.innerHTML = ''; } else {
+          pagEl.innerHTML = `
+            <button class="di-page-btn" data-dir="-1" ${_diPage === 0 ? 'disabled' : ''}
+              style="padding:5px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:#fff;color:#374151">← Trang trước</button>
+            <span style="font-size:12px;color:#6b7280">Trang ${_diPage + 1} / ${totalPages} &nbsp;·&nbsp; ${total} dòng</span>
+            <button class="di-page-btn" data-dir="1" ${_diPage >= totalPages - 1 ? 'disabled' : ''}
+              style="padding:5px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:#fff;color:#374151">Trang sau →</button>`;
+        }
+      }
+
+      renderDiCharts(rows);
+    }
+
+    function renderDiCharts(rows) {
+      const top10Qty = [...rows].sort((a, b) => b.closing - a.closing).slice(0, 10).reverse();
+      const ctx1 = document.getElementById('diChartTop10Qty')?.getContext('2d');
+      if (ctx1) {
+        if (_diChartQty) { _diChartQty.destroy(); _diChartQty = null; }
+        _diChartQty = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: top10Qty.map(r => `${r.sku}·${r.disty}`),
+            datasets: [{ data: top10Qty.map(r => r.closing), backgroundColor: '#3b82f6', borderRadius: 3, label: 'Closing' }]
+          },
+          options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } }
+          }
+        });
+      }
+
+      const top10Age = [...rows]
+        .filter(r => r.ratio !== null && r.code !== 'normal' && r.code !== 'new')
+        .sort((a, b) => (b.ratio || 0) - (a.ratio || 0)).slice(0, 10).reverse();
+      const ctx2 = document.getElementById('diChartTop10Age')?.getContext('2d');
+      if (ctx2) {
+        if (_diChartAge) { _diChartAge.destroy(); _diChartAge = null; }
+        _diChartAge = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: top10Age.map(r => `${r.sku}·${r.disty}`),
+            datasets: [{
+              data: top10Age.map(r => Math.round((r.ratio || 0) * 100)),
+              backgroundColor: top10Age.map(r => r.code === 'old' ? '#ef4444' : '#f59e0b'),
+              borderRadius: 3, label: '% tồn vs 4 tuần trước'
+            }]
+          },
+          options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { min: 0, max: 150, ticks: { font: { size: 10 }, callback: v => v + '%' } },
+              y: { ticks: { font: { size: 10 } } }
+            }
+          }
+        });
+      }
+    }
+
+    function switchToProductDetail(sku) {
+      document.querySelectorAll('.msi-menu-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.msi-tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelector('[data-tab="tab-products"]')?.classList.add('active');
+      document.getElementById('tab-products')?.classList.add('active');
+      document.getElementById('msiFilterBar')?.classList.add('hidden');
+      openProductDetail(sku);
+    }
+
+    function switchToDistyInventory(sku) {
+      document.querySelectorAll('.msi-menu-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.msi-tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelector('[data-tab="tab-disty-inventory"]')?.classList.add('active');
+      document.getElementById('tab-disty-inventory')?.classList.add('active');
+      document.getElementById('msiFilterBar')?.classList.add('hidden');
+      const searchEl = document.getElementById('diInvSearch');
+      if (searchEl) searchEl.value = sku;
+      _diFilters = { search: sku, lob: '', npp: '', status: '' };
+      _diPage = 0;
+      loadInventoryTab();
+    }
+
     tabLoaders['tab-disty-inventory'] = loadInventoryTab;
 
     // ══════════════════ Tab "Sản phẩm" ══════════════════
@@ -4638,7 +4873,9 @@
         return;
       }
       currentProductData = data;
-      document.getElementById('productDetailTitle').textContent = `${data.sku} — ${data.model_name}`;
+      const titleEl = document.getElementById('productDetailTitle');
+      titleEl.textContent = `${data.sku} — ${data.model_name}`;
+      titleEl.dataset.sku = data.sku;
       document.getElementById('editProductBtn')?.classList.toggle('hidden', !isProductsAdmin());
       document.getElementById('mergeWithBtn')?.classList.toggle('hidden', !isProductsAdmin());
       const editSkuBtn = isProductsAdmin()
