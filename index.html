@@ -2414,6 +2414,20 @@
 
   <div class="msi-toast" id="msiToast"></div>
 
+  <!-- Import report modal: 3-tier (lỗi / cảnh báo / thông tin) -->
+  <div id="importReportModal" class="hidden" style="position:fixed;inset:0;z-index:10000;background:rgba(10,26,60,0.55);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:12px;padding:24px 28px;max-width:700px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 12px 48px rgba(10,26,60,0.3)">
+      <h2 style="margin:0 0 18px;font-size:15px;font-weight:700;color:#1a2b4c">Báo cáo kiểm tra file import</h2>
+      <div id="importReportErrors"></div>
+      <div id="importReportWarnings"></div>
+      <div id="importReportInfo"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px">
+        <button type="button" id="importConfirmBtn" class="btn-primary hidden" style="padding:10px 22px;font-size:13px">Xác nhận import</button>
+        <button type="button" id="importCancelReportBtn" class="btn-secondary" style="padding:10px 22px;font-size:13px">Huỷ import</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -5274,24 +5288,173 @@
       return map;
     }
 
-    async function importDistySheet(disty, sheetName, rows, normToSku) {
+    // ─── PARSE PHASE (không ghi DB) ──────────────────────────────────────────
+
+    function parseDistySheetSync(disty, sheetName, rows) {
       const rule = DISTY_RULES[disty];
       const items = dedupeDistyItemsByCode(rule.parser(rows).filter(it => !isLaptopDistyItem(it)));
-      if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };
-
       let fallbackWeekDate = null;
+      let weekDateMissing = false;
       if (!rule.perRowDate) {
-        fallbackWeekDate = findWeekDateForDisty(rows, rule.headerRows) || new Date().toISOString().slice(0, 10);
+        fallbackWeekDate = findWeekDateForDisty(rows, rule.headerRows) || null;
+        weekDateMissing = !fallbackWeekDate;
+      }
+      return { disty, sheetName, items, fallbackWeekDate, weekDateMissing, rule };
+    }
+
+    async function checkExistingInventoryWeeks(parsedList) {
+      const existing = new Set();
+      for (const p of parsedList) {
+        if (!p.items.length) continue;
+        const weeks = [...new Set(p.items.map(it => it.rowDate || p.fallbackWeekDate).filter(Boolean))];
+        for (const week_date of weeks) {
+          const { data } = await sb.from('disty_inventory')
+            .select('id').eq('disty', p.disty).eq('week_date', week_date).limit(1);
+          if (data && data.length) existing.add(`${p.disty}:${week_date}`);
+        }
+      }
+      return existing;
+    }
+
+    function buildImportReport(parsedList, existingWeeks, skippedSheets, normToSku) {
+      const errors = [];
+      const warnings = [];
+      const infos = [];
+      const he = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+      if (!parsedList.length) {
+        errors.push(`Không nhận diện được sheet NPP nào. Sheet trong file: <em>${he(skippedSheets.join(', ') || '(không có)')}</em>. Cần đặt tên sheet đúng NPP: DGW / SPC / KTC / NWH / MAI HOANG / AD / PSD / MEKO.`);
+        return { errors, warnings, infos };
+      }
+      if (skippedSheets.length) {
+        warnings.push(`Sheet không khớp tên NPP (bỏ qua): ${skippedSheets.map(he).join(', ')}`);
       }
 
-      // 1. Upsert product_disty_codes — giữ sku cũ nếu admin đã map.
-      const codeRows = items.map((it) => ({ disty, disty_code: it.disty_code, disty_name: it.disty_name }));
+      for (const { disty, items, fallbackWeekDate, weekDateMissing, rule } of parsedList) {
+        // Tier 1: invalid date
+        if (!rule.perRowDate && weekDateMissing) {
+          errors.push(`[${he(disty)}] Không đọc được ngày tuần (week_date) từ header file. Kiểm tra lại định dạng.`);
+        }
+        // Tier 1: negative quantities
+        for (const it of items) {
+          const cl = (it.closing != null) ? Number(it.closing) : NaN;
+          const op = (it.opening != null) ? Number(it.opening) : NaN;
+          if (!isNaN(cl) && cl < 0)
+            errors.push(`[${he(disty)}] Số lượng closing âm: <em>${he(it.disty_name)}</em> = <strong>${cl}</strong>`);
+          else if (!isNaN(op) && op < 0)
+            errors.push(`[${he(disty)}] Số lượng opening âm: <em>${he(it.disty_name)}</em> = <strong>${op}</strong>`);
+        }
+
+        // Tier 2: too few rows
+        if (items.length > 0 && items.length < 5) {
+          warnings.push(`[${he(disty)}] Ít dữ liệu bất thường: chỉ có <strong>${items.length}</strong> dòng — có thể file bị thiếu hoặc lỗi.`);
+        }
+        // Tier 2: existing weeks (will be overwritten)
+        const allWeeks = [...new Set(items.map(it => it.rowDate || fallbackWeekDate).filter(Boolean))];
+        const dupWeeks = allWeeks.filter(w => existingWeeks.has(`${disty}:${w}`));
+        if (dupWeeks.length) {
+          const cnt = items.filter(it => dupWeeks.includes(it.rowDate || fallbackWeekDate)).length;
+          warnings.push(`[${he(disty)}] Tuần <strong>${dupWeeks.map(he).join(', ')}</strong> đã có trong DB — <strong>${cnt}</strong> dòng tồn kho sẽ bị ghi đè.`);
+        }
+        // Tier 2: new products not in DB
+        const newProds = items.filter(it => !normToSku.has(normalizeModelName(it.disty_name)));
+        if (newProds.length) {
+          const list = newProds.slice(0, 8).map(it => `<li>${he(it.disty_name)}</li>`).join('');
+          const more = newProds.length > 8 ? `<li><em>... và ${newProds.length - 8} sản phẩm khác</em></li>` : '';
+          warnings.push(`[${he(disty)}] <strong>${newProds.length}</strong> sản phẩm mới chưa có trong DB:<ul style="margin:4px 0 0 16px;padding:0">${list}${more}</ul>`);
+        }
+
+        // Tier 3: info summary
+        const mapped = items.filter(it => normToSku.has(normalizeModelName(it.disty_name))).length;
+        infos.push({ disty, read: items.length, mapped, unmapped: items.length - mapped, newCount: newProds.length, weeks: allWeeks.join(', ') || '?' });
+      }
+
+      return { errors, warnings, infos };
+    }
+
+    function renderImportReportModal(report, hasErrors) {
+      const he = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+      // Tier 1: Errors (red)
+      const errEl = document.getElementById('importReportErrors');
+      if (report.errors.length) {
+        errEl.innerHTML = `<details open style="border:1px solid #fca5a5;border-radius:8px;overflow:hidden;margin-bottom:12px">
+          <summary style="cursor:pointer;padding:10px 14px;background:#fef2f2;font-weight:600;color:#991b1b;user-select:none">
+            🔴 Lỗi cần sửa — ${report.errors.length} lỗi (import bị chặn)
+          </summary>
+          <div style="padding:8px 14px;background:#fff5f5">
+            ${report.errors.map(e => `<div style="padding:5px 0;border-bottom:1px solid #fee2e2;font-size:13px;color:#7f1d1d">• ${e}</div>`).join('')}
+          </div>
+        </details>`;
+      } else errEl.innerHTML = '';
+
+      // Tier 2: Warnings (yellow)
+      const warnEl = document.getElementById('importReportWarnings');
+      if (report.warnings.length) {
+        warnEl.innerHTML = `<details open style="border:1px solid #fcd34d;border-radius:8px;overflow:hidden;margin-bottom:12px">
+          <summary style="cursor:pointer;padding:10px 14px;background:#fffbeb;font-weight:600;color:#92400e;user-select:none">
+            ⚠️ Cảnh báo — ${report.warnings.length} mục (cần xác nhận)
+          </summary>
+          <div style="padding:8px 14px;background:#fefce8">
+            ${report.warnings.map(w => `<div style="padding:5px 0;border-bottom:1px solid #fde68a;font-size:13px;color:#78350f">• ${w}</div>`).join('')}
+          </div>
+        </details>`;
+      } else warnEl.innerHTML = '';
+
+      // Tier 3: Info (blue)
+      const infoEl = document.getElementById('importReportInfo');
+      if (report.infos.length) {
+        const rows = report.infos.map(info => `
+          <tr style="border-bottom:1px solid #bae6fd">
+            <td style="padding:6px 10px;font-weight:600;color:#1e40af">${he(info.disty)}</td>
+            <td style="padding:6px 10px;text-align:right">${info.read}</td>
+            <td style="padding:6px 10px;text-align:right;color:#059669">${info.mapped}</td>
+            <td style="padding:6px 10px;text-align:right;color:${info.newCount > 0 ? '#d97706' : '#6b7280'}">${info.newCount}</td>
+            <td style="padding:6px 10px;font-size:12px;color:#6b7280">${he(info.weeks)}</td>
+          </tr>`).join('');
+        const totalRead = report.infos.reduce((s, i) => s + i.read, 0);
+        infoEl.innerHTML = `<details open style="border:1px solid #93c5fd;border-radius:8px;overflow:hidden;margin-bottom:12px">
+          <summary style="cursor:pointer;padding:10px 14px;background:#eff6ff;font-weight:600;color:#1e40af;user-select:none">
+            ℹ️ Thông tin — ${report.infos.length} NPP, ${totalRead} dòng tổng cộng
+          </summary>
+          <div style="padding:8px 14px;background:#f0f9ff">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr style="color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:2px solid #bae6fd">
+                <th style="padding:4px 10px;text-align:left">NPP</th>
+                <th style="padding:4px 10px;text-align:right">Đọc được</th>
+                <th style="padding:4px 10px;text-align:right">Map SKU</th>
+                <th style="padding:4px 10px;text-align:right">SP mới</th>
+                <th style="padding:4px 10px;text-align:left">Tuần</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </details>`;
+      } else infoEl.innerHTML = '';
+
+      // Nút: nếu có lỗi chỉ hiện Huỷ; nếu không có lỗi hiện thêm nút Xác nhận/Tiếp tục
+      const confirmBtn = document.getElementById('importConfirmBtn');
+      if (confirmBtn) {
+        confirmBtn.classList.toggle('hidden', hasErrors);
+        confirmBtn.textContent = report.warnings.length ? 'Tiếp tục import' : 'Xác nhận import';
+      }
+      document.getElementById('importReportModal')?.classList.remove('hidden');
+    }
+
+    // ─── SAVE PHASE (ghi DB — chỉ gọi sau khi user xác nhận) ────────────────
+
+    async function saveDistySheetData(p, normToSku) {
+      const { disty, items, fallbackWeekDate } = p;
+      if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };
+
+      // 1. Upsert product_disty_codes
+      const codeRows = items.map(it => ({ disty, disty_code: it.disty_code, disty_name: it.disty_name }));
       const { error: codeErr } = await sb.from('product_disty_codes').upsert(codeRows, { onConflict: 'disty,disty_code' });
       if (codeErr) throw new Error(`[${disty}] Lỗi upsert product_disty_codes: ${codeErr.message}`);
 
-      // 1b. Auto-link: nếu normalized_name khớp sản phẩm đã có → gán sku (chỉ khi IS NULL)
+      // 1b. Auto-link: normalized_name khớp → gán sku (chỉ khi IS NULL)
       if (normToSku) {
-        const autoLinks = new Map(); // newSku → [disty_code, ...]
+        const autoLinks = new Map();
         for (const it of items) {
           const norm = normalizeModelName(it.disty_name);
           const existing = normToSku.get(norm);
@@ -5302,27 +5465,21 @@
         }
         for (const [sku, dcodes] of autoLinks) {
           const { error } = await sb.from('product_disty_codes')
-            .update({ sku })
-            .eq('disty', disty)
-            .in('disty_code', dcodes)
-            .is('sku', null);
+            .update({ sku }).eq('disty', disty).in('disty_code', dcodes).is('sku', null);
           if (error) console.warn(`[${disty}] auto-link error: ${error.message}`);
         }
       }
 
-      // 2. Tra lại sku đã map theo (disty, disty_code)
-      const codes = items.map((it) => it.disty_code);
+      // 2. Tra lại sku đã map
+      const codes = items.map(it => it.disty_code);
       const { data: mapRows, error: mapErr } = await sb
-        .from('product_disty_codes')
-        .select('disty_code, sku')
-        .eq('disty', disty)
-        .in('disty_code', codes);
+        .from('product_disty_codes').select('disty_code, sku').eq('disty', disty).in('disty_code', codes);
       if (mapErr) throw new Error(`[${disty}] Lỗi đọc product_disty_codes: ${mapErr.message}`);
       const skuByCode = {};
-      (mapRows || []).forEach((r) => { skuByCode[r.disty_code] = r.sku; });
+      (mapRows || []).forEach(r => { skuByCode[r.disty_code] = r.sku; });
 
-      // 3. Upsert disty_inventory — sku=NULL nếu chưa map.
-      const invRows = items.map((it) => ({
+      // 3. Upsert disty_inventory
+      const invRows = items.map(it => ({
         sku: skuByCode[it.disty_code] || null,
         disty,
         week_date: it.rowDate || fallbackWeekDate,
@@ -5334,7 +5491,7 @@
       const { error: invErr } = await sb.from('disty_inventory').upsert(invRows, { onConflict: 'sku,disty,week_date' });
       if (invErr) throw new Error(`[${disty}] Lỗi upsert disty_inventory: ${invErr.message}`);
 
-      const mapped = items.filter((it) => skuByCode[it.disty_code]).length;
+      const mapped = items.filter(it => skuByCode[it.disty_code]).length;
       return { disty, read: items.length, mapped, unmapped: items.length - mapped };
     }
 
@@ -5345,6 +5502,7 @@
     document.getElementById('importProductsBtn')?.addEventListener('click', () => {
       document.getElementById('importProductsInput')?.click();
     });
+
     document.getElementById('importProductsInput')?.addEventListener('change', async (event) => {
       const file = event.target.files[0];
       event.target.value = '';
@@ -5355,49 +5513,60 @@
       try {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: 'array' });
-        console.log('[importProducts] Sheet names đọc được từ file:', wb.SheetNames);
 
-        // Load normalized_name → sku map once for auto-linking during import
-        if (msgEl) { msgEl.textContent = 'Đang load danh sách sản phẩm để khớp tên...'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Đang load danh sách sản phẩm...'; msgEl.style.color = '#5e6f8a'; }
         const normToSku = await buildNormToSkuMap();
 
-        const report = [];
+        const parsedList = [];
         const skippedSheets = [];
         for (const sheetName of wb.SheetNames) {
           const disty = detectDistyFromSheetName(sheetName);
           if (!disty) { skippedSheets.push(sheetName); continue; }
           const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true });
-          if (sheetName.trim().toUpperCase() === 'DGW') {
-            console.log('[importProducts] 5 dòng đầu sheet DGW (raw):', rows.slice(0, 5));
-          }
-          console.log(`[importProducts] Sheet "${sheetName}" → NPP ${disty}, đọc thô ${rows.length} dòng.`);
-          report.push(await importDistySheet(disty, sheetName, rows, normToSku));
+          parsedList.push(parseDistySheetSync(disty, sheetName, rows));
         }
 
-        if (!report.length) {
-          if (msgEl) {
-            msgEl.textContent = 'Không nhận diện được sheet NPP nào trong file (cần đúng 1 trong 8 NPP: DGW/SPC/KTC/NWH/MAI HOANG/AD/PSD/MEKO).';
-            msgEl.style.color = '#b30012';
-          }
-          return;
+        if (msgEl) { msgEl.textContent = 'Đang kiểm tra dữ liệu...'; msgEl.style.color = '#5e6f8a'; }
+        const existingWeeks = await checkExistingInventoryWeeks(parsedList);
+        const report = buildImportReport(parsedList, existingWeeks, skippedSheets, normToSku);
+        const hasErrors = report.errors.length > 0;
+
+        window._importPending = hasErrors ? null : { parsedList, normToSku };
+        renderImportReportModal(report, hasErrors);
+        if (msgEl) msgEl.textContent = '';
+      } catch (err) {
+        if (msgEl) { msgEl.textContent = 'Lỗi đọc file: ' + err.message; msgEl.style.color = '#b30012'; }
+      }
+    });
+
+    document.getElementById('importConfirmBtn')?.addEventListener('click', async () => {
+      const pending = window._importPending;
+      if (!pending) return;
+      document.getElementById('importReportModal')?.classList.add('hidden');
+      const msgEl = document.getElementById('productsMessage');
+      if (msgEl) { msgEl.textContent = 'Đang lưu vào DB...'; msgEl.style.color = '#5e6f8a'; }
+      try {
+        const results = [];
+        for (const p of pending.parsedList) {
+          results.push(await saveDistySheetData(p, pending.normToSku));
         }
-
-        const totalRead = report.reduce((s, r) => s + r.read, 0);
-        const totalMapped = report.reduce((s, r) => s + r.mapped, 0);
-        const totalUnmapped = report.reduce((s, r) => s + r.unmapped, 0);
-
-        const lines = report.map((r) => `${escapeHtmlForDistyReport(r.disty)}: đọc ${r.read} dòng — map được ${r.mapped} — chưa map ${r.unmapped}`);
-        if (skippedSheets.length) lines.push(`Bỏ qua sheet không khớp NPP: ${skippedSheets.map(escapeHtmlForDistyReport).join(', ')}`);
-        lines.push(`<strong>Tổng: đọc ${totalRead} dòng — map được ${totalMapped} — chưa map ${totalUnmapped}</strong>`);
-        if (totalUnmapped > 0) lines.push(`${totalUnmapped} dòng chưa map được sku — cần admin map tay vào products_master.`);
-
-        if (msgEl) { msgEl.innerHTML = lines.join('<br>'); msgEl.style.color = '#1a2b4c'; }
-        showMsiToast(`Đã import ${totalRead} dòng tồn kho từ ${report.length} NPP`);
+        window._importPending = null;
+        const totalRead = results.reduce((s, r) => s + r.read, 0);
+        if (msgEl) {
+          msgEl.innerHTML = results.map(r => `${escapeHtmlForDistyReport(r.disty)}: ${r.read} dòng — map ${r.mapped} — chưa map ${r.unmapped}`).join('<br>');
+          msgEl.style.color = '#1a2b4c';
+        }
+        showMsiToast(`Đã import ${totalRead} dòng tồn kho từ ${results.length} NPP`);
         productsState.page = 0;
         await loadProductsList();
       } catch (err) {
-        if (msgEl) { msgEl.textContent = 'Lỗi đọc file Excel: ' + err.message; msgEl.style.color = '#b30012'; }
+        if (msgEl) { msgEl.textContent = 'Lỗi khi lưu vào DB: ' + err.message; msgEl.style.color = '#b30012'; }
       }
+    });
+
+    document.getElementById('importCancelReportBtn')?.addEventListener('click', () => {
+      document.getElementById('importReportModal')?.classList.add('hidden');
+      window._importPending = null;
     });
 
     // ══ SUPABASE AUTH ══════════════════════════════════════
