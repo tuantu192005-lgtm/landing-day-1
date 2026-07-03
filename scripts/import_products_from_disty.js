@@ -326,8 +326,9 @@ async function processSheet(disty, sheetName, rows) {
   const skuByCode = {};
   (mapRows || []).forEach((r) => { skuByCode[r.disty_code] = r.sku; });
 
-  // 3. Upsert disty_inventory — sku=NULL nếu chưa map.
+  // 3. Upsert disty_inventory — lưu disty_code để remap sku sau này
   const invRows = items.map((it) => ({
+    disty_code: it.disty_code,
     sku: skuByCode[it.disty_code] || null,
     disty,
     week_date: it.rowDate || fallbackWeekDate,
@@ -336,7 +337,7 @@ async function processSheet(disty, sheetName, rows) {
     sell_out: it.sell_out,
     closing: it.closing
   }));
-  const { error: invErr } = await sb.from('disty_inventory').upsert(invRows, { onConflict: 'sku,disty,week_date' });
+  const { error: invErr } = await sb.from('disty_inventory').upsert(invRows, { onConflict: 'disty_code,disty,week_date' });
   if (invErr) throw new Error(`[${disty}] Lỗi upsert disty_inventory: ${invErr.message}`);
 
   const mapped = items.filter((it) => skuByCode[it.disty_code]).length;
