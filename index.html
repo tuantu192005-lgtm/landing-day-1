@@ -4892,13 +4892,32 @@
       }
 
       // Kiểm tra sản phẩm tương tự sau khi sửa (chỉ khi đang EDIT, không phải ADD)
+      // Dùng ilike trên model_name rồi lọc JS-side — tránh phụ thuộc cột normalized_name
+      // có thể còn stale (NULL hoặc lower(trim) từ SQL patch cũ).
       if (origSku && normName) {
-        const { data: dupes } = await sb.from('products_master')
+        console.log('[suggest-merge] normName tính được:', JSON.stringify(normName));
+
+        // Từ khóa: ưu tiên từ có cả chữ lẫn số (mã model), fallback sang từ dài nhất
+        const normWords = normName.split(' ');
+        const keyWord = normWords.find(w => w.length >= 3 && /\d/.test(w) && /[a-z]/.test(w))
+          || normWords.find(w => w.length >= 4)
+          || normWords[0] || normName;
+        // Dấu gạch ngang → % để khớp cả "H610M-E" lẫn "H610M -E" trong DB
+        const likeToken = keyWord.replace(/-/g, '%');
+
+        const { data: candidates } = await sb.from('products_master')
           .select('sku, model_name, lob')
-          .eq('normalized_name', normName)
+          .ilike('model_name', `%${likeToken}%`)
           .neq('sku', sku)
-          .limit(1);
-        if (dupes && dupes.length) {
+          .limit(100);
+
+        console.log('[suggest-merge] candidates (ilike %' + likeToken + '%):', candidates?.length ?? 0,
+          (candidates || []).map(p => p.sku + ' → norm:' + normalizeModelName(p.model_name)));
+
+        const dupes = (candidates || []).filter(p => normalizeModelName(p.model_name) === normName);
+        console.log('[suggest-merge] dupes sau JS-filter:', dupes.length, dupes.map(p => p.sku));
+
+        if (dupes.length) {
           const d = dupes[0];
           const he = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
           _mergeSuggestSrc = sku;
