@@ -6049,6 +6049,7 @@
       if (!rule.perRowDate) {
         fallbackWeekDate = findWeekDateForDisty(rows, rule.headerRows) || null;
         weekDateMissing = !fallbackWeekDate;
+        if (weekDateMissing) fallbackWeekDate = new Date().toISOString().split('T')[0];
       }
       return { disty, sheetName, items, fallbackWeekDate, weekDateMissing, rule };
     }
@@ -6082,9 +6083,9 @@
       }
 
       for (const { disty, items, fallbackWeekDate, weekDateMissing, rule } of parsedList) {
-        // Tier 1: invalid date
+        // Tier 1: invalid date → hạ xuống cảnh báo vàng, dùng ngày hôm nay
         if (!rule.perRowDate && weekDateMissing) {
-          errors.push(`[${he(disty)}] Không đọc được ngày tuần (week_date) từ header file. Kiểm tra lại định dạng.`);
+          warnings.push(`[${he(disty)}] Không đọc được ngày tuần từ header — dùng ngày hôm nay <strong>${he(fallbackWeekDate)}</strong> làm week_date.`);
         }
         // Tier 1: negative quantities
         for (const it of items) {
