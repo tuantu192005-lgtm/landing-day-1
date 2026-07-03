@@ -5214,7 +5214,13 @@
         byLob.get(p.lob).push(p);
       }
 
-      // Level 2: token overlap >= 85%, same LOB, norms different
+      // Level 2: Jaccard token similarity >= 75%, same LOB, pre-filter guards
+      // Pre-conditions (fast fail before similarity compute):
+      //   - norms differ (L1 already handles exact match)
+      //   - model name length ratio within 30%
+      //   - at least 1 shared token of length >= 4 (anchor token)
+      // Similarity: |intersection| / |union| (Jaccard), threshold 0.75
+      // Output: top 50 pairs by score descending
       const level2 = []; const usedL2 = new Set();
       for (const [, prods] of byLob) {
         if (prods.length < 2) continue;
@@ -5224,17 +5230,24 @@
             const key = [a.sku, b.sku].sort().join(':');
             if (usedL1.has(key) || !isPairOk(a.sku, b.sku)) continue;
             if (!a.norm || !b.norm || a.norm === b.norm) continue;
+            // length ratio guard
+            const lenA = a.model_name.length, lenB = b.model_name.length;
+            if (Math.abs(lenA - lenB) / Math.max(lenA, lenB) >= 0.30) continue;
+            // anchor token guard: >= 1 shared token of length >= 4
             const ta = a.toks, tb = b.toks;
-            const shorter = ta.size <= tb.size ? ta : tb;
-            const longer  = ta.size <= tb.size ? tb : ta;
-            if (shorter.size < 2) continue;
+            let hasAnchor = false;
+            for (const t of ta) { if (t.length >= 4 && tb.has(t)) { hasAnchor = true; break; } }
+            if (!hasAnchor) continue;
+            // Jaccard similarity over token union
+            const union = new Set([...ta, ...tb]);
             let shared = 0;
-            for (const t of shorter) if (longer.has(t)) shared++;
-            const overlap = shared / shorter.size;
-            if (overlap >= 0.85) { level2.push({ a, b, sim: overlap }); usedL2.add(key); }
+            for (const t of ta) if (tb.has(t)) shared++;
+            const sim = shared / union.size;
+            if (sim >= 0.75) { level2.push({ a, b, sim }); usedL2.add(key); }
           }
       }
       level2.sort((x, y) => y.sim - x.sim);
+      if (level2.length > 50) level2.length = 50;
 
       // Level 3: stripped-SKU is prefix of other, same LOB, length ratio >= 60%
       const level3 = [];
