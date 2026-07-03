@@ -4445,13 +4445,16 @@
         // 1. Get distinct recent week_dates
         const { data: wkData, error: wkErr } = await sb.from('disty_inventory')
           .select('week_date').order('week_date', { ascending: false }).limit(200);
+        console.log('[DI] week query error:', wkErr, '| wkData length:', wkData?.length, '| first 3:', wkData?.slice(0,3));
         if (wkErr) throw new Error(wkErr.message);
         const weeks = [...new Set((wkData || []).map(r => r.week_date))];
+        console.log('[DI] distinct weeks:', weeks);
         if (!weeks.length) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.</td></tr>';
+          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.<br><small style="color:#9ca3af">Hãy import file Excel NPP trước trong tab Import.</small></td></tr>';
           return;
         }
         const latestWeek = weeks[0], compareWeek = weeks[4] || null;
+        console.log('[DI] latestWeek:', latestWeek, '| compareWeek:', compareWeek);
 
         // 2. Fetch current week (all rows, paginated)
         const currentRows = [];
@@ -4464,6 +4467,7 @@
           currentRows.push(...data);
           if (data.length < 1000) break;
         }
+        console.log('[DI] currentRows (week', latestWeek, '):', currentRows.length, '| sample:', currentRows.slice(0,3));
 
         // 3. Fetch 4-weeks-ago closing for comparison
         const compareMap = {};
@@ -4477,15 +4481,18 @@
             if (data.length < 1000) break;
           }
         }
+        console.log('[DI] compareMap entries:', Object.keys(compareMap).length);
 
         // 4. Fetch products_master info
         const productMap = {};
         const skuArr = [...new Set(currentRows.map(r => r.sku))];
+        console.log('[DI] unique SKUs in inventory:', skuArr.length);
         for (let i = 0; i < skuArr.length; i += 500) {
           const { data } = await sb.from('products_master')
             .select('sku, model_name, lob').in('sku', skuArr.slice(i, i + 500));
           for (const p of data || []) productMap[p.sku] = p;
         }
+        console.log('[DI] productMap entries (matched SKUs):', Object.keys(productMap).length);
 
         // 5. Build + classify rows
         const SO = { old: 0, watch: 1, normal: 2, new: 3 };
@@ -4513,8 +4520,10 @@
           return sd !== 0 ? sd : b.closing - a.closing;
         });
 
+        console.log('[DI] _diAllRows after build+filter:', _diAllRows.length);
         applyDiFiltersAndRender();
       } catch (err) {
+        console.error('[DI] loadInventoryTab error:', err);
         const tb = document.getElementById('diInvTableBody');
         if (tb) tb.innerHTML = `<tr><td colspan="7" style="color:#b30012;padding:16px">Lỗi: ${err.message}</td></tr>`;
       }
