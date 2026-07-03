@@ -2216,6 +2216,18 @@
             <div id="mergeInlineMsg" style="font-size:12px;min-height:14px;margin-top:4px;color:#6b7280"></div>
           </div>
 
+          <!-- Panel đổi SKU inline (admin only) -->
+          <div id="skuEditPanel" class="hidden" style="background:#f0f9ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 16px;margin-bottom:14px">
+            <div style="font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px">Nhập SKU mới (sẽ cập nhật toàn bộ tham chiếu):</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="skuEditInput" placeholder="SKU mới..." autocomplete="off"
+                style="font-family:monospace;flex:1;padding:6px 10px;border:1px solid #93c5fd;border-radius:6px;font-size:13px" />
+              <button type="button" class="btn-primary" id="skuEditSaveBtn" style="padding:6px 16px;font-size:13px">Lưu</button>
+              <button type="button" class="btn-secondary" id="skuEditCancelBtn" style="padding:6px 12px;font-size:13px">Huỷ</button>
+            </div>
+            <div id="skuEditMsg" style="margin-top:6px;font-size:12px"></div>
+          </div>
+
           <div class="product-detail-grid">
             <!-- CỘT TRÁI: thông tin cơ bản + NPP phân phối -->
             <div>
@@ -2424,6 +2436,18 @@
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px">
         <button type="button" id="importConfirmBtn" class="btn-primary hidden" style="padding:10px 22px;font-size:13px">Xác nhận import</button>
         <button type="button" id="importCancelReportBtn" class="btn-secondary" style="padding:10px 22px;font-size:13px">Huỷ import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal gợi ý gộp sau khi sửa tên model -->
+  <div id="mergeSuggestModal" class="hidden" style="position:fixed;inset:0;z-index:10001;background:rgba(10,26,60,0.55);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:100%;box-shadow:0 8px 40px rgba(10,26,60,0.3)">
+      <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1a2b4c">Phát hiện sản phẩm tương tự</h3>
+      <p id="mergeSuggestText" style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 18px"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn-primary" id="mergeSuggestYesBtn" style="padding:9px 20px;font-size:13px">Gộp luôn</button>
+        <button type="button" class="btn-secondary" id="mergeSuggestNoBtn" style="padding:9px 20px;font-size:13px">Không, chỉ lưu tên mới</button>
       </div>
     </div>
   </div>
@@ -4394,6 +4418,7 @@
       document.getElementById('productDetailView')?.classList.add('hidden');
       document.getElementById('productFormView')?.classList.add('hidden');
       closeMergeInlinePanel();
+      closeSkuEditPanel();
     }
 
     async function loadProductsTab() {
@@ -4586,6 +4611,7 @@
       document.getElementById('productDetailView')?.classList.remove('hidden');
       document.getElementById('productFormView')?.classList.add('hidden');
       closeMergeInlinePanel();
+      closeSkuEditPanel();
 
       const { data, error } = await sb.from('products_master').select('*').eq('sku', sku).maybeSingle();
       if (error || !data) {
@@ -4598,8 +4624,11 @@
       document.getElementById('productDetailTitle').textContent = `${data.sku} — ${data.model_name}`;
       document.getElementById('editProductBtn')?.classList.toggle('hidden', !isProductsAdmin());
       document.getElementById('mergeWithBtn')?.classList.toggle('hidden', !isProductsAdmin());
+      const editSkuBtn = isProductsAdmin()
+        ? ` <button type="button" id="editSkuBtn" style="margin-left:8px;font-size:11px;padding:2px 8px;background:none;border:1px solid #5e6f8a;border-radius:4px;cursor:pointer;color:#5e6f8a">Sửa SKU</button>`
+        : '';
       const infoRows = [
-        { label: 'SKU', value: `<span style="font-family:monospace;font-size:12px">${data.sku}</span>` },
+        { label: 'SKU', value: `<span style="font-family:monospace;font-size:12px">${data.sku}</span>${editSkuBtn}` },
         { label: 'Tên model', value: data.model_name },
         { label: 'LOB', value: lobBadgeHtml(data.lob) },
         { label: 'Giá SDP', value: `<strong>${fmtQtyMsi(data.sdp_price)}</strong> đ` },
@@ -4607,6 +4636,7 @@
       ];
       const infoEl = document.getElementById('productInfoRows');
       if (infoEl) infoEl.innerHTML = infoRows.map(r => `<div class="product-info-row"><span class="pir-label">${r.label}</span><span class="pir-value">${r.value}</span></div>`).join('');
+      document.getElementById('editSkuBtn')?.addEventListener('click', openSkuEditPanel);
 
       switchProductSubtab('productPricingPane');
       initProductPricingQuarterDropdown();
@@ -4851,12 +4881,37 @@
       }
 
       if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      const normName = normalizeModelName(modelName);
       const { error } = await sb.from('products_master').upsert({
-        sku, model_name: modelName, lob, sdp_price: priceVal === '' ? 0 : Number(priceVal), is_active: isActive, updated_at: new Date().toISOString()
+        sku, model_name: modelName, normalized_name: normName,
+        lob, sdp_price: priceVal === '' ? 0 : Number(priceVal), is_active: isActive, updated_at: new Date().toISOString()
       });
       if (error) {
         if (msgEl) { msgEl.textContent = 'Lỗi lưu sản phẩm: ' + error.message; msgEl.style.color = '#b30012'; }
         return;
+      }
+
+      // Kiểm tra sản phẩm tương tự sau khi sửa (chỉ khi đang EDIT, không phải ADD)
+      if (origSku && normName) {
+        const { data: dupes } = await sb.from('products_master')
+          .select('sku, model_name, lob')
+          .eq('normalized_name', normName)
+          .neq('sku', sku)
+          .limit(1);
+        if (dupes && dupes.length) {
+          const d = dupes[0];
+          const he = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+          _mergeSuggestSrc = sku;
+          _mergeSuggestDst = d;
+          document.getElementById('mergeSuggestText').innerHTML =
+            `Tên model vừa lưu khớp với sản phẩm có sẵn:<br>
+             <strong>${he(d.model_name)}</strong> — ${lobBadgeHtml(d.lob)} (SKU: <code>${he(d.sku)}</code>)<br><br>
+             Bạn có muốn gộp <code>${he(sku)}</code> vào sản phẩm trên không?<br>
+             <span style="font-size:12px;color:#6b7280">(Toàn bộ tồn kho và mã NPP của <strong>${he(sku)}</strong> sẽ chuyển sang, sau đó <strong>${he(sku)}</strong> bị xoá)</span>`;
+          document.getElementById('productFormView')?.classList.add('hidden');
+          document.getElementById('mergeSuggestModal')?.classList.remove('hidden');
+          return;
+        }
       }
 
       showMsiToast(origSku ? 'Đã cập nhật sản phẩm' : 'Đã thêm sản phẩm');
@@ -4930,16 +4985,8 @@
       document.getElementById('mergeInlineMsg').textContent = '';
     }
 
-    async function doMergeInline() {
-      const srcSku = mergeSelectedSku;
-      const dstSku = currentProductSku;
-      const msgEl = document.getElementById('mergeInlineMsg');
-      if (!srcSku || !dstSku) return;
-
-      msgEl.style.color = '#5e6f8a'; msgEl.textContent = 'Đang chuyển tồn kho...';
-      document.getElementById('mergeConfirmSection')?.classList.add('hidden');
-
-      // 1. Transfer disty_inventory (xoá conflict trước)
+    // Shared merge: chuyển inventory + codes từ srcSku → dstSku, xoá srcSku
+    async function mergeProducts(srcSku, dstSku) {
       const { data: dstInv } = await sb.from('disty_inventory').select('disty,week_date').eq('sku', dstSku);
       if (dstInv && dstInv.length) {
         for (const { disty, week_date } of dstInv) {
@@ -4947,21 +4994,28 @@
         }
       }
       const { error: invErr } = await sb.from('disty_inventory').update({ sku: dstSku }).eq('sku', srcSku);
-      if (invErr) { msgEl.style.color = '#b30012'; msgEl.textContent = `Lỗi tồn kho: ${invErr.message}`; return; }
-
-      // 2. Transfer product_disty_codes
-      msgEl.textContent = 'Đang chuyển mã NPP...';
+      if (invErr) throw new Error(`Lỗi tồn kho: ${invErr.message}`);
       const { error: codeErr } = await sb.from('product_disty_codes').update({ sku: dstSku }).eq('sku', srcSku);
-      if (codeErr) { msgEl.style.color = '#b30012'; msgEl.textContent = `Lỗi mã NPP: ${codeErr.message}`; return; }
-
-      // 3. Xoá products_master nguồn
-      msgEl.textContent = 'Đang xoá SKU nguồn...';
+      if (codeErr) throw new Error(`Lỗi mã NPP: ${codeErr.message}`);
       const { error: delErr } = await sb.from('products_master').delete().eq('sku', srcSku);
-      if (delErr) { msgEl.style.color = '#b30012'; msgEl.textContent = `Lỗi xoá SKU: ${delErr.message}`; return; }
+      if (delErr) throw new Error(`Lỗi xoá SKU nguồn: ${delErr.message}`);
+    }
 
-      closeMergeInlinePanel();
-      showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
-      await openProductDetail(dstSku);
+    async function doMergeInline() {
+      const srcSku = mergeSelectedSku;
+      const dstSku = currentProductSku;
+      const msgEl = document.getElementById('mergeInlineMsg');
+      if (!srcSku || !dstSku) return;
+      msgEl.style.color = '#5e6f8a'; msgEl.textContent = 'Đang gộp...';
+      document.getElementById('mergeConfirmSection')?.classList.add('hidden');
+      try {
+        await mergeProducts(srcSku, dstSku);
+        closeMergeInlinePanel();
+        showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
+        await openProductDetail(dstSku);
+      } catch (err) {
+        msgEl.style.color = '#b30012'; msgEl.textContent = err.message;
+      }
     }
 
     document.getElementById('mergeWithBtn')?.addEventListener('click', openMergeInlinePanel);
@@ -4975,6 +5029,92 @@
     document.getElementById('mergeSearchInput')?.addEventListener('input', (e) => {
       clearTimeout(mergeSearchTimer);
       mergeSearchTimer = setTimeout(() => searchMergeSku(e.target.value.trim()), 280);
+    });
+
+    // ── Sửa SKU (đổi primary key an toàn) ──────────────────────────────────
+
+    function openSkuEditPanel() {
+      document.getElementById('skuEditInput').value = '';
+      document.getElementById('skuEditMsg').textContent = '';
+      document.getElementById('skuEditPanel')?.classList.remove('hidden');
+      document.getElementById('skuEditInput')?.focus();
+    }
+
+    function closeSkuEditPanel() {
+      document.getElementById('skuEditPanel')?.classList.add('hidden');
+    }
+
+    async function saveNewSku() {
+      const newSku = (document.getElementById('skuEditInput')?.value || '').trim().toUpperCase();
+      const oldSku = currentProductSku;
+      const msgEl = document.getElementById('skuEditMsg');
+      if (!newSku) { msgEl.textContent = 'Vui lòng nhập SKU mới.'; msgEl.style.color = '#b30012'; return; }
+      if (newSku === oldSku) { msgEl.textContent = 'SKU mới trùng với SKU hiện tại.'; msgEl.style.color = '#b30012'; return; }
+
+      msgEl.textContent = 'Đang kiểm tra SKU...'; msgEl.style.color = '#5e6f8a';
+      const { data: exists } = await sb.from('products_master').select('sku').eq('sku', newSku).maybeSingle();
+      if (exists) {
+        msgEl.innerHTML = 'SKU này đã tồn tại. Dùng <strong>⇄ Gộp với SKU khác</strong> để gộp 2 sản phẩm thay thế.';
+        msgEl.style.color = '#b30012'; return;
+      }
+
+      msgEl.textContent = 'Đang cập nhật SKU...'; msgEl.style.color = '#5e6f8a';
+      try {
+        const d = currentProductData;
+        // 1. Tạo products_master mới với SKU mới
+        const { error: insErr } = await sb.from('products_master').insert({
+          sku: newSku, model_name: d.model_name, lob: d.lob,
+          sdp_price: d.sdp_price, normalized_name: d.normalized_name || normalizeModelName(d.model_name),
+          is_active: d.is_active
+        });
+        if (insErr) throw new Error('Lỗi tạo SKU mới: ' + insErr.message);
+
+        // 2–4. Chuyển toàn bộ tham chiếu sang SKU mới
+        await sb.from('product_disty_codes').update({ sku: newSku }).eq('sku', oldSku);
+        await sb.from('disty_inventory').update({ sku: newSku }).eq('sku', oldSku);
+        await sb.from('product_programs').update({ sku: newSku }).eq('sku', oldSku);
+
+        // 5. Xoá SKU cũ
+        const { error: delErr } = await sb.from('products_master').delete().eq('sku', oldSku);
+        if (delErr) throw new Error('Lỗi xoá SKU cũ: ' + delErr.message);
+
+        closeSkuEditPanel();
+        showMsiToast('Đã cập nhật SKU thành công');
+        await openProductDetail(newSku);
+      } catch (err) {
+        msgEl.textContent = err.message; msgEl.style.color = '#b30012';
+      }
+    }
+
+    document.getElementById('skuEditSaveBtn')?.addEventListener('click', saveNewSku);
+    document.getElementById('skuEditCancelBtn')?.addEventListener('click', closeSkuEditPanel);
+
+    // ── Gợi ý gộp sau khi sửa tên model ─────────────────────────────────────
+
+    let _mergeSuggestSrc = null;
+    let _mergeSuggestDst = null;
+
+    document.getElementById('mergeSuggestYesBtn')?.addEventListener('click', async () => {
+      const srcSku = _mergeSuggestSrc;
+      const dstSku = _mergeSuggestDst?.sku;
+      if (!srcSku || !dstSku) return;
+      document.getElementById('mergeSuggestModal')?.classList.add('hidden');
+      try {
+        await mergeProducts(srcSku, dstSku);
+        _mergeSuggestSrc = null; _mergeSuggestDst = null;
+        showMsiToast(`Đã gộp "${srcSku}" vào "${dstSku}"`);
+        await openProductDetail(dstSku);
+      } catch (err) {
+        showMsiToast('Lỗi gộp: ' + err.message);
+        await openProductDetail(srcSku);
+      }
+    });
+
+    document.getElementById('mergeSuggestNoBtn')?.addEventListener('click', async () => {
+      const sku = _mergeSuggestSrc;
+      document.getElementById('mergeSuggestModal')?.classList.add('hidden');
+      _mergeSuggestSrc = null; _mergeSuggestDst = null;
+      if (sku) await openProductDetail(sku);
     });
 
     // ── Import tồn kho từ Excel NPP — 8 NPP (DGW/SPC/KTC/NWH/MAI HOANG/AD/
