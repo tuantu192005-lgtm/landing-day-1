@@ -12,29 +12,30 @@ export function normalizeModelName(name) {
   let n = name.toLowerCase().trim();
   // Remove prefixes — longest first to prevent partial matches
   const prefixes = [
-    // Dạng "(Category) MSI ..."
     '(vga card) msi ', '(vga card) ',
     '(main board) msi ', '(main board) ',
     '(mainboard) msi ', '(mainboard) ',
-    // Tiếng Việt dài
     'tấm mạch in đã lắp ráp msi ', 'tấm mạch in đã lắp ráp ',
+    'tấm mạch in msi ',
     'bảng mạch chính msi ', 'bảng mạch chính ',
     'nguồn máy tính msi ', 'nguồn máy tính ',
+    'cạc màn hình msi ', 'cạc màn hình ',
+    'cạc đồ họa msi ', 'cạc đồ họa ',
+    'card màn hình msi ', 'card màn hình ',
+    'card đồ họa msi ', 'card đồ họa ',
+    'màn hình gaming msi ',
     'màn hình lcd msi ', 'màn hình msi ', 'lcd msi ',
     'mainboard msi ', 'main msi ', 'vga msi ',
-    'bo mạch chủ ', 'màn hình ', 'mainboard ', 'main ',
+    'bo mạch chủ msi ', 'bo mạch chủ ', 'màn hình ', 'mainboard ', 'main ',
     'msi ', 'msı '
   ];
   for (const p of prefixes) {
     if (n.startsWith(p)) { n = n.slice(p.length); break; }
   }
-  // Remove suffixes
   for (const s of [' - new', ' (new)']) {
     if (n.endsWith(s)) { n = n.slice(0, -s.length); break; }
   }
-  // Remove spaces around hyphens: 'H610M -E' → 'H610M-E'
   n = n.replace(/\s*-\s*/g, '-');
-  // Collapse multiple spaces
   return n.trim().replace(/\s+/g, ' ');
 }
 

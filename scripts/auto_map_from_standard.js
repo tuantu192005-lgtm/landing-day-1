@@ -2,7 +2,7 @@
 // Đọc Model_chuẩn_MSI.xlsx → upsert products_master → map product_disty_codes + disty_inventory
 // Chạy: node scripts/auto_map_from_standard.js
 
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import XLSX from 'xlsx';
 import path from 'path';
@@ -50,6 +50,13 @@ function normalizeForMatch(name) {
   // Một số NPP (KTC) bỏ "geforce " hoặc "radeon " ở đầu
   if (n.startsWith('geforce ')) n = n.slice('geforce '.length);
   if (n.startsWith('radeon '))  n = n.slice('radeon '.length);
+  // KTC bỏ "MAX" trong "MAX WIFI": "CARBON WF" → sau WF→WIFI → "CARBON WIFI"
+  // nhưng chuẩn là "CARBON MAX WIFI" → bỏ "max " trước "wifi" ở cả hai phía
+  n = n.replace(/\bmax wifi\b/gi, 'wifi');
+  // Bỏ hardware specs thường bị thêm/bỏ tuỳ NPP
+  n = n.replace(/\s+gddr\d+x?\b/gi, '');   // gddr7, gddr6x, gddr6
+  n = n.replace(/\s+\d{2,4}bit\b/gi, '');  // 128bit, 256bit
+  n = n.replace(/\s+pcie[\d.]+\b/gi, '');  // pcie5, pcie4.0
   return n.trim().replace(/\s+/g, ' ');
 }
 
@@ -231,18 +238,20 @@ async function main() {
   // 6. Match theo normalized disty_name → standard model
   console.log('\n[6] Map product_disty_codes theo tên...');
   let codesMatched = 0, codesAlreadyOk = 0, codesNoMatch = 0;
-  const unmatchedSample = [];
+  const unmatchedAll = [];   // toàn bộ unmatched để export JSON
   const codeUpdates = [];
+  // Track các standard SKU đã được map (cả mới lẫn đã ok)
+  const mappedStdSkus = new Set();
 
   for (const code of allCodes) {
     if (!code.disty_name) { codesNoMatch++; continue; }
-    // Dùng normalizeForMatch để mở rộng viết tắt (WF→WIFI, strip geforce...)
+    // Dùng normalizeForMatch để mở rộng viết tắt (WF→WIFI, strip geforce, strip specs...)
     const norm = normalizeForMatch(code.disty_name);
 
     // Exact match
     let matched = normToStd.get(norm);
 
-    // Prefix match (disty_name có thêm specs sau tên model)
+    // Prefix match: disty_name có thêm specs sau tên model chuẩn
     if (!matched) {
       for (const [stdNorm, stdModel] of normToStd) {
         if (norm.startsWith(stdNorm + ' ') || norm.startsWith(stdNorm + '/')) {
@@ -254,6 +263,7 @@ async function main() {
 
     if (matched) {
       const newSku = matched.model_name;
+      mappedStdSkus.add(newSku);
       if (code.sku === newSku) { codesAlreadyOk++; continue; }
       // Verify target SKU exists in products_master (đã insert ở bước 3)
       if (!existingSkuMap.has(newSku)) {
@@ -265,7 +275,13 @@ async function main() {
       codesMatched++;
     } else {
       codesNoMatch++;
-      if (unmatchedSample.length < 10) unmatchedSample.push(`${code.disty}:${code.disty_code} → "${code.disty_name}"`);
+      unmatchedAll.push({
+        disty: code.disty,
+        disty_code: code.disty_code,
+        disty_name: code.disty_name,
+        normalized: norm,
+        current_sku: code.sku || null
+      });
     }
   }
   console.log(`    → Match mới: ${codesMatched} | Đã đúng: ${codesAlreadyOk} | Không match: ${codesNoMatch}`);
@@ -306,9 +322,8 @@ async function main() {
   console.log(`  product_disty_codes mới map    : ${codesUpdated}`);
   console.log(`  disty_inventory dòng update    : ${invUpdated}`);
 
-  // Model chuẩn chưa có disty_code nào trỏ vào
-  const allUpdatedSkus = new Set(codeUpdates.map(u => u.newSku));
-  const notMapped = standardModels.filter(m => !allUpdatedSkus.has(m.model_name));
+  // Model chuẩn chưa có disty_code nào trỏ vào (kể cả đã ok từ lần trước)
+  const notMapped = standardModels.filter(m => !mappedStdSkus.has(m.model_name));
   console.log(`\n  Model chuẩn chưa có disty_code: ${notMapped.length}`);
   if (notMapped.length <= 30) {
     notMapped.forEach(m => console.log(`    [${m.lob}] ${m.model_name}`));
@@ -317,10 +332,27 @@ async function main() {
     console.log(`    ... và ${notMapped.length - 30} model nữa`);
   }
 
-  if (unmatchedSample.length) {
+  // Sample 10 unmatched codes để xem nhanh
+  if (unmatchedAll.length) {
     console.log(`\n  Mẫu disty_code không match (10 đầu):`);
-    unmatchedSample.forEach(s => console.log(`    ${s}`));
+    unmatchedAll.slice(0, 10).forEach(u =>
+      console.log(`    ${u.disty}:${u.disty_code} → "${u.disty_name}" [norm: "${u.normalized}"]`)
+    );
   }
+
+  // Export toàn bộ unmatched ra JSON để xem xét thủ công
+  const outPath = new URL('./unmatched_disty_codes.json', import.meta.url);
+  const exportData = {
+    generated_at: new Date().toISOString(),
+    total_unmatched: unmatchedAll.length,
+    by_disty: {},
+    items: unmatchedAll
+  };
+  for (const u of unmatchedAll) {
+    exportData.by_disty[u.disty] = (exportData.by_disty[u.disty] || 0) + 1;
+  }
+  writeFileSync(outPath, JSON.stringify(exportData, null, 2), 'utf8');
+  console.log(`\n  → Đã export ${unmatchedAll.length} unmatched codes ra scripts/unmatched_disty_codes.json`);
 }
 
 main().catch(err => { console.error('\n[ERROR]', err.message); process.exit(1); });
