@@ -4549,60 +4549,45 @@
       if (countEl) countEl.textContent = '';
 
       try {
-        // 1. Query riêng để lấy week_dates — limit lớn để không bỏ sót tuần cũ
-        // wkRaw có nhiều dòng (1 row/DI row), dùng để đếm số dòng mỗi tuần
-        const { data: wkRaw, error: wkErr } = await sb.from('disty_inventory')
-          .select('week_date').order('week_date', { ascending: false }).limit(5000);
-        if (wkErr) throw new Error(wkErr.message);
-
-        // Đếm số dòng mỗi tuần — chọn tuần có NHIỀU dòng nhất làm latestWeek
-        // Tránh bug: fallback date (AD) có date mới hơn nhưng chỉ vài chục dòng,
-        // tuần thật (DGW/KTC/SPC) có hàng trăm dòng → cần chọn theo count, không theo date
-        const weekCount = new Map();
-        for (const r of wkRaw || []) {
-          weekCount.set(r.week_date, (weekCount.get(r.week_date) || 0) + 1);
-        }
-        // weeks sorted by date descending (dùng cho compareWeek)
-        const weeks = [...weekCount.keys()].sort((a, b) => b.localeCompare(a));
-        // latestWeek = tuần có nhiều dòng nhất
-        const latestWeek = [...weekCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-        console.log('[DI] week counts:', [...weekCount.entries()].sort((a,b)=>b[1]-a[1]).map(([d,c])=>`${d}(${c} rows)`));
-        console.log('[DI] latestWeek (max rows):', latestWeek);
-        if (!latestWeek || !weeks.length) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.<br><small style="color:#9ca3af">Hãy import file Excel NPP trước trong tab Import.</small></td></tr>';
-          return;
-        }
-        // compareWeek = 4 tuần trước latestWeek (theo thứ tự date)
-        const latestIdx = weeks.indexOf(latestWeek);
-        const compareWeek = weeks[latestIdx + 4] || null;
-        console.log('[DI] latestWeek:', latestWeek, '| compareWeek:', compareWeek);
-
-        // 2. Fetch current week (all rows, paginated) — không lọc sku IS NOT NULL để lấy tất cả dòng
-        const currentRows = [];
+        // 1. Fetch toàn bộ disty_inventory (paginated, sort week_date DESC)
+        // Mỗi NPP báo cáo vào tuần riêng → không dùng 1 latestWeek chung cho toàn bảng
+        const allDiRows = [];
         for (let from = 0; ; from += 1000) {
           const { data, error } = await sb.from('disty_inventory')
-            .select('sku, disty, closing').eq('week_date', latestWeek)
+            .select('sku, disty, closing, week_date')
+            .order('week_date', { ascending: false })
             .range(from, from + 999);
           if (error) throw new Error(error.message);
           if (!data?.length) break;
-          currentRows.push(...data);
+          allDiRows.push(...data);
           if (data.length < 1000) break;
         }
-        console.log('[DI] currentRows (week', latestWeek, '):', currentRows.length, '| sample:', currentRows.slice(0,3));
-
-        // 3. Fetch 4-weeks-ago closing for comparison
-        const compareMap = {};
-        if (compareWeek) {
-          for (let from = 0; ; from += 1000) {
-            const { data } = await sb.from('disty_inventory')
-              .select('sku, disty, closing').eq('week_date', compareWeek)
-              .range(from, from + 999);
-            if (!data?.length) break;
-            for (const r of data) if (r.sku) compareMap[`${r.sku}:${r.disty}`] = r.closing ?? 0;
-            if (data.length < 1000) break;
-          }
+        console.log('[DI] allDiRows fetched:', allDiRows.length);
+        if (!allDiRows.length) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.<br><small style="color:#9ca3af">Hãy import file Excel NPP trước trong tab Import.</small></td></tr>';
+          return;
         }
-        console.log('[DI] compareMap entries:', Object.keys(compareMap).length);
+
+        // 2. Group by (sku, disty) — rows đã sorted DESC nên phần tử đầu = tuần mới nhất của NPP đó
+        // currentRow = rows[0] (latest), compareRow = rows[4] (~4 tuần trước của chính NPP đó)
+        const grouped = new Map(); // `${sku}:${disty}` → rows[]
+        for (const r of allDiRows) {
+          const k = `${r.sku}:${r.disty}`;
+          if (!grouped.has(k)) grouped.set(k, []);
+          grouped.get(k).push(r);
+        }
+        const currentRows = [...grouped.values()].map(rows => rows[0]);
+        const compareMap = {};
+        for (const [k, rows] of grouped) {
+          const old = rows[4]; // ~4 tuần trước của chính NPP đó
+          if (old?.closing != null) compareMap[k] = old.closing;
+        }
+
+        // Log debug: tuần của từng NPP
+        const distyWeeks = {};
+        for (const r of currentRows) distyWeeks[r.disty] = (distyWeeks[r.disty] || new Set()).add(r.week_date);
+        console.log('[DI] latest week per disty:', Object.fromEntries(Object.entries(distyWeeks).map(([d,s])=>[d,[...s].join(',')])));
+        console.log('[DI] currentRows (latest per sku×disty):', currentRows.length, '| compareMap entries:', Object.keys(compareMap).length);
 
         // 4. Fetch products_master info
         const productMap = {};
@@ -4634,7 +4619,7 @@
           return {
             sku: r.sku, model_name: pm.model_name || '—', lob: pm.lob || '—',
             normalized_name: pm.normalized_name || '',
-            disty: r.disty, closing: now, week_date: latestWeek, code, label,
+            disty: r.disty, closing: now, week_date: r.week_date, code, label,
             ratio: (old > 0) ? now / old : null
           };
         }).filter(Boolean).sort((a, b) => {
