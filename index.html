@@ -4549,19 +4549,32 @@
       if (countEl) countEl.textContent = '';
 
       try {
-        // 1. Query riêng để lấy distinct week_dates — limit lớn để không bỏ sót tuần cũ
-        // (không dùng limit nhỏ: nếu tuần mới nhất có >200 rows thì tuần cũ bị blind)
+        // 1. Query riêng để lấy week_dates — limit lớn để không bỏ sót tuần cũ
+        // wkRaw có nhiều dòng (1 row/DI row), dùng để đếm số dòng mỗi tuần
         const { data: wkRaw, error: wkErr } = await sb.from('disty_inventory')
           .select('week_date').order('week_date', { ascending: false }).limit(5000);
         if (wkErr) throw new Error(wkErr.message);
-        const weeks = [...new Set((wkRaw || []).map(r => r.week_date))];
-        const latestWeek = weeks[0] ?? null;
-        console.log('[DI] distinct weeks:', weeks, '| latestWeek:', latestWeek);
+
+        // Đếm số dòng mỗi tuần — chọn tuần có NHIỀU dòng nhất làm latestWeek
+        // Tránh bug: fallback date (AD) có date mới hơn nhưng chỉ vài chục dòng,
+        // tuần thật (DGW/KTC/SPC) có hàng trăm dòng → cần chọn theo count, không theo date
+        const weekCount = new Map();
+        for (const r of wkRaw || []) {
+          weekCount.set(r.week_date, (weekCount.get(r.week_date) || 0) + 1);
+        }
+        // weeks sorted by date descending (dùng cho compareWeek)
+        const weeks = [...weekCount.keys()].sort((a, b) => b.localeCompare(a));
+        // latestWeek = tuần có nhiều dòng nhất
+        const latestWeek = [...weekCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+        console.log('[DI] week counts:', [...weekCount.entries()].sort((a,b)=>b[1]-a[1]).map(([d,c])=>`${d}(${c} rows)`));
+        console.log('[DI] latestWeek (max rows):', latestWeek);
         if (!latestWeek || !weeks.length) {
           if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px">Chưa có dữ liệu tồn kho NPP.<br><small style="color:#9ca3af">Hãy import file Excel NPP trước trong tab Import.</small></td></tr>';
           return;
         }
-        const compareWeek = weeks[4] || null;
+        // compareWeek = 4 tuần trước latestWeek (theo thứ tự date)
+        const latestIdx = weeks.indexOf(latestWeek);
+        const compareWeek = weeks[latestIdx + 4] || null;
         console.log('[DI] latestWeek:', latestWeek, '| compareWeek:', compareWeek);
 
         // 2. Fetch current week (all rows, paginated) — không lọc sku IS NOT NULL để lấy tất cả dòng
