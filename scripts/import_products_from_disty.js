@@ -30,13 +30,15 @@ function normalizeModelName(name) {
     'card màn hình msi ', 'card màn hình ',
     'card đồ họa msi ', 'card đồ họa ',
     'màn hình gaming msi ',
-    'màn hình lcd msi ', 'màn hình msi ', 'lcd msi ',
+    'màn hình lcd msi ', 'màn hình msi ', 'lcd msi ', 'lcd ',
     'mainboard msi ', 'main msi ', 'vga msi ',
     'bo mạch chủ msi ', 'bo mạch chủ ', 'màn hình ', 'mainboard ', 'main ',
     'msi ', 'msı '
   ];
   for (const p of prefixes) { if (n.startsWith(p)) { n = n.slice(p.length); break; } }
   for (const s of [' - new', ' (new)']) { if (n.endsWith(s)) { n = n.slice(0, -s.length); break; } }
+  n = n.replace(/\s*\(model:[^)]+\)\s*[\d.]*\s*inch\b/i, '');
+  n = n.replace(/\s*[\d.]+['''"]+$/, '');
   n = n.replace(/\s*-\s*/g, '-');
   return n.trim().replace(/\s+/g, ' ');
 }
