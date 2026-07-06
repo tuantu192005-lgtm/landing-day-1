@@ -4631,6 +4631,9 @@
           return sd !== 0 ? sd : b.closing - a.closing;
         });
 
+        window._diAllRows = _diAllRows; // debug
+        const badRows = _diAllRows.filter(r => !r.disty?.trim());
+        if (badRows.length) console.log('[DI] bad disty rows:', badRows);
         console.log('[DI] _diAllRows after build+filter:', _diAllRows.length);
         applyDiFiltersAndRender();
       } catch (err) {
