@@ -6686,6 +6686,11 @@
         'tấm mạch in msi ',
         'bảng mạch chính msi ', 'bảng mạch chính ',
         'nguồn máy tính msi ', 'nguồn máy tính ',
+        'vỏ máy tính msi ', 'vỏ case msi ',
+        'nguồn msi ',
+        'tản nhiệt cpu msi ', 'tản nhiệt msi ',
+        'ổ cứng ssd msi ', 'ổ cứng msi ',
+        'bộ nhớ msi ',
         'cạc màn hình msi ', 'cạc màn hình ',
         'cạc đồ họa msi ', 'cạc đồ họa ',
         'card màn hình msi ', 'card màn hình ',
@@ -6702,17 +6707,91 @@
       return n.trim().replace(/\s+/g, ' ');
     }
 
+    // Strip GeForce/Radeon prefix for fuzzy matching (VGMR uses "RTX...", standard uses "GeForce RTX...")
+    function tsMatchKey(norm) {
+      let n = (norm || '').toLowerCase().trim();
+      if (n.startsWith('geforce ')) n = n.slice(8);
+      if (n.startsWith('radeon '))  n = n.slice(7);
+      return n;
+    }
+
+    // Produce a clean model name (strip Vietnamese prefix, re-capitalize MSI-style)
+    // Used to generate SKU when creating a new products_master row from an unmatched disty item.
+    function computeCleanSkuName(distyName) {
+      if (!distyName) return '';
+      const orig = distyName.trim();
+      if (/^\((PC|LAPTOP|MINI PC)\)\s/i.test(orig)) return orig.toUpperCase().replace(/\b(PC|LAPTOP|MINI PC)\b/, m => m);
+      const lower = orig.toLowerCase();
+      const prefixes = [
+        '(vga card) msi ', '(vga card) ',
+        '(main board) msi ', '(main board) ',
+        '(mainboard) msi ', '(mainboard) ',
+        'tấm mạch in đã lắp ráp msi ', 'tấm mạch in đã lắp ráp ',
+        'tấm mạch in msi ',
+        'bảng mạch chính msi ', 'bảng mạch chính ',
+        'nguồn máy tính msi ', 'nguồn máy tính ',
+        'vỏ máy tính msi ', 'vỏ case msi ',
+        'nguồn msi ',
+        'tản nhiệt cpu msi ', 'tản nhiệt msi ',
+        'ổ cứng ssd msi ', 'ổ cứng msi ',
+        'bộ nhớ msi ',
+        'cạc màn hình msi ', 'cạc màn hình ',
+        'cạc đồ họa msi ', 'cạc đồ họa ',
+        'card màn hình msi ', 'card màn hình ',
+        'card đồ họa msi ', 'card đồ họa ',
+        'màn hình gaming msi ',
+        'màn hình lcd msi ', 'màn hình msi ', 'lcd msi ',
+        'mainboard msi ', 'main msi ', 'vga msi ',
+        'bo mạch chủ msi ', 'bo mạch chủ ', 'màn hình ', 'mainboard ', 'main ',
+      ];
+      let stripped = orig;
+      for (const p of prefixes) {
+        if (lower.startsWith(p)) { stripped = orig.slice(p.length); break; }
+      }
+      const sl = stripped.toLowerCase();
+      if (sl.startsWith('msi ') || sl.startsWith('msı ')) stripped = stripped.slice(4);
+      let result = stripped.toUpperCase();
+      if (result.startsWith('GEFORCE ')) result = 'GeForce ' + result.slice(8);
+      else if (result.startsWith('RADEON ')) result = 'Radeon ' + result.slice(7);
+      return result.trim().replace(/\s+/g, ' ');
+    }
+
+    function mapDistyLob(lob) {
+      if (!lob) return 'Unknown';
+      const l = lob.toLowerCase().trim();
+      if (l === 'vga' || l.includes('vga') || l.includes('graphic')) return 'VGA';
+      if (l === 'mb' || l.includes('mainboard') || l.includes('main board') || l.includes('motherboard') || l === 'maiboard') return 'MB';
+      if (l === 'lcd' || l.includes('lcd') || l.includes('monitor') || l.includes('display') || l === 'mnt') return 'MNT';
+      if (l === 'case' || l === 'chassis' || l.includes('case') || l.includes('chassis')) return 'CASE';
+      if (l === 'psu' || l.includes('psu') || l.includes('power')) return 'PSU';
+      if (l === 'ssd' || l.includes('ssd') || l.includes('storage') || l.includes('spatium')) return 'SSD';
+      if (l === 'cooler' || l.includes('cool') || l.includes('fan') || l.includes('liquid')) return 'COOLER';
+      return 'Unknown';
+    }
+
+    function inferLobFromName(name) {
+      const n = (name || '').toLowerCase();
+      if (/\b(geforce|radeon|rtx|gtx|rx\s+\d)/.test(n)) return 'VGA';
+      if (/\b[zxbh]\d{3,4}\b/.test(n) || /\b(motherboard|mainboard)\b/.test(n)) return 'MB';
+      if (/\b(lcd|monitor|optix|mag g\d|qhd|ips|va\s+panel)\b/.test(n)) return 'MNT';
+      if (/\b(forge|velox|gungnir|vampiric|pano m\d|airflow)\b/.test(n)) return 'CASE';
+      if (/\b(spatium|nvme)\b/.test(n)) return 'SSD';
+      if (/\b(coreliquid|aircooler|fan\b|cooling)\b/.test(n)) return 'COOLER';
+      if (/\b(mpe|meg ai|mag a\d{3,}p)\b/.test(n)) return 'PSU';
+      return 'Unknown';
+    }
+
     async function buildNormToSkuMap() {
       const map = new Map();
       let from = 0;
       const PG = 1000;
       while (true) {
-        const { data, error } = await sb.from('products_master').select('sku, model_name').range(from, from + PG - 1);
+        const { data, error } = await sb.from('products_master').select('sku, normalized_name').range(from, from + PG - 1);
         if (error) throw new Error('Lỗi load normToSku: ' + error.message);
         if (!data || !data.length) break;
-        for (const { sku, model_name } of data) {
-          const norm = normalizeModelName(model_name);
-          if (norm && !map.has(norm)) map.set(norm, sku);
+        for (const { sku, normalized_name } of data) {
+          const k = tsMatchKey(normalized_name);
+          if (k && !map.has(k)) map.set(k, sku);
         }
         if (data.length < PG) break;
         from += PG;
@@ -6790,15 +6869,15 @@
           warnings.push(`[${he(disty)}] Tuần <strong>${dupWeeks.map(he).join(', ')}</strong> đã có trong DB — <strong>${cnt}</strong> dòng tồn kho sẽ bị ghi đè.`);
         }
         // Tier 2: new products not in DB
-        const newProds = items.filter(it => !normToSku.has(normalizeModelName(it.disty_name)));
+        const newProds = items.filter(it => !normToSku.has(tsMatchKey(normalizeModelName(it.disty_name))));
         if (newProds.length) {
           const list = newProds.slice(0, 8).map(it => `<li>${he(it.disty_name)}</li>`).join('');
           const more = newProds.length > 8 ? `<li><em>... và ${newProds.length - 8} sản phẩm khác</em></li>` : '';
-          warnings.push(`[${he(disty)}] <strong>${newProds.length}</strong> sản phẩm mới chưa có trong DB:<ul style="margin:4px 0 0 16px;padding:0">${list}${more}</ul>`);
+          warnings.push(`[${he(disty)}] <strong>${newProds.length}</strong> sản phẩm mới — sẽ tự động tạo SKU từ tên model:<ul style="margin:4px 0 0 16px;padding:0">${list}${more}</ul>`);
         }
 
         // Tier 3: info summary
-        const mapped = items.filter(it => normToSku.has(normalizeModelName(it.disty_name))).length;
+        const mapped = items.filter(it => normToSku.has(tsMatchKey(normalizeModelName(it.disty_name)))).length;
         infos.push({ disty, read: items.length, mapped, unmapped: items.length - mapped, newCount: newProds.length, weeks: allWeeks.join(', ') || '?' });
       }
 
@@ -6880,47 +6959,49 @@
       const { disty, items, fallbackWeekDate } = p;
       if (!items.length) return { disty, read: 0, mapped: 0, unmapped: 0 };
 
-      // 1. Upsert product_disty_codes
-      const codeRows = items.map(it => ({ disty, disty_code: it.disty_code, disty_name: it.disty_name }));
+      // 1. Resolve SKU for each item: lookup in normToSku, or create new products_master row
+      const skuByCode = {};
+      const newPmRows = [];
+      for (const it of items) {
+        const matchKey = tsMatchKey(normalizeModelName(it.disty_name));
+        let sku = (normToSku && normToSku.get(matchKey)) || null;
+        if (!sku) {
+          const cleanName = computeCleanSkuName(it.disty_name);
+          if (cleanName) {
+            sku = cleanName;
+            const norm = normalizeModelName(cleanName);
+            const normKey = tsMatchKey(norm);
+            if (normToSku && !normToSku.has(normKey)) {
+              const lob = it.lob ? mapDistyLob(it.lob) : inferLobFromName(cleanName);
+              newPmRows.push({ sku: cleanName, model_name: cleanName, normalized_name: norm, lob });
+              normToSku.set(normKey, cleanName);
+            }
+          }
+        }
+        skuByCode[it.disty_code] = sku;
+      }
+
+      // 2. Insert new products_master rows
+      if (newPmRows.length) {
+        const { error } = await sb.from('products_master').upsert(newPmRows, { onConflict: 'sku' });
+        if (error) console.warn(`[${disty}] Lỗi tạo PM mới: ${error.message}`);
+      }
+
+      // 3. Upsert product_disty_codes WITH sku set immediately
+      const codeRows = items.map(it => ({
+        disty, disty_code: it.disty_code, disty_name: it.disty_name,
+        sku: skuByCode[it.disty_code] || null
+      }));
       const { error: codeErr } = await sb.from('product_disty_codes').upsert(codeRows, { onConflict: 'disty,disty_code' });
       if (codeErr) throw new Error(`[${disty}] Lỗi upsert product_disty_codes: ${codeErr.message}`);
 
-      // 1b. Auto-link: normalized_name khớp → gán sku (chỉ khi IS NULL)
-      if (normToSku) {
-        const autoLinks = new Map();
-        for (const it of items) {
-          const norm = normalizeModelName(it.disty_name);
-          const existing = normToSku.get(norm);
-          if (existing) {
-            if (!autoLinks.has(existing)) autoLinks.set(existing, []);
-            autoLinks.get(existing).push(it.disty_code);
-          }
-        }
-        for (const [sku, dcodes] of autoLinks) {
-          const { error } = await sb.from('product_disty_codes')
-            .update({ sku }).eq('disty', disty).in('disty_code', dcodes).is('sku', null);
-          if (error) console.warn(`[${disty}] auto-link error: ${error.message}`);
-        }
-      }
-
-      // 2. Tra lại sku đã map
-      const codes = items.map(it => it.disty_code);
-      const { data: mapRows, error: mapErr } = await sb
-        .from('product_disty_codes').select('disty_code, sku').eq('disty', disty).in('disty_code', codes);
-      if (mapErr) throw new Error(`[${disty}] Lỗi đọc product_disty_codes: ${mapErr.message}`);
-      const skuByCode = {};
-      (mapRows || []).forEach(r => { skuByCode[r.disty_code] = r.sku; });
-
-      // 3. Upsert disty_inventory — lưu disty_code để remap sku sau này
+      // 4. Upsert disty_inventory WITH sku
       const invRows = items.map(it => ({
         disty_code: it.disty_code,
         sku: skuByCode[it.disty_code] || null,
         disty,
         week_date: it.rowDate || fallbackWeekDate,
-        opening: it.opening,
-        sell_in: it.sell_in,
-        sell_out: it.sell_out,
-        closing: it.closing
+        opening: it.opening, sell_in: it.sell_in, sell_out: it.sell_out, closing: it.closing
       }));
       const { error: invErr } = await sb.from('disty_inventory').upsert(invRows, { onConflict: 'disty_code,disty,week_date' });
       if (invErr) throw new Error(`[${disty}] Lỗi upsert disty_inventory: ${invErr.message}`);
