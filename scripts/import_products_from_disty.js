@@ -442,7 +442,7 @@ async function processSheet(disty, sheetName, rows, normKeyMap) {
         const normKey = tsMatchKey(norm);
         if (!normKeyMap.has(normKey)) {
           const lob = it.lob ? mapDistyLob(it.lob) : inferLobFromName(cleanName);
-          newPmRows.push({ sku: cleanName, model_name: cleanName, normalized_name: norm, lob });
+          newPmRows.push({ sku: cleanName, model_name: cleanName, normalized_name: norm, lob, is_active: true });
           normKeyMap.set(normKey, cleanName);
         }
       }
@@ -450,11 +450,11 @@ async function processSheet(disty, sheetName, rows, normKeyMap) {
     skuByCode[it.disty_code] = sku;
   }
 
-  // 2. Insert new products_master rows
+  // 2. INSERT new products_master rows FIRST — FK constraint requires these to exist before product_disty_codes
   if (newPmRows.length) {
     const { error } = await sb.from('products_master').upsert(newPmRows, { onConflict: 'sku' });
-    if (error) console.warn(`  [${disty}] Lỗi tạo PM mới: ${error.message}`);
-    else console.log(`  Đã tạo ${newPmRows.length} sản phẩm mới trong products_master`);
+    if (error) throw new Error(`[${disty}] Lỗi tạo products_master mới: ${error.message}`);
+    console.log(`  Đã tạo ${newPmRows.length} sản phẩm mới trong products_master`);
   }
 
   // 3. Upsert product_disty_codes WITH sku set immediately

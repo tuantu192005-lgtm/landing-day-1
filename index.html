@@ -6973,7 +6973,7 @@
             const normKey = tsMatchKey(norm);
             if (normToSku && !normToSku.has(normKey)) {
               const lob = it.lob ? mapDistyLob(it.lob) : inferLobFromName(cleanName);
-              newPmRows.push({ sku: cleanName, model_name: cleanName, normalized_name: norm, lob });
+              newPmRows.push({ sku: cleanName, model_name: cleanName, normalized_name: norm, lob, is_active: true });
               normToSku.set(normKey, cleanName);
             }
           }
@@ -6981,10 +6981,10 @@
         skuByCode[it.disty_code] = sku;
       }
 
-      // 2. Insert new products_master rows
+      // 2. INSERT new products_master rows FIRST — must succeed before product_disty_codes (FK constraint)
       if (newPmRows.length) {
         const { error } = await sb.from('products_master').upsert(newPmRows, { onConflict: 'sku' });
-        if (error) console.warn(`[${disty}] Lỗi tạo PM mới: ${error.message}`);
+        if (error) throw new Error(`[${disty}] Lỗi tạo products_master mới: ${error.message}`);
       }
 
       // 3. Upsert product_disty_codes WITH sku set immediately
