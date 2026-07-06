@@ -2183,6 +2183,7 @@
               <button type="button" class="btn-secondary hidden" id="importProductsBtn">Import từ Excel</button>
               <input type="file" id="importProductsInput" accept=".xlsx,.xls" class="hidden" />
               <button type="button" class="btn-secondary hidden" id="detectDupSkuBtn" style="color:#7c3aed;border-color:#7c3aed">🔍 Phát hiện SKU trùng</button>
+              <button type="button" class="btn-secondary hidden" id="tempSkuBtn" style="color:#b45309;border-color:#b45309">📋 SKU tạm</button>
               <button type="button" class="btn-secondary hidden" id="mappingNppBtn" style="color:#0369a1;border-color:#0369a1">🔗 Mapping NPP</button>
             </div>
             <div class="table-wrapper">
@@ -2551,6 +2552,33 @@
         <div id="dupDetectSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
         <div id="dupDetectResults"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal SKU tạm cần gộp -->
+  <div id="tempSkuModal" class="hidden" style="position:fixed;inset:0;z-index:10004;background:rgba(10,26,60,.55);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:1060px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(10,26,60,.3)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-shrink:0">
+        <h2 style="margin:0;font-size:15px;font-weight:700;color:#1a2b4c;flex:1">📋 SKU tạm chưa chuẩn hóa</h2>
+        <button type="button" id="closeTempSkuBtn" style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:#9ca3af;padding:0 4px">×</button>
+      </div>
+      <div id="tempSkuStats" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:13px;color:#374151;flex-shrink:0"></div>
+      <div style="overflow-y:auto;flex:1;border:1px solid #e5e7eb;border-radius:8px">
+        <table class="target-table" style="font-size:12px;min-width:820px">
+          <thead style="position:sticky;top:0;background:#f8fafc;z-index:1">
+            <tr>
+              <th style="width:140px">SKU tạm</th>
+              <th>Tên model</th>
+              <th style="width:64px">LOB</th>
+              <th style="width:110px">NPP</th>
+              <th style="width:190px">SKU chuẩn gợi ý</th>
+              <th style="width:220px">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="tempSkuTableBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9ca3af">Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="tempSkuPagination" style="display:flex;gap:8px;padding:12px 0 0;align-items:center;flex-shrink:0"></div>
     </div>
   </div>
 
@@ -4803,6 +4831,7 @@
       document.getElementById('addProductBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('importProductsBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('detectDupSkuBtn')?.classList.toggle('hidden', !isAdmin);
+      document.getElementById('tempSkuBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('mappingNppBtn')?.classList.toggle('hidden', !isAdmin);
       document.getElementById('addNppCodeBtn')?.classList.toggle('hidden', !isAdmin);
       showProductsListView();
@@ -6068,6 +6097,248 @@
 
     document.getElementById('closeDupDetectBtn')?.addEventListener('click', () => {
       document.getElementById('dupDetectModal')?.classList.add('hidden');
+    });
+
+    // ── SKU tạm cần gộp ──────────────────────────────────────────────────────
+
+    function isTempSku(sku) {
+      if (!sku) return false;
+      return /^\d/.test(sku) ||
+        /^(VGMR|SVGAMSI|MAMB|MAMH|MAKTC)/i.test(sku);
+    }
+
+    let _tempSkuAll = [], _tempSkuPage = 0;
+    const TEMP_SKU_PAGE = 50;
+
+    document.getElementById('tempSkuBtn')?.addEventListener('click', () => {
+      document.getElementById('tempSkuModal')?.classList.remove('hidden');
+      loadTempSkuList();
+    });
+    document.getElementById('closeTempSkuBtn')?.addEventListener('click', () => {
+      document.getElementById('tempSkuModal')?.classList.add('hidden');
+    });
+
+    async function loadTempSkuList() {
+      const statsEl = document.getElementById('tempSkuStats');
+      const tbody   = document.getElementById('tempSkuTableBody');
+      statsEl.textContent = 'Đang tải...';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9ca3af">Đang tải...</td></tr>';
+
+      // Load products_master (paginated)
+      const allPM = [];
+      for (let from = 0; ; from += 1000) {
+        const { data } = await sb.from('products_master')
+          .select('sku, model_name, lob, normalized_name').range(from, from + 999);
+        if (!data?.length) break;
+        allPM.push(...data);
+        if (data.length < 1000) break;
+      }
+
+      // Load disty_codes: which temp SKUs have NPP coverage
+      const { data: allCodes } = await sb.from('product_disty_codes').select('sku, disty');
+      const skuDistyMap = new Map();
+      for (const c of allCodes || []) {
+        if (!skuDistyMap.has(c.sku)) skuDistyMap.set(c.sku, new Set());
+        skuDistyMap.get(c.sku).add(c.disty);
+      }
+
+      // Build normalized_name → standard SKUs (non-temp)
+      const normToStd = new Map();
+      for (const p of allPM) {
+        if (isTempSku(p.sku)) continue;
+        const n = p.normalized_name || '';
+        if (!normToStd.has(n)) normToStd.set(n, []);
+        normToStd.get(n).push(p);
+      }
+
+      // Collect temp SKUs with suggestions
+      const items = [];
+      for (const p of allPM) {
+        if (!isTempSku(p.sku)) continue;
+        const n = p.normalized_name || '';
+        const stds = normToStd.get(n) || [];
+        const distys = skuDistyMap.get(p.sku);
+        items.push({
+          sku: p.sku, model_name: p.model_name, lob: p.lob,
+          normalized_name: n,
+          stdSku: stds[0] || null,
+          distys: distys ? [...distys] : [],
+          hasNpp: !!(distys && distys.size > 0),
+        });
+      }
+      items.sort((a, b) => {
+        if (!!a.stdSku !== !!b.stdSku) return a.stdSku ? -1 : 1;
+        return a.sku.localeCompare(b.sku);
+      });
+
+      _tempSkuAll = items;
+      _tempSkuPage = 0;
+      renderTempSkuStats();
+      renderTempSkuPage();
+    }
+
+    function renderTempSkuStats() {
+      const el = document.getElementById('tempSkuStats');
+      if (!el) return;
+      const total = _tempSkuAll.length;
+      const withSug  = _tempSkuAll.filter(t => t.stdSku).length;
+      const hasNpp   = _tempSkuAll.filter(t => t.hasNpp).length;
+      el.innerHTML = `Tổng: <strong>${total}</strong> SKU tạm &nbsp;·&nbsp;
+        Có gợi ý: <strong style="color:#0369a1">${withSug}</strong> &nbsp;·&nbsp;
+        Đã có NPP: <strong style="color:#059669">${hasNpp}</strong> &nbsp;·&nbsp;
+        Chưa có NPP: <strong style="color:#6b7280">${total - hasNpp}</strong>`;
+    }
+
+    function renderTempSkuPage() {
+      const tbody  = document.getElementById('tempSkuTableBody');
+      const pagEl  = document.getElementById('tempSkuPagination');
+      const total  = _tempSkuAll.length;
+      const pages  = Math.max(1, Math.ceil(total / TEMP_SKU_PAGE));
+      if (_tempSkuPage >= pages) _tempSkuPage = pages - 1;
+      const slice  = _tempSkuAll.slice(_tempSkuPage * TEMP_SKU_PAGE, (_tempSkuPage + 1) * TEMP_SKU_PAGE);
+      const he     = escapeHtmlForDistyReport;
+
+      if (!slice.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#059669;font-weight:600">✅ Không còn SKU tạm nào!</td></tr>';
+        if (pagEl) pagEl.innerHTML = '';
+        return;
+      }
+
+      tbody.innerHTML = slice.map(item => {
+        const nppHtml = item.hasNpp
+          ? `<span style="color:#059669;font-size:11px">${he(item.distys.join(', '))}</span>`
+          : `<span style="color:#9ca3af;font-size:11px">—</span>`;
+        const stdHtml = item.stdSku
+          ? `<span style="color:#0369a1;font-size:11px;font-weight:600" title="${he(item.stdSku.sku)}">${he(item.stdSku.sku.length > 28 ? item.stdSku.sku.slice(0,26)+'…' : item.stdSku.sku)}</span>
+             <div style="color:#9ca3af;font-size:10px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:185px" title="${he(item.stdSku.model_name)}">${he(item.stdSku.model_name)}</div>`
+          : `<span style="color:#9ca3af;font-size:11px">—</span>`;
+        const mergeBtn = item.stdSku
+          ? `<button class="ts-merge-btn btn-primary" data-src="${he(item.sku)}" data-dst="${he(item.stdSku.sku)}"
+               style="font-size:11px;padding:3px 10px">Gộp ngay</button> `
+          : '';
+        return `<tr>
+          <td><code style="font-size:11px;font-weight:600">${he(item.sku)}</code></td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${he(item.model_name)}">${he(item.model_name)}</td>
+          <td>${lobBadgeHtml(item.lob)}</td>
+          <td>${nppHtml}</td>
+          <td>${stdHtml}</td>
+          <td style="white-space:nowrap">
+            ${mergeBtn}<button class="ts-find-btn btn-secondary" data-src="${he(item.sku)}"
+              style="font-size:11px;padding:3px 8px">Tìm SKU khác</button>
+            <div class="ts-search-box hidden" style="margin-top:6px;position:relative">
+              <input type="text" class="ts-search-input" placeholder="Nhập SKU hoặc tên model..."
+                style="border:1px solid #d1d5db;border-radius:6px;padding:4px 8px;font-size:11px;width:200px" />
+              <div class="ts-suggestions" style="display:none;position:absolute;left:0;top:100%;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:200;max-height:180px;overflow-y:auto;min-width:240px"></div>
+              <div class="ts-confirm-area hidden" style="margin-top:4px;font-size:11px">
+                <span class="ts-confirm-text" style="color:#78350f"></span>
+                <button class="ts-confirm-btn btn-primary" data-src="${he(item.sku)}"
+                  style="font-size:11px;padding:2px 8px;margin-left:6px">Xác nhận gộp</button>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      // Pagination
+      if (pagEl) {
+        pagEl.innerHTML = pages <= 1 ? '' : `
+          <button class="ts-page-btn" data-dir="-1" ${_tempSkuPage === 0 ? 'disabled' : ''}
+            style="padding:5px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:#fff">← Trang trước</button>
+          <span style="font-size:12px;color:#6b7280">Trang ${_tempSkuPage + 1} / ${pages} &nbsp;·&nbsp; ${total} SKU tạm</span>
+          <button class="ts-page-btn" data-dir="1" ${_tempSkuPage >= pages - 1 ? 'disabled' : ''}
+            style="padding:5px 14px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;background:#fff">Trang sau →</button>`;
+      }
+    }
+
+    // Delegate clicks inside tempSkuModal
+    document.getElementById('tempSkuModal')?.addEventListener('click', async e => {
+      // Gộp ngay
+      const mergeBtn = e.target.closest('.ts-merge-btn');
+      if (mergeBtn) {
+        const src = mergeBtn.dataset.src, dst = mergeBtn.dataset.dst;
+        mergeBtn.disabled = true; mergeBtn.textContent = '⏳';
+        try {
+          await mergeProducts(src, dst);
+          _tempSkuAll = _tempSkuAll.filter(t => t.sku !== src);
+          renderTempSkuStats(); renderTempSkuPage();
+          showMsiToast(`Đã gộp ${src} → ${dst}`);
+        } catch (err) { showMsiToast('Lỗi: ' + err.message); mergeBtn.disabled = false; mergeBtn.textContent = 'Gộp ngay'; }
+        return;
+      }
+      // Tìm SKU khác — toggle inline search
+      const findBtn = e.target.closest('.ts-find-btn');
+      if (findBtn) {
+        const box = findBtn.closest('td').querySelector('.ts-search-box');
+        box?.classList.toggle('hidden');
+        box?.querySelector('.ts-search-input')?.focus();
+        return;
+      }
+      // Xác nhận gộp từ inline search
+      const confirmBtn = e.target.closest('.ts-confirm-btn');
+      if (confirmBtn) {
+        const src = confirmBtn.dataset.src;
+        const dst = confirmBtn.dataset.dst;
+        if (!src || !dst) return;
+        confirmBtn.disabled = true; confirmBtn.textContent = '⏳';
+        try {
+          await mergeProducts(src, dst);
+          _tempSkuAll = _tempSkuAll.filter(t => t.sku !== src);
+          renderTempSkuStats(); renderTempSkuPage();
+          showMsiToast(`Đã gộp ${src} → ${dst}`);
+        } catch (err) { showMsiToast('Lỗi: ' + err.message); confirmBtn.disabled = false; confirmBtn.textContent = 'Xác nhận gộp'; }
+        return;
+      }
+      // Pagination
+      const pageBtn = e.target.closest('.ts-page-btn');
+      if (pageBtn && !pageBtn.disabled) {
+        _tempSkuPage += parseInt(pageBtn.dataset.dir, 10);
+        renderTempSkuPage();
+      }
+    });
+
+    // Inline search input handler (delegated via input event)
+    document.getElementById('tempSkuModal')?.addEventListener('input', async e => {
+      const input = e.target.closest('.ts-search-input');
+      if (!input) return;
+      const q = input.value.trim();
+      const sugEl = input.closest('.ts-search-box').querySelector('.ts-suggestions');
+      const confirmArea = input.closest('.ts-search-box').querySelector('.ts-confirm-area');
+      confirmArea?.classList.add('hidden');
+      if (!q) { sugEl.style.display = 'none'; return; }
+      const { data } = await sb.from('products_master')
+        .select('sku, model_name, lob')
+        .or(`sku.ilike.%${q}%,model_name.ilike.%${q}%`)
+        .limit(8);
+      const he = escapeHtmlForDistyReport;
+      sugEl.innerHTML = (data || []).filter(p => !isTempSku(p.sku)).map(p =>
+        `<div class="ts-sug-item" data-sku="${he(p.sku)}" data-name="${he(p.model_name).replace(/"/g,'&quot;')}"
+          style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid #f1f5f9;display:flex;gap:8px;align-items:baseline">
+          <span style="font-family:monospace;font-weight:600;color:#1a2b4c;flex-shrink:0">${he(p.sku.length>30?p.sku.slice(0,28)+'…':p.sku)}</span>
+          <span style="color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${he(p.model_name)}</span>
+          <span style="margin-left:auto;flex-shrink:0">${lobBadgeHtml(p.lob)}</span>
+        </div>`).join('') || '<div style="padding:8px 10px;font-size:12px;color:#6b7280">Không tìm thấy</div>';
+      sugEl.style.display = 'block';
+    });
+
+    // Select suggestion from inline search
+    document.getElementById('tempSkuModal')?.addEventListener('click', e => {
+      const sug = e.target.closest('.ts-sug-item');
+      if (!sug) return;
+      const dstSku = sug.dataset.sku;
+      const dstName = sug.dataset.name;
+      const box = sug.closest('.ts-search-box');
+      const input = box.querySelector('.ts-search-input');
+      const sugEl = box.querySelector('.ts-suggestions');
+      const confirmArea = box.querySelector('.ts-confirm-area');
+      const confirmBtn = box.querySelector('.ts-confirm-btn');
+      const srcSku = confirmBtn?.dataset.src;
+      input.value = `${dstSku} — ${dstName}`;
+      sugEl.style.display = 'none';
+      if (confirmArea && confirmBtn) {
+        confirmBtn.dataset.dst = dstSku;
+        confirmArea.querySelector('.ts-confirm-text').textContent = `Gộp ${srcSku} → ${dstSku}?`;
+        confirmArea.classList.remove('hidden');
+      }
     });
 
     // Delegate merge, ignore, and pagination clicks inside modal
