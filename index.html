@@ -6142,13 +6142,22 @@
         skuDistyMap.get(c.sku).add(c.disty);
       }
 
+      // Strip geforce/radeon prefix khi so khớp — giống normalizeForMatch trong Node script
+      // Cần vì: temp SKU normalized_name = "rtx 5060 ti...", standard = "geforce rtx 5060 ti..."
+      function tsMatchKey(norm) {
+        let n = (norm || '').toLowerCase().trim();
+        if (n.startsWith('geforce ')) n = n.slice(8);
+        if (n.startsWith('radeon '))  n = n.slice(7);
+        return n;
+      }
+
       // Build normalized_name → standard SKUs (non-temp)
       const normToStd = new Map();
       for (const p of allPM) {
         if (isTempSku(p.sku)) continue;
-        const n = p.normalized_name || '';
-        if (!normToStd.has(n)) normToStd.set(n, []);
-        normToStd.get(n).push(p);
+        const k = tsMatchKey(p.normalized_name);
+        if (!normToStd.has(k)) normToStd.set(k, []);
+        normToStd.get(k).push(p);
       }
 
       // Collect temp SKUs with suggestions
@@ -6156,7 +6165,7 @@
       for (const p of allPM) {
         if (!isTempSku(p.sku)) continue;
         const n = p.normalized_name || '';
-        const stds = normToStd.get(n) || [];
+        const stds = normToStd.get(tsMatchKey(n)) || [];
         const distys = skuDistyMap.get(p.sku);
         items.push({
           sku: p.sku, model_name: p.model_name, lob: p.lob,
