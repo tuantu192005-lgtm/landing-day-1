@@ -4603,7 +4603,7 @@
         // 5. Build + classify rows
         const SO = { old: 0, watch: 1, normal: 2, new: 3 };
         _diAllRows = currentRows.map(r => {
-          if (!r.sku) return null;
+          if (!r.sku || !r.disty) return null;
           const pm = productMap[r.sku];
           if (!pm) return null;
           const now = r.closing ?? 0;
