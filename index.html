@@ -4603,10 +4603,14 @@
         // 5. Build + classify rows
         const SO = { old: 0, watch: 1, normal: 2, new: 3 };
         _diAllRows = currentRows.map(r => {
+          if (!r.sku) return null;
           const pm = productMap[r.sku];
           if (!pm) return null;
           const now = r.closing ?? 0;
           const old = compareMap[`${r.sku}:${r.disty}`];
+          // Ẩn dòng không có data thật: closing=0 VÀ không có lịch sử tồn kho trước đó
+          // Giữ lại nếu now=0 nhưng old>0 (hết hàng — trend có nghĩa)
+          if (now === 0 && !old) return null;
           let code, label;
           if (old === undefined)   { code = 'new';    label = '⚪ Mới'; }
           else if (old <= 0)       { code = 'normal'; label = '🟢 Bình thường'; }
