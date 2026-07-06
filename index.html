@@ -6706,7 +6706,9 @@
       for (const s of [' - new', ' (new)']) { if (n.endsWith(s)) { n = n.slice(0, -s.length); break; } }
       n = n.replace(/\s*\(model:[^)]+\)\s*[\d.]*\s*inch\b/i, '');
       n = n.replace(/\s*[\d.]+['''"]+$/, '');
-      n = n.replace(/\s*\/\d+[''"]?\s*inch.*/i, '');
+      n = n.replace(/\s*\/\s*\d+[\d.]*\s*[''"]?\s*inch.*/i, '');
+      n = n.replace(/\s*\/\s*(FHD|WQHD|UHD|QHD|IPS|VA|TN|OLED|4K|2K).*/i, '');
+      n = n.replace(/\s+\d+[\d.]*['''"]\s*$/, '');
       n = n.replace(/\s*-\s*/g, '-');
       return n.trim().replace(/\s+/g, ' ');
     }
