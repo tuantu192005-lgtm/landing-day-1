@@ -6878,7 +6878,7 @@
         // Tier 2: new products not in DB
         const newProds = items.filter(it => !normToSku.has(tsMatchKey(normalizeModelName(it.disty_name))));
         if (newProds.length) {
-          const list = newProds.slice(0, 8).map(it => `<li>${he(it.disty_name)}</li>`).join('');
+          const list = newProds.slice(0, 8).map(it => `<li>${he(computeCleanSkuName(it.disty_name))}</li>`).join('');
           const more = newProds.length > 8 ? `<li><em>... và ${newProds.length - 8} sản phẩm khác</em></li>` : '';
           warnings.push(`[${he(disty)}] <strong>${newProds.length}</strong> sản phẩm mới — sẽ tự động tạo SKU từ tên model:<ul style="margin:4px 0 0 16px;padding:0">${list}${more}</ul>`);
         }
