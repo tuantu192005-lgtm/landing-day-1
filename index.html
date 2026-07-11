@@ -5141,7 +5141,14 @@
           </div>
         </div>`;
       }
-      const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
+      // Staff bi khoa cung "Nhan vien" = chinh ho, khong duoc chon nguoi khac —
+      // chi admin (Nam) moi thay dropdown chon duoc ca doi.
+      const assignedField = isAdmin
+        ? (() => {
+            const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
+            return `<select class="pp-assigned">${empOptions}</select>`;
+          })()
+        : `<div class="pp-field-readonly-value">${he(currentUser?.name || '—')}</div>`;
       const distyChecks = PRODUCTS_DISTY_LIST.map((d) =>
         `<label class="pp-disty-chip"><input type="checkbox" class="pp-disty" value="${he(d)}" ${distyArr.includes(d) ? 'checked' : ''}> ${he(d)}</label>`
       ).join('');
@@ -5154,7 +5161,7 @@
         </div>
         <div class="pp-card-row">
           <div class="pp-field"><label>Đại lý</label><select class="pp-customer">${customerSelectOptions}</select></div>
-          <div class="pp-field"><label>Nhân viên</label><select class="pp-assigned">${empOptions}</select></div>
+          <div class="pp-field"><label>Nhân viên</label>${assignedField}</div>
           <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
         </div>
         <div class="pp-card-row">
@@ -5289,7 +5296,9 @@
           disty: distyChecked.length ? distyChecked : null,
           customer_id: customerId ? Number(customerId) : null,
           customer_name: customerName,
-          assigned_to: card.querySelector('.pp-assigned')?.value || null,
+          // Staff luon bi khoa cung = chinh ho (khong co select .pp-assigned de doc);
+          // chi admin moi duoc chon nguoi khac hoac de trong ("Chung").
+          assigned_to: isProductsAdmin() ? (card.querySelector('.pp-assigned')?.value || null) : currentUser.id,
           hero: Number(card.querySelector('.pp-hero')?.value) || 0,
           extra_1: Number(card.querySelector('.pp-extra1')?.value) || 0,
           extra_2: Number(card.querySelector('.pp-extra2')?.value) || 0,
