@@ -5567,13 +5567,35 @@
       const tbody = document.getElementById('productPricingTableBody');
       if (!tbody || !currentProductSku || !quarter || !currentUser) return;
 
-      const upsertRows = collectEditablePricingRows(quarter).map((row) => ({
+      // Goi collectEditablePricingRows() DUY NHAT 1 LAN va tai su dung cho
+      // ca 2 buoc — moi lan goi ham nay tu sinh UUID moi cho dong chua co id
+      // (crypto.randomUUID()), goi 2 lan se ra 2 id khac nhau va lam hong
+      // buoc 2 (tuong update lai thanh insert dong khac).
+      const baseRows = collectEditablePricingRows(quarter);
+      if (!baseRows.length) {
+        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        return;
+      }
+
+      // Buoc 1: dam bao row da ton tai voi status='draft'. Day la buoc bat
+      // buoc voi dong CHUA TUNG luu — RLS staff_insert_own chi cho INSERT
+      // khi status='draft', gui thang 'pending' se bi tu choi (dung loi da
+      // gap). Voi dong da Luu nhap tu truoc, day chi la update draft->draft,
+      // khong doi gi.
+      const draftRows = baseRows.map((row) => ({ ...row, status: 'draft' }));
+      const draftOk = await savePricingRows(draftRows, msgEl);
+      if (!draftOk) return;
+
+      // Buoc 2: chuyen sang pending — luc nay row chac chan da ton tai nen
+      // day la UPDATE, thoa policy staff_update_own_draft (cho phep
+      // draft -> pending).
+      const pendingRows = baseRows.map((row) => ({
         ...row,
         status: 'pending',
         submitted_by: currentUser.id,
         submitted_at: new Date().toISOString()
       }));
-      const ok = await savePricingRows(upsertRows, msgEl);
+      const ok = await savePricingRows(pendingRows, msgEl);
       if (!ok) return;
       showMsiToast('Đã gửi duyệt');
       await loadProductPricingPane();
