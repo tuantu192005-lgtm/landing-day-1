@@ -1448,8 +1448,9 @@
       cursor: pointer;
       user-select: none;
     }
-    .pp-card-summary .pp-summary-disty { flex: 1 1 auto; font-weight: 600; color: #111827; font-size: 0.92rem; }
-    .pp-card-summary .pp-summary-customer { flex: 1 1 auto; color: #4b5563; font-size: 0.88rem; }
+    .pp-card-summary .pp-summary-customer { flex: 1 1 auto; font-weight: 600; color: #111827; font-size: 0.92rem; }
+    .pp-card-summary .pp-summary-net { font-weight: 700; color: #111827; font-size: 0.92rem; white-space: nowrap; }
+    .pp-card-summary .pp-summary-disty { flex: 1 1 auto; color: #4b5563; font-size: 0.88rem; text-align: right; }
     .pp-card-summary .pp-summary-chevron { color: #9ca3af; transition: transform .15s ease; }
     .pp-card-collapsed .pp-card-summary .pp-summary-chevron { transform: rotate(-90deg); }
     .pp-card-collapsed .pp-card-body { display: none; }
@@ -2445,7 +2446,7 @@
                 <h4>Thông tin sản phẩm</h4>
                 <div id="productInfoRows"></div>
               </div>
-              <div class="product-npp-card">
+              <div class="product-npp-card hidden">
                 <h4>NPP phân phối</h4>
                 <table class="target-table" style="font-size:12px">
                   <thead><tr><th>NPP</th><th>Mã NPP</th><th>Tên NPP</th></tr></thead>
@@ -5364,12 +5365,13 @@
       const distyArr = Array.isArray(r.disty) ? r.disty : (r.disty ? [r.disty] : []);
       const distyText = distyArr.length ? distyArr.map(he).join(', ') : '—';
 
-      // Dòng đã lưu (có id) mặc định thu gọn, chỉ hiện NPP/Đại lý/Trạng thái —
+      // Dòng đã lưu (có id) mặc định thu gọn, chỉ hiện Đại lý/Net Price/NPP/Trạng thái —
       // bấm vào mới mở ra đầy đủ. Dòng mới thêm (chưa có id) luôn hiện đầy đủ.
       const isSaved = !!r.id;
       const summaryHtml = isSaved ? `<div class="pp-card-summary">
-          <span class="pp-summary-disty">${distyText}</span>
           <span class="pp-summary-customer">${he(r.customer_name || '—')}</span>
+          <span class="pp-summary-net">${fmtQtyMsi(net)}</span>
+          <span class="pp-summary-disty">${distyText}</span>
           <span class="pp-summary-status">${statusBadge}</span>
           <span class="pp-summary-chevron">▾</span>
         </div>` : '';
