@@ -1318,6 +1318,22 @@
     }
     .pp-disty-chip input { width: auto; padding: 0; border: none; }
     .pp-card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .pp-card-summary {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pp-card-summary .pp-summary-disty { flex: 1 1 auto; font-weight: 600; color: #111827; font-size: 0.92rem; }
+    .pp-card-summary .pp-summary-customer { flex: 1 1 auto; color: #4b5563; font-size: 0.88rem; }
+    .pp-card-summary .pp-summary-chevron { color: #9ca3af; transition: transform .15s ease; }
+    .pp-card-collapsed .pp-card-summary .pp-summary-chevron { transform: rotate(-90deg); }
+    .pp-card-collapsed .pp-card-body { display: none; }
+    .pp-card:not(.pp-card-collapsed) .pp-card-summary { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; }
+    @media (max-width: 640px) {
+      .pp-card-summary { flex-wrap: wrap; gap: 8px; }
+    }
     .pp-card-placeholder { padding: 20px; color: #9ca3af; text-align: center; }
     .pp-status-badge { display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap; }
     .pp-status-draft    { background:#e5e7eb;color:#374151; }
@@ -5119,12 +5135,25 @@
       // khi đã pending/approved thì chỉ admin (Nam) mới sửa được — sales chỉ xem.
       const lockedForNonAdmin = !isAdmin && (status === 'pending' || status === 'approved');
       const distyArr = Array.isArray(r.disty) ? r.disty : (r.disty ? [r.disty] : []);
+      const distyText = distyArr.length ? distyArr.map(he).join(', ') : '—';
+
+      // Dòng đã lưu (có id) mặc định thu gọn, chỉ hiện NPP/Đại lý/Trạng thái —
+      // bấm vào mới mở ra đầy đủ. Dòng mới thêm (chưa có id) luôn hiện đầy đủ.
+      const isSaved = !!r.id;
+      const summaryHtml = isSaved ? `<div class="pp-card-summary">
+          <span class="pp-summary-disty">${distyText}</span>
+          <span class="pp-summary-customer">${he(r.customer_name || '—')}</span>
+          <span class="pp-summary-status">${statusBadge}</span>
+          <span class="pp-summary-chevron">▾</span>
+        </div>` : '';
+
+      let bodyHtml;
       if (lockedForNonAdmin) {
         const empName = EMPLOYEES.find((e) => e.id === r.assigned_to)?.name || '— Chung —';
-        return `<div class="pp-card" data-id="${r.id || ''}" data-status="${status}">
+        bodyHtml = `<div class="pp-card-body">
           <div class="pp-field pp-field-disty">
             <label>NPP</label>
-            <div class="pp-field-readonly-value">${distyArr.length ? distyArr.map(he).join(', ') : '—'}</div>
+            <div class="pp-field-readonly-value">${distyText}</div>
           </div>
           <div class="pp-card-row">
             <div class="pp-field"><label>Đại lý</label><div class="pp-field-readonly-value">${r.customer_name || '—'}</div></div>
@@ -5140,42 +5169,45 @@
             <div class="pp-field pp-field-net"><label>Net Price</label><div class="pp-field-readonly-value">${fmtQtyMsi(net)}</div></div>
           </div>
         </div>`;
+      } else {
+        // Staff bi khoa cung "Nhan vien" = chinh ho, khong duoc chon nguoi khac —
+        // chi admin (Nam) moi thay dropdown chon duoc ca doi.
+        const assignedField = isAdmin
+          ? (() => {
+              const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
+              return `<select class="pp-assigned">${empOptions}</select>`;
+            })()
+          : `<div class="pp-field-readonly-value">${he(currentUser?.name || '—')}</div>`;
+        const distyChecks = PRODUCTS_DISTY_LIST.map((d) =>
+          `<label class="pp-disty-chip"><input type="checkbox" class="pp-disty" value="${he(d)}" ${distyArr.includes(d) ? 'checked' : ''}> ${he(d)}</label>`
+        ).join('');
+        const customerSelectOptions = `<option value="">— Chọn khách hàng —</option>` +
+          (customerOptions || []).map((c) => `<option value="${c.id}" ${String(c.id) === String(r.customer_id ?? '') ? 'selected' : ''}>${he(c.full_name)}</option>`).join('');
+        bodyHtml = `<div class="pp-card-body">
+          <div class="pp-field pp-field-disty">
+            <label>NPP (chọn nhiều)</label>
+            <div class="pp-disty-checks">${distyChecks}</div>
+          </div>
+          <div class="pp-card-row">
+            <div class="pp-field"><label>Đại lý</label><select class="pp-customer">${customerSelectOptions}</select></div>
+            <div class="pp-field"><label>Nhân viên</label>${assignedField}</div>
+            <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
+          </div>
+          <div class="pp-card-row">
+            <div class="pp-field"><label>Hero</label><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></div>
+            <div class="pp-field"><label>Extra 1</label><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" /></div>
+            <div class="pp-field"><label>Extra 2</label><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" /></div>
+            <div class="pp-field"><label>Extra 3</label><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" /></div>
+            <div class="pp-field"><label>Extra 4</label><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" /></div>
+            <div class="pp-field pp-field-net"><label>Net Price</label><span class="pp-net">${fmtQtyMsi(net)}</span></div>
+          </div>
+          <div class="pp-card-actions">
+            <button type="button" class="btn-secondary pp-delete-row">Xoá</button>
+          </div>
+        </div>`;
       }
-      // Staff bi khoa cung "Nhan vien" = chinh ho, khong duoc chon nguoi khac —
-      // chi admin (Nam) moi thay dropdown chon duoc ca doi.
-      const assignedField = isAdmin
-        ? (() => {
-            const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
-            return `<select class="pp-assigned">${empOptions}</select>`;
-          })()
-        : `<div class="pp-field-readonly-value">${he(currentUser?.name || '—')}</div>`;
-      const distyChecks = PRODUCTS_DISTY_LIST.map((d) =>
-        `<label class="pp-disty-chip"><input type="checkbox" class="pp-disty" value="${he(d)}" ${distyArr.includes(d) ? 'checked' : ''}> ${he(d)}</label>`
-      ).join('');
-      const customerSelectOptions = `<option value="">— Chọn khách hàng —</option>` +
-        (customerOptions || []).map((c) => `<option value="${c.id}" ${String(c.id) === String(r.customer_id ?? '') ? 'selected' : ''}>${he(c.full_name)}</option>`).join('');
-      return `<div class="pp-card" data-id="${r.id || ''}" data-status="${status}">
-        <div class="pp-field pp-field-disty">
-          <label>NPP (chọn nhiều)</label>
-          <div class="pp-disty-checks">${distyChecks}</div>
-        </div>
-        <div class="pp-card-row">
-          <div class="pp-field"><label>Đại lý</label><select class="pp-customer">${customerSelectOptions}</select></div>
-          <div class="pp-field"><label>Nhân viên</label>${assignedField}</div>
-          <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
-        </div>
-        <div class="pp-card-row">
-          <div class="pp-field"><label>Hero</label><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></div>
-          <div class="pp-field"><label>Extra 1</label><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" /></div>
-          <div class="pp-field"><label>Extra 2</label><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" /></div>
-          <div class="pp-field"><label>Extra 3</label><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" /></div>
-          <div class="pp-field"><label>Extra 4</label><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" /></div>
-          <div class="pp-field pp-field-net"><label>Net Price</label><span class="pp-net">${fmtQtyMsi(net)}</span></div>
-        </div>
-        <div class="pp-card-actions">
-          <button type="button" class="btn-secondary pp-delete-row">Xoá</button>
-        </div>
-      </div>`;
+
+      return `<div class="pp-card${isSaved ? ' pp-card-collapsed' : ''}" data-id="${r.id || ''}" data-status="${status}">${summaryHtml}${bodyHtml}</div>`;
     }
 
     function attachPricingRowHandlers() {
@@ -5183,6 +5215,11 @@
       if (!tbody) return;
       const sdpPrice = currentProductData?.sdp_price || 0;
       tbody.querySelectorAll('.pp-card').forEach((card) => {
+        // Thu gon/mo rong: ap dung cho moi dong da luu (co thanh tom tat),
+        // ca ban chi-doc (locked) lan ban sua duoc — khong phu thuoc .pp-hero.
+        card.querySelector('.pp-card-summary')?.addEventListener('click', () => {
+          card.classList.toggle('pp-card-collapsed');
+        });
         if (!card.querySelector('.pp-hero')) return;
         const recalc = () => {
           const hero = Number(card.querySelector('.pp-hero')?.value) || 0;
