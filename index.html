@@ -5504,17 +5504,23 @@
       const tbody = document.getElementById('productPricingTableBody');
       if (!tbody) return [];
       const cards = [...tbody.querySelectorAll('.pp-card')].filter((card) => card.querySelector('.pp-hero'));
-      // Luôn gán id (random UUID phía client cho dòng mới) — nếu để 1 dòng
-      // trong cùng mảng upsert KHÔNG có id trong khi dòng khác CÓ, PostgREST
-      // sẽ NULL-fill cột id cho dòng thiếu (union cột theo cả batch) thay vì
-      // để DEFAULT gen_random_uuid() tự áp dụng, gây lỗi NOT NULL constraint.
+      // isNew: true neu dong chua co id that tu DB (card.dataset.id rong) —
+      // dung de savePricingRows() quyet dinh goi insert() hay update() THAT
+      // SU, khong dung upsert(). Ly do: voi Postgres RLS, INSERT ... ON
+      // CONFLICT DO UPDATE (chinh la co che cua upsert()) van kiem tra
+      // WITH CHECK cua POLICY INSERT tren gia tri dang ghi, du cuoi cung
+      // di vao nhanh UPDATE do trung id. staff_insert_own chi cho INSERT
+      // khi status='draft', nen upsert() voi status='pending' luon bi
+      // chan boi policy INSERT bat ke row da ton tai hay chua.
       return cards.map((card) => {
+        const existingId = card.dataset.id || '';
         const customerSel = card.querySelector('.pp-customer');
         const customerId = customerSel?.value || '';
         const customerName = customerId ? customerSel.options[customerSel.selectedIndex].textContent : null;
         const distyChecked = [...card.querySelectorAll('.pp-disty:checked')].map((cb) => cb.value);
         return {
-          id: card.dataset.id || crypto.randomUUID(),
+          id: existingId || crypto.randomUUID(),
+          isNew: !existingId,
           sku: currentProductSku,
           quarter,
           disty: distyChecked.length ? distyChecked : null,
@@ -5533,16 +5539,33 @@
       });
     }
 
-    async function savePricingRows(upsertRows, msgEl) {
-      if (!upsertRows.length) {
+    // Luu THAT SU tach insert()/update() rieng biet — KHONG dung upsert().
+    // rows[].isNew quyet dinh dong nao insert() (dong chua tung luu), dong
+    // nao update() theo dung id (dong da ton tai trong DB).
+    async function savePricingRows(rows, msgEl) {
+      if (!rows.length) {
         if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
         return false;
       }
       if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
-      const { error } = await sb.from('product_programs').upsert(upsertRows);
-      if (error) {
-        if (msgEl) { msgEl.textContent = 'Lỗi lưu chương trình giá: ' + error.message; msgEl.style.color = '#b30012'; }
-        return false;
+
+      const newRows = rows.filter((r) => r.isNew).map(({ isNew, ...fields }) => fields);
+      const existingRows = rows.filter((r) => !r.isNew);
+
+      if (newRows.length) {
+        const { error } = await sb.from('product_programs').insert(newRows);
+        if (error) {
+          if (msgEl) { msgEl.textContent = 'Lỗi lưu chương trình giá: ' + error.message; msgEl.style.color = '#b30012'; }
+          return false;
+        }
+      }
+      for (const row of existingRows) {
+        const { id, isNew, ...fields } = row;
+        const { error } = await sb.from('product_programs').update(fields).eq('id', id);
+        if (error) {
+          if (msgEl) { msgEl.textContent = 'Lỗi lưu chương trình giá: ' + error.message; msgEl.style.color = '#b30012'; }
+          return false;
+        }
       }
       if (msgEl) msgEl.textContent = '';
       return true;
@@ -5554,8 +5577,8 @@
       const tbody = document.getElementById('productPricingTableBody');
       if (!tbody || !currentProductSku || !quarter) return;
 
-      const upsertRows = collectEditablePricingRows(quarter).map((row) => ({ ...row, status: 'draft' }));
-      const ok = await savePricingRows(upsertRows, msgEl);
+      const rows = collectEditablePricingRows(quarter).map((row) => ({ ...row, status: 'draft' }));
+      const ok = await savePricingRows(rows, msgEl);
       if (!ok) return;
       showMsiToast('Đã lưu nháp');
       await loadProductPricingPane();
@@ -5568,29 +5591,28 @@
       if (!tbody || !currentProductSku || !quarter || !currentUser) return;
 
       // Goi collectEditablePricingRows() DUY NHAT 1 LAN va tai su dung cho
-      // ca 2 buoc — moi lan goi ham nay tu sinh UUID moi cho dong chua co id
-      // (crypto.randomUUID()), goi 2 lan se ra 2 id khac nhau va lam hong
-      // buoc 2 (tuong update lai thanh insert dong khac).
+      // ca 2 buoc — moi lan goi ham nay tu sinh UUID moi cho dong chua co id,
+      // goi 2 lan se ra 2 id khac nhau va lam hong buoc 2.
       const baseRows = collectEditablePricingRows(quarter);
       if (!baseRows.length) {
         if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
         return;
       }
 
-      // Buoc 1: dam bao row da ton tai voi status='draft'. Day la buoc bat
-      // buoc voi dong CHUA TUNG luu — RLS staff_insert_own chi cho INSERT
-      // khi status='draft', gui thang 'pending' se bi tu choi (dung loi da
-      // gap). Voi dong da Luu nhap tu truoc, day chi la update draft->draft,
-      // khong doi gi.
+      // Buoc 1: insert() that su cho dong moi (status='draft', thoa
+      // staff_insert_own), update() cho dong da ton tai (draft->draft,
+      // vo hai). Sau buoc nay TAT CA dong chac chan da co trong DB.
       const draftRows = baseRows.map((row) => ({ ...row, status: 'draft' }));
       const draftOk = await savePricingRows(draftRows, msgEl);
       if (!draftOk) return;
 
-      // Buoc 2: chuyen sang pending — luc nay row chac chan da ton tai nen
-      // day la UPDATE, thoa policy staff_update_own_draft (cho phep
-      // draft -> pending).
+      // Buoc 2: update() THAT SU sang pending — ep isNew=false cho TOAN BO
+      // dong (ke ca dong vua duoc insert o buoc 1), dam bao khong bao gio
+      // goi lai insert()/upsert() voi status='pending' — chi UPDATE thuan
+      // tuy, thoa staff_update_own_draft (cho phep draft -> pending).
       const pendingRows = baseRows.map((row) => ({
         ...row,
+        isNew: false,
         status: 'pending',
         submitted_by: currentUser.id,
         submitted_at: new Date().toISOString()
