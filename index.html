@@ -1400,6 +1400,46 @@
       user-select: none;
     }
     .pp-disty-chip input { width: auto; padding: 0; border: none; }
+    .pp-extra-dates { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+    .pp-extra-dates input[type="date"] { font-size: 0.78rem; padding: 5px 6px; }
+    .pp-extra-dates span { color: #9ca3af; font-size: 0.78rem; }
+    .pp-extra-dates-ro { margin-top: 4px; font-size: 0.76rem; color: #6b7280; }
+    .pp-field-note { margin-bottom: 12px; }
+    .pp-field-note textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 0.88rem;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .pp-approval-panel {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .pp-approval-panel > label {
+      display: block;
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      margin-bottom: 4px;
+    }
+    .pp-approval-panel textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 0.88rem;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .pp-approval-actions { display: flex; gap: 10px; margin-top: 10px; }
     .pp-card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .pp-card-summary {
       display: flex;
@@ -5334,6 +5374,18 @@
           <span class="pp-summary-chevron">▾</span>
         </div>` : '';
 
+      // Moc thoi gian rieng cho tung Extra (cot DB da co san extra_N_start_date/end_date)
+      const extraDateRangeRo = (n) => {
+        const s = r[`extra_${n}_start_date`], e = r[`extra_${n}_end_date`];
+        return (s || e) ? `<div class="pp-extra-dates-ro">${s || '?'} – ${e || '?'}</div>` : '';
+      };
+      const extraDateRangeInputs = (n) => `
+          <div class="pp-extra-dates">
+            <input type="date" class="pp-extra${n}-start" value="${r[`extra_${n}_start_date`] || ''}" title="Từ ngày" />
+            <span>–</span>
+            <input type="date" class="pp-extra${n}-end" value="${r[`extra_${n}_end_date`] || ''}" title="Đến ngày" />
+          </div>`;
+
       let bodyHtml;
       if (lockedForNonAdmin) {
         const empName = EMPLOYEES.find((e) => e.id === r.assigned_to)?.name || '— Chung —';
@@ -5349,12 +5401,14 @@
           </div>
           <div class="pp-card-row">
             <div class="pp-field"><label>Hero</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.hero)}</div></div>
-            <div class="pp-field"><label>Extra 1</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_1)}</div></div>
-            <div class="pp-field"><label>Extra 2</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_2)}</div></div>
-            <div class="pp-field"><label>Extra 3</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_3)}</div></div>
-            <div class="pp-field"><label>Extra 4</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_4)}</div></div>
+            <div class="pp-field"><label>Extra 1</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_1)}</div>${extraDateRangeRo(1)}</div>
+            <div class="pp-field"><label>Extra 2</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_2)}</div>${extraDateRangeRo(2)}</div>
+            <div class="pp-field"><label>Extra 3</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_3)}</div>${extraDateRangeRo(3)}</div>
+            <div class="pp-field"><label>Extra 4</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_4)}</div>${extraDateRangeRo(4)}</div>
             <div class="pp-field pp-field-net"><label>Net Price</label><div class="pp-field-readonly-value">${fmtQtyMsi(net)}</div></div>
           </div>
+          ${r.note ? `<div class="pp-field pp-field-note"><label>Ghi chú</label><div class="pp-field-readonly-value">${he(r.note)}</div></div>` : ''}
+          ${r.rejection_note ? `<div class="pp-field pp-field-note"><label>Ghi chú của quản lý</label><div class="pp-field-readonly-value">${he(r.rejection_note)}</div></div>` : ''}
         </div>`;
       } else {
         // Staff bi khoa cung "Nhan vien" = chinh ho, khong duoc chon nguoi khac —
@@ -5370,6 +5424,13 @@
         ).join('');
         const customerSelectOptions = `<option value="">— Chọn khách hàng —</option>` +
           (customerOptions || []).map((c) => `<option value="${c.id}" ${String(c.id) === String(r.customer_id ?? '') ? 'selected' : ''}>${he(c.full_name)}</option>`).join('');
+        // Ghi chu cua quan ly (cot rejection_note) — dung chung cho Duyet (khong bat buoc)
+        // va Tu choi (bat buoc). Neu dang o man hinh duyet (pending+admin) thi hien textarea
+        // song voi 2 nut; con lai (rejected/approved da co san rejection_note) chi hien read-only.
+        const showApprovalPanel = isAdmin && status === 'pending';
+        const adminNoteReadonly = !showApprovalPanel && r.rejection_note
+          ? `<div class="pp-field pp-field-note"><label>Ghi chú của quản lý</label><div class="pp-field-readonly-value">${he(r.rejection_note)}</div></div>`
+          : '';
         bodyHtml = `<div class="pp-card-body">
           <div class="pp-field pp-field-disty">
             <label>NPP (chọn nhiều)</label>
@@ -5382,15 +5443,29 @@
           </div>
           <div class="pp-card-row">
             <div class="pp-field"><label>Hero</label><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></div>
-            <div class="pp-field"><label>Extra 1</label><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" /></div>
-            <div class="pp-field"><label>Extra 2</label><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" /></div>
-            <div class="pp-field"><label>Extra 3</label><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" /></div>
-            <div class="pp-field"><label>Extra 4</label><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" /></div>
+            <div class="pp-field"><label>Extra 1</label><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" />${extraDateRangeInputs(1)}</div>
+            <div class="pp-field"><label>Extra 2</label><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" />${extraDateRangeInputs(2)}</div>
+            <div class="pp-field"><label>Extra 3</label><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" />${extraDateRangeInputs(3)}</div>
+            <div class="pp-field"><label>Extra 4</label><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" />${extraDateRangeInputs(4)}</div>
             <div class="pp-field pp-field-net"><label>Net Price</label><span class="pp-net">${fmtQtyMsi(net)}</span></div>
           </div>
-          <div class="pp-card-actions">
-            <button type="button" class="btn-secondary pp-delete-row">Xoá</button>
+          <div class="pp-field pp-field-note">
+            <label>Ghi chú</label>
+            <textarea class="pp-note" rows="2" placeholder="Giải thích lý do/điều kiện chương trình cho Nam dễ hiểu khi duyệt">${he(r.note || '')}</textarea>
           </div>
+          ${adminNoteReadonly}
+          <div class="pp-card-actions">
+            ${showApprovalPanel ? '' : `<button type="button" class="btn-secondary pp-delete-row">Xoá</button>`}
+          </div>
+          ${showApprovalPanel ? `
+          <div class="pp-approval-panel">
+            <label>Ghi chú của quản lý</label>
+            <textarea class="pp-admin-note" rows="2" placeholder="Không bắt buộc khi Duyệt, bắt buộc khi Từ chối"></textarea>
+            <div class="pp-approval-actions">
+              <button type="button" class="btn-primary pp-approve-btn">Duyệt</button>
+              <button type="button" class="btn-secondary pp-reject-btn" style="color:#b91c1c;border-color:#fca5a5">Từ chối</button>
+            </div>
+          </div>` : ''}
         </div>`;
       }
 
@@ -5428,6 +5503,47 @@
             if (error) { showMsiToast('Lỗi xoá: ' + error.message); return; }
           }
           card.remove();
+        });
+
+        // Man hinh duyet cua admin (chi hien khi status='pending') — Ghi chú
+        // của quản lý dung chung cot rejection_note: khong bat buoc khi Duyet,
+        // bat buoc khi Tu choi. Trigger notify_on_approval() da co san trong
+        // DB se tu gui thong bao cho sales, khong can tu tao notification.
+        card.querySelector('.pp-approve-btn')?.addEventListener('click', async () => {
+          const id = card.dataset.id;
+          if (!id || !currentUser) return;
+          const note = card.querySelector('.pp-admin-note')?.value.trim() || null;
+          if (!confirm('Duyệt chương trình giá này?')) return;
+          const { error } = await sb.from('product_programs').update({
+            status: 'approved',
+            approved_by: currentUser.id,
+            approved_at: new Date().toISOString(),
+            rejection_note: note
+          }).eq('id', id);
+          if (error) { showMsiToast('Lỗi duyệt: ' + error.message); return; }
+          showMsiToast('Đã duyệt chương trình giá');
+          await loadProductPricingPane();
+        });
+        card.querySelector('.pp-reject-btn')?.addEventListener('click', async () => {
+          const id = card.dataset.id;
+          if (!id || !currentUser) return;
+          const noteEl = card.querySelector('.pp-admin-note');
+          const note = noteEl?.value.trim() || '';
+          if (!note) {
+            showMsiToast('Cần nhập ghi chú của quản lý khi từ chối.');
+            noteEl?.focus();
+            return;
+          }
+          if (!confirm('Từ chối chương trình giá này?')) return;
+          const { error } = await sb.from('product_programs').update({
+            status: 'rejected',
+            approved_by: currentUser.id,
+            approved_at: new Date().toISOString(),
+            rejection_note: note
+          }).eq('id', id);
+          if (error) { showMsiToast('Lỗi từ chối: ' + error.message); return; }
+          showMsiToast('Đã từ chối chương trình giá');
+          await loadProductPricingPane();
         });
       });
     }
@@ -5534,6 +5650,15 @@
           extra_2: Number(card.querySelector('.pp-extra2')?.value) || 0,
           extra_3: Number(card.querySelector('.pp-extra3')?.value) || 0,
           extra_4: Number(card.querySelector('.pp-extra4')?.value) || 0,
+          extra_1_start_date: card.querySelector('.pp-extra1-start')?.value || null,
+          extra_1_end_date: card.querySelector('.pp-extra1-end')?.value || null,
+          extra_2_start_date: card.querySelector('.pp-extra2-start')?.value || null,
+          extra_2_end_date: card.querySelector('.pp-extra2-end')?.value || null,
+          extra_3_start_date: card.querySelector('.pp-extra3-start')?.value || null,
+          extra_3_end_date: card.querySelector('.pp-extra3-end')?.value || null,
+          extra_4_start_date: card.querySelector('.pp-extra4-start')?.value || null,
+          extra_4_end_date: card.querySelector('.pp-extra4-end')?.value || null,
+          note: card.querySelector('.pp-note')?.value || null,
           updated_at: new Date().toISOString()
         };
       });
