@@ -743,6 +743,8 @@
       z-index: 9999;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
+    /* TAM AN CHATBOT: xoa dong nay de bat lai giao dien chatbot */
+    #chatbot-fab { display: none !important; }
     #chatbot-fab:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(16,42,78,0.45); }
     #chatbot-fab .fab-badge {
       position: absolute; top: -4px; right: -4px;
@@ -1272,16 +1274,44 @@
     .mapping-stat-total { background:#e0e7ff;color:#3730a3; }
     .mapping-stat-mapped { background:#dcfce7;color:#166534; }
     .mapping-stat-unmapped { background:#fef9c3;color:#854d0e; }
-    .products-pricing-table input,
-    .products-pricing-table select {
+    /* ── Chương trình giá (CK): mỗi dòng 1 card thay vì hàng bảng chật ── */
+    .pp-card-list { display:flex; flex-direction:column; gap:12px; }
+    .pp-card { border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; background:#fff; }
+    .pp-card-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .pp-card-row:last-of-type { margin-bottom: 0; }
+    .pp-field label {
+      display: block;
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      margin-bottom: 4px;
+    }
+    .pp-field select, .pp-field input {
       width: 100%;
       box-sizing: border-box;
-      font-size: 0.85rem;
-      padding: 4px 6px;
+      font-size: 0.92rem;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
     }
-    .products-pricing-table .net-price-cell {
-      font-weight: 700;
-      text-align: right;
+    .pp-field-readonly-value { font-size: 0.92rem; color: #111827; padding: 6px 0; }
+    .pp-field-net .pp-net { font-weight: 700; font-size: 1rem; display:block; padding: 6px 0; }
+    .pp-card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .pp-card-placeholder { padding: 20px; color: #9ca3af; text-align: center; }
+    .pp-status-badge { display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap; }
+    .pp-status-draft    { background:#e5e7eb;color:#374151; }
+    .pp-status-pending  { background:#fef9c3;color:#854d0e; }
+    .pp-status-approved { background:#dcfce7;color:#166534; }
+    .pp-status-rejected { background:#fee2e2;color:#991b1b; }
+    @media (max-width: 640px) {
+      .pp-card-row { grid-template-columns: 1fr 1fr; }
     }
     /* ── compact products list table ── */
     .products-table td, .products-table th { padding: 4px 8px; font-size: 12px; }
@@ -2278,26 +2308,11 @@
                       <select id="productPricingQuarter"></select>
                     </div>
                   </div>
-                  <div class="table-wrapper">
-                    <table class="target-table products-pricing-table" id="productPricingTable">
-                      <thead>
-                        <tr>
-                          <th>NPP</th><th>Đại lý</th><th>Nhân viên</th>
-                          <th class="kpi-col-num">Hero</th>
-                          <th class="kpi-col-num">Extra 1</th>
-                          <th class="kpi-col-num">Extra 2</th>
-                          <th class="kpi-col-num">Extra 3</th>
-                          <th class="kpi-col-num">Extra 4</th>
-                          <th class="kpi-col-num">Net Price</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody id="productPricingTableBody"></tbody>
-                    </table>
-                  </div>
+                  <div id="productPricingTableBody" class="pp-card-list"></div>
                   <div class="dashboard-actions hidden" id="productPricingActions" style="margin-top:14px">
                     <button type="button" class="btn-secondary" id="addPricingRowBtn">+ Thêm dòng</button>
-                    <button type="button" class="btn-primary" id="savePricingBtn">Lưu tất cả</button>
+                    <button type="button" class="btn-secondary" id="saveDraftPricingBtn">Lưu nháp</button>
+                    <button type="button" class="btn-primary" id="submitPricingBtn">Gửi duyệt</button>
                   </div>
                   <div class="login-error" id="productPricingMessage"></div>
                 </div>
@@ -5078,67 +5093,113 @@
       }
     }
 
-    function productPricingRowHtml(r, isAdmin, sdpPrice) {
+    const PP_STATUS_LABEL = { draft: 'Nháp', pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Bị từ chối' };
+    const PP_STATUS_CLASS = { draft: 'pp-status-draft', pending: 'pp-status-pending', approved: 'pp-status-approved', rejected: 'pp-status-rejected' };
+
+    function productPricingRowHtml(r, isAdmin, sdpPrice, customerOptions) {
+      const he = escapeHtmlForDistyReport;
       const net = sdpPrice - (r.hero || 0) - (r.extra_1 || 0) - (r.extra_2 || 0) - (r.extra_3 || 0) - (r.extra_4 || 0);
-      if (!isAdmin) {
+      const status = r.status || 'draft';
+      const statusBadge = `<span class="pp-status-badge ${PP_STATUS_CLASS[status] || ''}">${PP_STATUS_LABEL[status] || status}</span>`;
+      // Sales chỉ được sửa/xoá khi dòng còn ở draft/rejected (chưa gửi hoặc bị từ chối);
+      // khi đã pending/approved thì chỉ admin (Nam) mới sửa được — sales chỉ xem.
+      const lockedForNonAdmin = !isAdmin && (status === 'pending' || status === 'approved');
+      if (lockedForNonAdmin) {
         const empName = EMPLOYEES.find((e) => e.id === r.assigned_to)?.name || '— Chung —';
-        return `<tr data-id="${r.id || ''}">
-          <td>${r.disty || '—'}</td>
-          <td>${r.customer_name || '—'}</td>
-          <td>${empName}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(r.hero)}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(r.extra_1)}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(r.extra_2)}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(r.extra_3)}</td>
-          <td class="kpi-col-num">${fmtQtyMsi(r.extra_4)}</td>
-          <td class="net-price-cell">${fmtQtyMsi(net)}</td>
-          <td></td>
-        </tr>`;
+        return `<div class="pp-card" data-id="${r.id || ''}" data-status="${status}">
+          <div class="pp-card-row">
+            <div class="pp-field"><label>NPP</label><div class="pp-field-readonly-value">${r.disty || '—'}</div></div>
+            <div class="pp-field"><label>Đại lý</label><div class="pp-field-readonly-value">${r.customer_name || '—'}</div></div>
+            <div class="pp-field"><label>Nhân viên</label><div class="pp-field-readonly-value">${empName}</div></div>
+            <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
+          </div>
+          <div class="pp-card-row">
+            <div class="pp-field"><label>Hero</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.hero)}</div></div>
+            <div class="pp-field"><label>Extra 1</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_1)}</div></div>
+            <div class="pp-field"><label>Extra 2</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_2)}</div></div>
+            <div class="pp-field"><label>Extra 3</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_3)}</div></div>
+            <div class="pp-field"><label>Extra 4</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_4)}</div></div>
+            <div class="pp-field pp-field-net"><label>Net Price</label><div class="pp-field-readonly-value">${fmtQtyMsi(net)}</div></div>
+          </div>
+        </div>`;
       }
       const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
       const distyOptions = `<option value="" ${!r.disty ? 'selected' : ''}>—</option>` + PRODUCTS_DISTY_LIST.map((d) => `<option ${d === r.disty ? 'selected' : ''}>${d}</option>`).join('');
-      return `<tr data-id="${r.id || ''}">
-        <td><select class="pp-disty">${distyOptions}</select></td>
-        <td><input type="text" class="pp-customer" value="${r.customer_name || ''}" /></td>
-        <td><select class="pp-assigned">${empOptions}</select></td>
-        <td><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></td>
-        <td><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" /></td>
-        <td><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" /></td>
-        <td><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" /></td>
-        <td><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" /></td>
-        <td class="net-price-cell pp-net">${fmtQtyMsi(net)}</td>
-        <td><button type="button" class="btn-secondary pp-delete-row">Xoá</button></td>
-      </tr>`;
+      const customerSelectOptions = `<option value="">— Chọn khách hàng —</option>` +
+        (customerOptions || []).map((c) => `<option value="${c.id}" ${String(c.id) === String(r.customer_id ?? '') ? 'selected' : ''}>${he(c.full_name)}</option>`).join('');
+      return `<div class="pp-card" data-id="${r.id || ''}" data-status="${status}">
+        <div class="pp-card-row">
+          <div class="pp-field"><label>NPP</label><select class="pp-disty">${distyOptions}</select></div>
+          <div class="pp-field"><label>Đại lý</label><select class="pp-customer">${customerSelectOptions}</select></div>
+          <div class="pp-field"><label>Nhân viên</label><select class="pp-assigned">${empOptions}</select></div>
+          <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
+        </div>
+        <div class="pp-card-row">
+          <div class="pp-field"><label>Hero</label><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></div>
+          <div class="pp-field"><label>Extra 1</label><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" /></div>
+          <div class="pp-field"><label>Extra 2</label><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" /></div>
+          <div class="pp-field"><label>Extra 3</label><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" /></div>
+          <div class="pp-field"><label>Extra 4</label><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" /></div>
+          <div class="pp-field pp-field-net"><label>Net Price</label><span class="pp-net">${fmtQtyMsi(net)}</span></div>
+        </div>
+        <div class="pp-card-actions">
+          <button type="button" class="btn-secondary pp-delete-row">Xoá</button>
+        </div>
+      </div>`;
     }
 
     function attachPricingRowHandlers() {
       const tbody = document.getElementById('productPricingTableBody');
       if (!tbody) return;
       const sdpPrice = currentProductData?.sdp_price || 0;
-      tbody.querySelectorAll('tr').forEach((tr) => {
-        if (!tr.querySelector('.pp-hero')) return;
+      tbody.querySelectorAll('.pp-card').forEach((card) => {
+        if (!card.querySelector('.pp-hero')) return;
         const recalc = () => {
-          const hero = Number(tr.querySelector('.pp-hero')?.value) || 0;
-          const e1 = Number(tr.querySelector('.pp-extra1')?.value) || 0;
-          const e2 = Number(tr.querySelector('.pp-extra2')?.value) || 0;
-          const e3 = Number(tr.querySelector('.pp-extra3')?.value) || 0;
-          const e4 = Number(tr.querySelector('.pp-extra4')?.value) || 0;
-          const netEl = tr.querySelector('.pp-net');
+          const hero = Number(card.querySelector('.pp-hero')?.value) || 0;
+          const e1 = Number(card.querySelector('.pp-extra1')?.value) || 0;
+          const e2 = Number(card.querySelector('.pp-extra2')?.value) || 0;
+          const e3 = Number(card.querySelector('.pp-extra3')?.value) || 0;
+          const e4 = Number(card.querySelector('.pp-extra4')?.value) || 0;
+          const netEl = card.querySelector('.pp-net');
           if (netEl) netEl.textContent = fmtQtyMsi(sdpPrice - hero - e1 - e2 - e3 - e4);
         };
         ['.pp-hero', '.pp-extra1', '.pp-extra2', '.pp-extra3', '.pp-extra4'].forEach((sel) => {
-          tr.querySelector(sel)?.addEventListener('input', recalc);
+          card.querySelector(sel)?.addEventListener('input', recalc);
         });
-        tr.querySelector('.pp-delete-row')?.addEventListener('click', async () => {
-          const id = tr.dataset.id;
+        card.querySelector('.pp-delete-row')?.addEventListener('click', async () => {
+          const id = card.dataset.id;
           if (id) {
             if (!confirm('Xoá chương trình giá này?')) return;
             const { error } = await sb.from('product_programs').delete().eq('id', id);
             if (error) { showMsiToast('Lỗi xoá: ' + error.message); return; }
           }
-          tr.remove();
+          card.remove();
         });
       });
+    }
+
+    // Danh sách khách hàng cho dropdown chọn CK — cache theo lần load pane gần nhất.
+    // Staff (role != 'admin') chỉ thấy khách đang được phân công (customer_assignments,
+    // end_date = null); admin thấy toàn bộ bảng customers.
+    let productPricingCustomers = [];
+
+    async function loadAssignableCustomers() {
+      if (!currentUser) return [];
+      if (currentUser.role === 'admin') {
+        const { data, error } = await sb.from('customers').select('id, full_name').order('full_name');
+        if (error) { console.error('loadAssignableCustomers (admin):', error.message); return []; }
+        return data || [];
+      }
+      const { data, error } = await sb
+        .from('customer_assignments')
+        .select('customer_id, customers(id, full_name)')
+        .eq('sales_id', currentUser.id)
+        .is('end_date', null);
+      if (error) { console.error('loadAssignableCustomers (staff):', error.message); return []; }
+      return (data || [])
+        .map((row) => row.customers)
+        .filter(Boolean)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
     }
 
     async function loadProductPricingPane() {
@@ -5147,76 +5208,117 @@
       const actionsEl = document.getElementById('productPricingActions');
       const quarter = document.getElementById('productPricingQuarter')?.value;
       if (!tbody || !currentProductSku || !quarter) return;
-      tbody.innerHTML = '<tr><td colspan="10">Đang tải...</td></tr>';
+      tbody.innerHTML = '<div class="pp-card-placeholder">Đang tải...</div>';
       if (msgEl) msgEl.textContent = '';
 
-      const { data, error } = await sb.from('product_programs').select('*').eq('sku', currentProductSku).eq('quarter', quarter).order('created_at', { ascending: true });
+      const [{ data, error }, customers] = await Promise.all([
+        sb.from('product_programs').select('*').eq('sku', currentProductSku).eq('quarter', quarter).order('created_at', { ascending: true }),
+        loadAssignableCustomers()
+      ]);
+      productPricingCustomers = customers;
       if (error) {
         const msg = isMissingTableError(error, 'product_programs')
           ? 'Bảng product_programs chưa được tạo — chạy mcp_tables_v11.sql trước.'
           : 'Lỗi tải chương trình giá: ' + error.message;
-        tbody.innerHTML = `<tr><td colspan="10">${msg}</td></tr>`;
+        tbody.innerHTML = `<div class="pp-card-placeholder">${msg}</div>`;
         return;
       }
 
       const isAdmin = isProductsAdmin();
-      actionsEl?.classList.toggle('hidden', !isAdmin);
+      actionsEl?.classList.toggle('hidden', !currentUser);
       const rows = data || [];
       const sdpPrice = currentProductData?.sdp_price || 0;
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="10">Chưa có chương trình giá cho quý này.</td></tr>`;
+        tbody.innerHTML = `<div class="pp-card-placeholder">Chưa có chương trình giá cho quý này.</div>`;
         return;
       }
-      tbody.innerHTML = rows.map((r) => productPricingRowHtml(r, isAdmin, sdpPrice)).join('');
+      tbody.innerHTML = rows.map((r) => productPricingRowHtml(r, isAdmin, sdpPrice, productPricingCustomers)).join('');
       attachPricingRowHandlers();
     }
 
     document.getElementById('addPricingRowBtn')?.addEventListener('click', () => {
       const tbody = document.getElementById('productPricingTableBody');
       if (!tbody) return;
-      if (tbody.querySelector('td[colspan]')) tbody.innerHTML = '';
-      tbody.insertAdjacentHTML('beforeend', productPricingRowHtml({ hero: 0, extra_1: 0, extra_2: 0, extra_3: 0, extra_4: 0 }, true, currentProductData?.sdp_price || 0));
+      if (tbody.querySelector('.pp-card-placeholder')) tbody.innerHTML = '';
+      tbody.insertAdjacentHTML('beforeend', productPricingRowHtml({ hero: 0, extra_1: 0, extra_2: 0, extra_3: 0, extra_4: 0 }, isProductsAdmin(), currentProductData?.sdp_price || 0, productPricingCustomers));
       attachPricingRowHandlers();
     });
 
-    document.getElementById('savePricingBtn')?.addEventListener('click', async () => {
+    // Gom dữ liệu từ các dòng đang ở chế độ sửa được (locked rows không có .pp-hero
+    // nên tự động bị loại — sales không thể gửi lại dòng pending/approved qua đây).
+    function collectEditablePricingRows(quarter) {
+      const tbody = document.getElementById('productPricingTableBody');
+      if (!tbody) return [];
+      const cards = [...tbody.querySelectorAll('.pp-card')].filter((card) => card.querySelector('.pp-hero'));
+      // Luôn gán id (random UUID phía client cho dòng mới) — nếu để 1 dòng
+      // trong cùng mảng upsert KHÔNG có id trong khi dòng khác CÓ, PostgREST
+      // sẽ NULL-fill cột id cho dòng thiếu (union cột theo cả batch) thay vì
+      // để DEFAULT gen_random_uuid() tự áp dụng, gây lỗi NOT NULL constraint.
+      return cards.map((card) => {
+        const customerSel = card.querySelector('.pp-customer');
+        const customerId = customerSel?.value || '';
+        const customerName = customerId ? customerSel.options[customerSel.selectedIndex].textContent : null;
+        return {
+          id: card.dataset.id || crypto.randomUUID(),
+          sku: currentProductSku,
+          quarter,
+          disty: card.querySelector('.pp-disty')?.value || null,
+          customer_id: customerId ? Number(customerId) : null,
+          customer_name: customerName,
+          assigned_to: card.querySelector('.pp-assigned')?.value || null,
+          hero: Number(card.querySelector('.pp-hero')?.value) || 0,
+          extra_1: Number(card.querySelector('.pp-extra1')?.value) || 0,
+          extra_2: Number(card.querySelector('.pp-extra2')?.value) || 0,
+          extra_3: Number(card.querySelector('.pp-extra3')?.value) || 0,
+          extra_4: Number(card.querySelector('.pp-extra4')?.value) || 0,
+          updated_at: new Date().toISOString()
+        };
+      });
+    }
+
+    async function savePricingRows(upsertRows, msgEl) {
+      if (!upsertRows.length) {
+        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        return false;
+      }
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      const { error } = await sb.from('product_programs').upsert(upsertRows);
+      if (error) {
+        if (msgEl) { msgEl.textContent = 'Lỗi lưu chương trình giá: ' + error.message; msgEl.style.color = '#b30012'; }
+        return false;
+      }
+      if (msgEl) msgEl.textContent = '';
+      return true;
+    }
+
+    document.getElementById('saveDraftPricingBtn')?.addEventListener('click', async () => {
       const msgEl = document.getElementById('productPricingMessage');
       const quarter = document.getElementById('productPricingQuarter')?.value;
       const tbody = document.getElementById('productPricingTableBody');
       if (!tbody || !currentProductSku || !quarter) return;
 
-      const rows = [...tbody.querySelectorAll('tr')].filter((tr) => tr.querySelector('.pp-hero'));
-      // Luôn gán id (random UUID phía client cho dòng mới) — nếu để 1 dòng
-      // trong cùng mảng upsert KHÔNG có id trong khi dòng khác CÓ, PostgREST
-      // sẽ NULL-fill cột id cho dòng thiếu (union cột theo cả batch) thay vì
-      // để DEFAULT gen_random_uuid() tự áp dụng, gây lỗi NOT NULL constraint.
-      const upsertRows = rows.map((tr) => ({
-        id: tr.dataset.id || crypto.randomUUID(),
-        sku: currentProductSku,
-        quarter,
-        disty: tr.querySelector('.pp-disty')?.value || null,
-        customer_name: tr.querySelector('.pp-customer')?.value || null,
-        assigned_to: tr.querySelector('.pp-assigned')?.value || null,
-        hero: Number(tr.querySelector('.pp-hero')?.value) || 0,
-        extra_1: Number(tr.querySelector('.pp-extra1')?.value) || 0,
-        extra_2: Number(tr.querySelector('.pp-extra2')?.value) || 0,
-        extra_3: Number(tr.querySelector('.pp-extra3')?.value) || 0,
-        extra_4: Number(tr.querySelector('.pp-extra4')?.value) || 0,
-        updated_at: new Date().toISOString()
-      }));
-      if (!upsertRows.length) {
-        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
-        return;
-      }
+      const upsertRows = collectEditablePricingRows(quarter).map((row) => ({ ...row, status: 'draft' }));
+      const ok = await savePricingRows(upsertRows, msgEl);
+      if (!ok) return;
+      showMsiToast('Đã lưu nháp');
+      await loadProductPricingPane();
+    });
 
-      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
-      const { error } = await sb.from('product_programs').upsert(upsertRows);
-      if (error) {
-        if (msgEl) { msgEl.textContent = 'Lỗi lưu chương trình giá: ' + error.message; msgEl.style.color = '#b30012'; }
-        return;
-      }
-      if (msgEl) msgEl.textContent = '';
-      showMsiToast('Đã lưu chương trình giá');
+    document.getElementById('submitPricingBtn')?.addEventListener('click', async () => {
+      const msgEl = document.getElementById('productPricingMessage');
+      const quarter = document.getElementById('productPricingQuarter')?.value;
+      const tbody = document.getElementById('productPricingTableBody');
+      if (!tbody || !currentProductSku || !quarter || !currentUser) return;
+
+      const upsertRows = collectEditablePricingRows(quarter).map((row) => ({
+        ...row,
+        status: 'pending',
+        submitted_by: currentUser.id,
+        submitted_at: new Date().toISOString()
+      }));
+      const ok = await savePricingRows(upsertRows, msgEl);
+      if (!ok) return;
+      showMsiToast('Đã gửi duyệt');
       await loadProductPricingPane();
     });
 
