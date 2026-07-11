@@ -994,6 +994,89 @@
       font-size: 1rem;
     }
 
+    .notif-bell-wrap { position: relative; }
+    .notif-bell-btn {
+      position: relative;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: var(--white);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .notif-bell-btn:hover { background: rgba(255, 255, 255, 0.22); }
+    .notif-bell-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      background: #e53e3e;
+      color: #fff;
+      border: 2px solid var(--navy-strong, #102a4e);
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 14px;
+      text-align: center;
+    }
+    .notif-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 360px;
+      max-width: calc(100vw - 24px);
+      max-height: 420px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgba(16,42,78,0.28);
+      border: 1px solid rgba(16,42,78,0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      z-index: 9997;
+    }
+    .notif-dropdown-hd {
+      padding: 12px 16px;
+      font-weight: 700;
+      font-size: 13px;
+      color: #111827;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .notif-dropdown-list { overflow-y: auto; }
+    .notif-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      border-bottom: 1px solid #f1f5f9;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 12.5px;
+      color: #374151;
+      position: relative;
+    }
+    .notif-item:hover { background: #f8fafc; }
+    .notif-item.unread { background: #eff6ff; }
+    .notif-item.unread:hover { background: #e0edff; }
+    .notif-item.unread::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 16px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #2563eb;
+    }
+    .notif-item .notif-msg { padding-left: 14px; color: #1f2937; }
+    .notif-item .notif-time { padding-left: 14px; display: block; margin-top: 3px; font-size: 11px; color: #9ca3af; }
+    .notif-empty { padding: 24px 16px; text-align: center; color: #9ca3af; font-size: 12.5px; }
+
     .msi-filter-bar {
       display: flex;
       align-items: center;
@@ -1904,6 +1987,16 @@
         <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i> Data Source</button>
       </nav>
       <div class="msi-header-right">
+        <div class="notif-bell-wrap">
+          <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Thông báo">
+            <i class="fas fa-bell"></i>
+            <span class="notif-bell-badge hidden" id="notifBellBadge">0</span>
+          </button>
+          <div class="notif-dropdown hidden" id="notifDropdown">
+            <div class="notif-dropdown-hd">Thông báo</div>
+            <div class="notif-dropdown-list" id="notifDropdownList"></div>
+          </div>
+        </div>
         <span class="user-chip" id="currentUserChip">Chưa đăng nhập</span>
         <button class="logout-btn hidden" id="logoutButton">Đăng xuất</button>
         <button type="button" class="msi-hamburger" id="msiHamburger" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
@@ -2832,6 +2925,7 @@
       document.getElementById('tab-summaries')?.classList.add('active');
       populateYearFilter();
       tabLoaders['tab-summaries']?.();
+      initNotificationBell();
     }
 
     // ══ TAB SUMMARIES DASHBOARD ══════════════════════════════
@@ -4817,13 +4911,106 @@
       }
     }
 
-    function switchToProductDetail(sku) {
+    async function switchToProductDetail(sku) {
       document.querySelectorAll('.msi-menu-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.msi-tab-pane').forEach(p => p.classList.remove('active'));
       document.querySelector('[data-tab="tab-products"]')?.classList.add('active');
       document.getElementById('tab-products')?.classList.add('active');
       document.getElementById('msiFilterBar')?.classList.add('hidden');
-      openProductDetail(sku);
+      await openProductDetail(sku);
+    }
+
+    // ══ CHUÔNG THÔNG BÁO (header) ═══════════════════════════════════════
+    // Đọc từ bảng notifications theo recipient_id = user đang đăng nhập.
+    // RLS: xem migrations/v14_notifications_rls.sql — bảng này trước đó
+    // bật RLS nhưng không có policy nào, chặn tuốt kể cả chủ thông báo.
+
+    function fmtNotifTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function loadNotifications() {
+      if (!currentUser) return;
+      const badgeEl = document.getElementById('notifBellBadge');
+      const listEl = document.getElementById('notifDropdownList');
+      const { data, error } = await sb.from('notifications')
+        .select('id, type, message, related_program_id, related_customer_id, is_read, created_at')
+        .eq('recipient_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (error) {
+        if (listEl) listEl.innerHTML = `<div class="notif-empty">Lỗi tải thông báo: ${error.message}</div>`;
+        return;
+      }
+      const rows = data || [];
+      const unreadCount = rows.filter((r) => !r.is_read).length;
+      if (badgeEl) {
+        badgeEl.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badgeEl.classList.toggle('hidden', unreadCount === 0);
+      }
+      if (!listEl) return;
+      if (!rows.length) {
+        listEl.innerHTML = `<div class="notif-empty">Chưa có thông báo nào.</div>`;
+        return;
+      }
+      const he = escapeHtmlForDistyReport;
+      listEl.innerHTML = rows.map((r) => `
+        <button type="button" class="notif-item ${r.is_read ? '' : 'unread'}" data-id="${r.id}" data-related-program-id="${r.related_program_id || ''}">
+          <span class="notif-msg">${he(r.message)}</span>
+          <span class="notif-time">${fmtNotifTime(r.created_at)}</span>
+        </button>
+      `).join('');
+      listEl.querySelectorAll('.notif-item').forEach((btn) => {
+        btn.addEventListener('click', () => handleNotifClick(btn.dataset.id, btn.dataset.relatedProgramId));
+      });
+    }
+
+    async function handleNotifClick(notifId, relatedProgramId) {
+      document.getElementById('notifDropdown')?.classList.add('hidden');
+      const { error } = await sb.from('notifications').update({ is_read: true }).eq('id', notifId);
+      if (error) showMsiToast('Lỗi đánh dấu đã đọc: ' + error.message);
+      await loadNotifications();
+
+      if (!relatedProgramId) return;
+      const { data: prog, error: progErr } = await sb.from('product_programs')
+        .select('sku, quarter').eq('id', relatedProgramId).maybeSingle();
+      if (progErr || !prog) { showMsiToast('Không tìm thấy chương trình giá liên quan.'); return; }
+
+      await switchToProductDetail(prog.sku);
+      const quarterSel = document.getElementById('productPricingQuarter');
+      if (quarterSel && quarterSel.value !== prog.quarter) {
+        quarterSel.value = prog.quarter;
+        await loadProductPricingPane();
+      }
+      const targetCard = document.querySelector(`.pp-card[data-id="${relatedProgramId}"]`);
+      if (targetCard) {
+        targetCard.classList.remove('pp-card-collapsed');
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetCard.style.outline = '2px solid #2563eb';
+        setTimeout(() => { targetCard.style.outline = ''; }, 2000);
+      }
+    }
+
+    document.getElementById('notifBellBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dd = document.getElementById('notifDropdown');
+      const willOpen = dd?.classList.contains('hidden');
+      dd?.classList.toggle('hidden');
+      if (willOpen) loadNotifications();
+    });
+    document.addEventListener('click', (e) => {
+      const wrap = document.querySelector('.notif-bell-wrap');
+      if (wrap && !wrap.contains(e.target)) document.getElementById('notifDropdown')?.classList.add('hidden');
+    });
+
+    let _notifPollTimer = null;
+    function initNotificationBell() {
+      loadNotifications();
+      if (_notifPollTimer) clearInterval(_notifPollTimer);
+      _notifPollTimer = setInterval(loadNotifications, 45000);
     }
 
     function switchToDistyInventory(sku, normalizedName) {
@@ -7333,6 +7520,11 @@
       currentUser = null;
       currentUserChip.textContent = 'Chưa đăng nhập';
       logoutButton.classList.add('hidden');
+      if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
+      document.getElementById('notifBellBadge')?.classList.add('hidden');
+      document.getElementById('notifDropdown')?.classList.add('hidden');
+      const notifListEl = document.getElementById('notifDropdownList');
+      if (notifListEl) notifListEl.innerHTML = '';
       showScreen('loginScreen');
     });
 
