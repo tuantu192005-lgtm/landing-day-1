@@ -6859,9 +6859,9 @@
           const cl = (it.closing != null) ? Number(it.closing) : NaN;
           const op = (it.opening != null) ? Number(it.opening) : NaN;
           if (!isNaN(cl) && cl < 0)
-            errors.push(`[${he(disty)}] Số lượng closing âm: <em>${he(it.disty_name)}</em> = <strong>${cl}</strong>`);
+            errors.push(`[${he(disty)}] Số lượng closing âm: <em>${he(computeCleanSkuName(it.disty_name))}</em> = <strong>${cl}</strong>`);
           else if (!isNaN(op) && op < 0)
-            errors.push(`[${he(disty)}] Số lượng opening âm: <em>${he(it.disty_name)}</em> = <strong>${op}</strong>`);
+            errors.push(`[${he(disty)}] Số lượng opening âm: <em>${he(computeCleanSkuName(it.disty_name))}</em> = <strong>${op}</strong>`);
         }
 
         // Tier 2: too few rows

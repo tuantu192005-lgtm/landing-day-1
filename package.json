@@ -6,7 +6,7 @@
   "main": "mcp_server.js",
   "scripts": {
     "start": "node mcp_server.js",
-    "build:cf": "mkdir -p dist && cp index.html Logo.png dist/ && cp -r admin dist/"
+    "build:cf": "node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('index.html','dist/index.html');fs.copyFileSync('Logo.png','dist/Logo.png');fs.cpSync('admin','dist/admin',{recursive:true});\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
