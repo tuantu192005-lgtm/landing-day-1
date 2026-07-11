@@ -1303,6 +1303,20 @@
     }
     .pp-field-readonly-value { font-size: 0.92rem; color: #111827; padding: 6px 0; }
     .pp-field-net .pp-net { font-weight: 700; font-size: 1rem; display:block; padding: 6px 0; }
+    .pp-field-disty { margin-bottom: 12px; }
+    .pp-disty-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pp-disty-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pp-disty-chip input { width: auto; padding: 0; border: none; }
     .pp-card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .pp-card-placeholder { padding: 20px; color: #9ca3af; text-align: center; }
     .pp-status-badge { display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap; }
@@ -5104,11 +5118,15 @@
       // Sales chỉ được sửa/xoá khi dòng còn ở draft/rejected (chưa gửi hoặc bị từ chối);
       // khi đã pending/approved thì chỉ admin (Nam) mới sửa được — sales chỉ xem.
       const lockedForNonAdmin = !isAdmin && (status === 'pending' || status === 'approved');
+      const distyArr = Array.isArray(r.disty) ? r.disty : (r.disty ? [r.disty] : []);
       if (lockedForNonAdmin) {
         const empName = EMPLOYEES.find((e) => e.id === r.assigned_to)?.name || '— Chung —';
         return `<div class="pp-card" data-id="${r.id || ''}" data-status="${status}">
+          <div class="pp-field pp-field-disty">
+            <label>NPP</label>
+            <div class="pp-field-readonly-value">${distyArr.length ? distyArr.map(he).join(', ') : '—'}</div>
+          </div>
           <div class="pp-card-row">
-            <div class="pp-field"><label>NPP</label><div class="pp-field-readonly-value">${r.disty || '—'}</div></div>
             <div class="pp-field"><label>Đại lý</label><div class="pp-field-readonly-value">${r.customer_name || '—'}</div></div>
             <div class="pp-field"><label>Nhân viên</label><div class="pp-field-readonly-value">${empName}</div></div>
             <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
@@ -5124,12 +5142,17 @@
         </div>`;
       }
       const empOptions = `<option value="">— Chung —</option>` + EMPLOYEES.map((e) => `<option value="${e.id}" ${e.id === r.assigned_to ? 'selected' : ''}>${e.name}</option>`).join('');
-      const distyOptions = `<option value="" ${!r.disty ? 'selected' : ''}>—</option>` + PRODUCTS_DISTY_LIST.map((d) => `<option ${d === r.disty ? 'selected' : ''}>${d}</option>`).join('');
+      const distyChecks = PRODUCTS_DISTY_LIST.map((d) =>
+        `<label class="pp-disty-chip"><input type="checkbox" class="pp-disty" value="${he(d)}" ${distyArr.includes(d) ? 'checked' : ''}> ${he(d)}</label>`
+      ).join('');
       const customerSelectOptions = `<option value="">— Chọn khách hàng —</option>` +
         (customerOptions || []).map((c) => `<option value="${c.id}" ${String(c.id) === String(r.customer_id ?? '') ? 'selected' : ''}>${he(c.full_name)}</option>`).join('');
       return `<div class="pp-card" data-id="${r.id || ''}" data-status="${status}">
+        <div class="pp-field pp-field-disty">
+          <label>NPP (chọn nhiều)</label>
+          <div class="pp-disty-checks">${distyChecks}</div>
+        </div>
         <div class="pp-card-row">
-          <div class="pp-field"><label>NPP</label><select class="pp-disty">${distyOptions}</select></div>
           <div class="pp-field"><label>Đại lý</label><select class="pp-customer">${customerSelectOptions}</select></div>
           <div class="pp-field"><label>Nhân viên</label><select class="pp-assigned">${empOptions}</select></div>
           <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
@@ -5258,11 +5281,12 @@
         const customerSel = card.querySelector('.pp-customer');
         const customerId = customerSel?.value || '';
         const customerName = customerId ? customerSel.options[customerSel.selectedIndex].textContent : null;
+        const distyChecked = [...card.querySelectorAll('.pp-disty:checked')].map((cb) => cb.value);
         return {
           id: card.dataset.id || crypto.randomUUID(),
           sku: currentProductSku,
           quarter,
-          disty: card.querySelector('.pp-disty')?.value || null,
+          disty: distyChecked.length ? distyChecked : null,
           customer_id: customerId ? Number(customerId) : null,
           customer_name: customerName,
           assigned_to: card.querySelector('.pp-assigned')?.value || null,
