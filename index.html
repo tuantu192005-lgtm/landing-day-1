@@ -1442,21 +1442,27 @@
     .pp-approval-actions { display: flex; gap: 10px; margin-top: 10px; }
     .pp-card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .pp-card-summary {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(90px, auto) minmax(0, 1fr) auto auto;
       align-items: center;
       gap: 14px;
       cursor: pointer;
       user-select: none;
     }
-    .pp-card-summary .pp-summary-customer { flex: 1 1 auto; font-weight: 600; color: #111827; font-size: 0.92rem; }
-    .pp-card-summary .pp-summary-net { font-weight: 700; color: #111827; font-size: 0.92rem; white-space: nowrap; }
-    .pp-card-summary .pp-summary-disty { flex: 1 1 auto; color: #4b5563; font-size: 0.88rem; text-align: right; }
+    .pp-card-summary .pp-summary-customer { font-weight: 600; color: #111827; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pp-card-summary .pp-summary-net { font-weight: 700; color: #111827; font-size: 0.92rem; white-space: nowrap; text-align: right; }
+    .pp-card-summary .pp-summary-disty { color: #4b5563; font-size: 0.88rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pp-card-summary .pp-summary-chevron { color: #9ca3af; transition: transform .15s ease; }
     .pp-card-collapsed .pp-card-summary .pp-summary-chevron { transform: rotate(-90deg); }
     .pp-card-collapsed .pp-card-body { display: none; }
     .pp-card:not(.pp-card-collapsed) .pp-card-summary { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; }
     @media (max-width: 640px) {
-      .pp-card-summary { flex-wrap: wrap; gap: 8px; }
+      .pp-card-summary { grid-template-columns: 1fr minmax(80px, auto); grid-template-areas: "cust net" "disty disty" "status chevron"; row-gap: 6px; }
+      .pp-card-summary .pp-summary-customer { grid-area: cust; }
+      .pp-card-summary .pp-summary-net { grid-area: net; }
+      .pp-card-summary .pp-summary-disty { grid-area: disty; text-align: left; }
+      .pp-card-summary .pp-summary-status { grid-area: status; }
+      .pp-card-summary .pp-summary-chevron { grid-area: chevron; justify-self: end; }
     }
     .pp-card-placeholder { padding: 20px; color: #9ca3af; text-align: center; }
     .pp-status-badge { display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap; }
@@ -1466,6 +1472,48 @@
     .pp-status-rejected { background:#fee2e2;color:#991b1b; }
     @media (max-width: 640px) {
       .pp-card-row { grid-template-columns: 1fr 1fr; }
+    }
+    /* ── Menu Khách hàng ── */
+    .cust-toolbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+    .cust-toolbar-group { display: flex; flex-direction: column; gap: 4px; }
+    .cust-toolbar-group label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+    .cust-toolbar-group select, .cust-toolbar-group input {
+      padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.88rem;
+    }
+    .cust-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(90px, auto) minmax(0, 1fr);
+      align-items: center; gap: 14px; cursor: pointer;
+    }
+    .cust-row-name { font-weight: 600; color: #111827; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cust-row-pct { font-weight: 700; font-size: 0.98rem; text-align: right; white-space: nowrap; }
+    .cust-row-nums { color: #6b7280; font-size: 0.82rem; text-align: right; white-space: nowrap; }
+    .cust-pct-good { color: #1c9a5b; }
+    .cust-pct-bad { color: #c0392b; }
+    .cust-pct-none { color: #9ca3af; font-weight: 400; }
+    .cust-detail-total { font-size: 0.9rem; color: #374151; }
+    .cust-detail-header, .cust-detail-row {
+      display: grid; grid-template-columns: minmax(0, 1.4fr) 110px 110px 90px;
+      align-items: center; gap: 12px; padding: 8px 14px;
+    }
+    .cust-detail-header { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+    .cust-detail-header span:not(:first-child), .cust-detail-row .cust-detail-num { text-align: right; }
+    .cust-detail-row { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; margin-top: 8px; }
+    .cust-detail-cat { font-weight: 600; color: #111827; font-size: 0.88rem; }
+    .cust-detail-num { font-size: 0.86rem; color: #374151; }
+    .cust-target-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .cust-target-form select, .cust-target-form input {
+      padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.88rem;
+    }
+    .cust-over-warn { color: #c0392b; font-weight: 600; }
+    @media (max-width: 640px) {
+      .cust-row { grid-template-columns: 1fr auto; grid-template-areas: "name pct" "nums nums"; row-gap: 4px; }
+      .cust-row-name { grid-area: name; }
+      .cust-row-pct { grid-area: pct; }
+      .cust-row-nums { grid-area: nums; text-align: left; }
+      .cust-detail-header { display: none; }
+      .cust-detail-row { grid-template-columns: 1fr; row-gap: 4px; }
+      .cust-detail-num { text-align: left; }
     }
     /* ── compact products list table ── */
     .products-table td, .products-table th { padding: 4px 8px; font-size: 12px; }
@@ -2022,6 +2070,7 @@
       <nav class="msi-menu" id="msiMenu">
         <button type="button" class="msi-menu-btn active" data-tab="tab-summaries"><i class="fas fa-chart-pie"></i> Summaries Dashboard</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-sales-kpi"><i class="fas fa-bullseye"></i> Sales &amp; KPI</button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-customers"><i class="fas fa-address-card"></i> Khách hàng</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-products"><i class="fas fa-box"></i> Sản phẩm</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i> Disty Inventory</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-weekly-report"><i class="fas fa-calendar-week"></i> Weekly Report</button>
@@ -2644,6 +2693,73 @@
         </div>
       </section>
 
+      <section class="msi-tab-pane" id="tab-customers">
+        <div class="msi-panel" style="margin-bottom:14px">
+          <div class="cust-toolbar">
+            <div class="cust-toolbar-group" id="custStaffFilterWrap" style="display:none">
+              <label for="custStaffFilter">Nhân viên</label>
+              <select id="custStaffFilter"></select>
+            </div>
+            <div class="cust-toolbar-group">
+              <label for="custPeriodMode">Kỳ xem</label>
+              <select id="custPeriodMode">
+                <option value="month" selected>Tháng</option>
+                <option value="quarter">Quý</option>
+                <option value="year">Năm</option>
+              </select>
+            </div>
+            <div class="cust-toolbar-group">
+              <label for="custPeriodYear">Năm</label>
+              <select id="custPeriodYear"></select>
+            </div>
+            <div class="cust-toolbar-group" id="custPeriodQuarterWrap">
+              <label for="custPeriodQuarter">Quý</label>
+              <select id="custPeriodQuarter">
+                <option value="1">Q1</option><option value="2">Q2</option>
+                <option value="3">Q3</option><option value="4">Q4</option>
+              </select>
+            </div>
+            <div class="cust-toolbar-group" id="custPeriodMonthWrap">
+              <label for="custPeriodMonth">Tháng</label>
+              <select id="custPeriodMonth">
+                <option value="1">Tháng 1</option><option value="2">Tháng 2</option>
+                <option value="3">Tháng 3</option><option value="4">Tháng 4</option>
+                <option value="5">Tháng 5</option><option value="6">Tháng 6</option>
+                <option value="7">Tháng 7</option><option value="8">Tháng 8</option>
+                <option value="9">Tháng 9</option><option value="10">Tháng 10</option>
+                <option value="11">Tháng 11</option><option value="12">Tháng 12</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="custListView">
+          <div class="pp-card-list" id="custListBody"><div class="pp-card-placeholder">Đang tải...</div></div>
+        </div>
+
+        <div id="custDetailView" class="hidden">
+          <button type="button" class="btn-secondary" id="custDetailBackBtn"><i class="fas fa-arrow-left"></i> Quay lại danh sách</button>
+          <h3 id="custDetailName" style="margin:14px 0 4px"></h3>
+          <div class="cust-detail-total" id="custDetailTotal"></div>
+
+          <div class="cust-detail-header" style="margin-top:14px">
+            <span>Nhóm sản phẩm</span><span>Target</span><span>Đã đạt</span><span>%</span>
+          </div>
+          <div id="custDetailCategoryBody"></div>
+
+          <div class="msi-panel" style="margin-top:16px">
+            <h4 style="font-size:13px;margin:0 0 10px">Nhập / sửa target tháng</h4>
+            <div class="cust-target-form">
+              <select id="custTargetCategory"></select>
+              <input type="month" id="custTargetMonth" />
+              <input type="number" id="custTargetQty" placeholder="Số lượng target" min="0" step="1" />
+              <button type="button" class="btn-primary" id="custTargetSaveBtn">Lưu</button>
+            </div>
+            <div id="custTargetMsg" style="font-size:12px;margin-top:8px"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="msi-tab-pane" id="tab-data-source">
         <div class="msi-panel" style="margin-bottom:20px" id="dataSourceImportSection">
           <h3>Import dữ liệu Sellout (Admin)</h3>
@@ -2876,7 +2992,7 @@
       return { ...msiFilters };
     }
 
-    const TABS_NO_FILTER = new Set(['tab-products', 'tab-disty-inventory']);
+    const TABS_NO_FILTER = new Set(['tab-products', 'tab-disty-inventory', 'tab-customers']);
 
     function initMsiTabs() {
       document.querySelectorAll('.msi-menu-btn').forEach((btn) => {
@@ -5548,6 +5664,295 @@
           await loadProductPricingPane();
         });
       });
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Menu Khách hàng: tiến độ target theo khách, gộp nhóm sản phẩm x
+    // khách hàng, đối chiếu sellout_data (qua view v_sellout_categorized)
+    // và customer_targets. Không dùng scopeByRole() vì bảng liên quan
+    // (customer_targets/v_sellout_categorized) không có cột assigned_to —
+    // phạm vi khách hàng suy ra qua customer_assignments.sales_id.
+    // ══════════════════════════════════════════════════════════════════
+    let custTabInitialized = false;
+    let custStaffId = null; // nhân viên đang xem (chính mình nếu staff, chọn được nếu admin)
+    let custSelectedCustomerId = null;
+    let custListCache = { customers: [], achievedByCustomer: {}, targetByCustomer: {} };
+
+    async function loadCustomersForStaff(staffId) {
+      if (!staffId) return [];
+      const { data, error } = await sb
+        .from('customer_assignments')
+        .select('customer_id, customers(id, full_name)')
+        .eq('sales_id', staffId)
+        .is('end_date', null);
+      if (error) { console.error('[loadCustomersForStaff]', error.message); return []; }
+      return (data || []).map((r) => r.customers).filter(Boolean).sort((a, b) => a.full_name.localeCompare(b.full_name));
+    }
+
+    // Tháng bắt đầu/kết thúc (1-12) của kỳ đang chọn + khoảng ngày tương ứng.
+    // sale_date (sellout) dùng [startDate, endExclusive); target_month (luôn
+    // ngày 1) dùng [monthStart, monthEndLast] — cả 2 suy từ cùng 1 kỳ chọn.
+    function getCustPeriodRange() {
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const mode = document.getElementById('custPeriodMode')?.value || 'month';
+      const year = parseInt(document.getElementById('custPeriodYear')?.value, 10) || new Date().getFullYear();
+      let startMonth, endMonth;
+      if (mode === 'year') { startMonth = 1; endMonth = 12; }
+      else if (mode === 'quarter') {
+        const q = parseInt(document.getElementById('custPeriodQuarter')?.value, 10) || 1;
+        startMonth = (q - 1) * 3 + 1; endMonth = startMonth + 2;
+      } else {
+        const m = parseInt(document.getElementById('custPeriodMonth')?.value, 10) || (new Date().getMonth() + 1);
+        startMonth = m; endMonth = m;
+      }
+      const startDate = `${year}-${pad2(startMonth)}-01`;
+      const nextMonthDate = new Date(year, endMonth, 1); // ngày 1 của tháng KẾ TIẾP (cận trên loại trừ)
+      const endExclusive = `${nextMonthDate.getFullYear()}-${pad2(nextMonthDate.getMonth() + 1)}-01`;
+      const monthEndLast = `${year}-${pad2(endMonth)}-01`;
+      return { year, startMonth, endMonth, startDate, endExclusive, monthStart: startDate, monthEndLast };
+    }
+
+    function populateCustPeriodSelectors() {
+      const yearSel = document.getElementById('custPeriodYear');
+      const now = new Date();
+      if (yearSel && !yearSel.options.length) {
+        const thisYear = now.getFullYear();
+        const years = [];
+        for (let y = thisYear; y >= thisYear - 3; y--) years.push(y);
+        yearSel.innerHTML = years.map((y) => `<option value="${y}">${y}</option>`).join('');
+      }
+      if (yearSel) yearSel.value = String(now.getFullYear());
+      const monthSel = document.getElementById('custPeriodMonth');
+      if (monthSel) monthSel.value = String(now.getMonth() + 1);
+      const quarterSel = document.getElementById('custPeriodQuarter');
+      if (quarterSel) quarterSel.value = String(Math.floor(now.getMonth() / 3) + 1);
+    }
+
+    function updateCustPeriodModeVisibility() {
+      const mode = document.getElementById('custPeriodMode')?.value || 'month';
+      document.getElementById('custPeriodQuarterWrap')?.classList.toggle('hidden', mode !== 'quarter');
+      document.getElementById('custPeriodMonthWrap')?.classList.toggle('hidden', mode !== 'month');
+    }
+
+    async function initCustomerTabOnce() {
+      if (custTabInitialized) return;
+      custTabInitialized = true;
+      populateCustPeriodSelectors();
+      updateCustPeriodModeVisibility();
+
+      const isAdmin = currentUser?.role === 'admin';
+      const staffWrap = document.getElementById('custStaffFilterWrap');
+      const staffSel = document.getElementById('custStaffFilter');
+      if (isAdmin) {
+        staffWrap.style.display = '';
+        staffSel.innerHTML = EMPLOYEES.map((e) => `<option value="${e.id}">${e.name}</option>`).join('');
+        custStaffId = EMPLOYEES[0]?.id || null;
+        staffSel.value = custStaffId || '';
+        staffSel.addEventListener('change', () => {
+          custStaffId = staffSel.value;
+          closeCustomerDetail();
+          loadCustomerList();
+        });
+      } else {
+        staffWrap.style.display = 'none';
+        custStaffId = currentUser?.id || null;
+      }
+
+      ['custPeriodMode', 'custPeriodYear', 'custPeriodQuarter', 'custPeriodMonth'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('change', () => {
+          if (id === 'custPeriodMode') updateCustPeriodModeVisibility();
+          closeCustomerDetail();
+          loadCustomerList();
+        });
+      });
+
+      document.getElementById('custDetailBackBtn')?.addEventListener('click', closeCustomerDetail);
+      document.getElementById('custTargetSaveBtn')?.addEventListener('click', saveCustTarget);
+
+      // 16 category thật cho dropdown nhập target — lấy từ targets (nguồn thật),
+      // không tự bịa nhãn nhóm mới.
+      const catSel = document.getElementById('custTargetCategory');
+      const parentMap = await getCategoryParentMap();
+      catSel.innerHTML = Object.keys(parentMap).sort().map((c) => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    async function loadCustomerTab() {
+      await initCustomerTabOnce();
+      await loadCustomerList();
+    }
+    tabLoaders['tab-customers'] = loadCustomerTab;
+
+    async function loadCustomerList() {
+      const he = escapeHtmlForDistyReport;
+      const body = document.getElementById('custListBody');
+      if (!body) return;
+      body.innerHTML = '<div class="pp-card-placeholder">Đang tải...</div>';
+
+      const customers = await loadCustomersForStaff(custStaffId);
+      if (!customers.length) {
+        body.innerHTML = '<div class="pp-card-placeholder">Không có khách hàng nào được phân công.</div>';
+        custListCache = { customers: [], achievedByCustomer: {}, targetByCustomer: {} };
+        return;
+      }
+      const ids = customers.map((c) => c.id);
+      const range = getCustPeriodRange();
+
+      // fetchAllPages: PostgREST giới hạn 1000 dòng/request, sellout theo
+      // năm/quý có thể vượt mốc đó — không dùng .limit() thường ở đây.
+      const [{ data: achievedRows, error: achErr }, { data: targetRows, error: tgtErr }] = await Promise.all([
+        fetchAllPages((from, to) => sb.from('v_sellout_categorized')
+          .select('customer_id, category, quantity')
+          .in('customer_id', ids)
+          .gte('sale_date', range.startDate).lt('sale_date', range.endExclusive)
+          .range(from, to)),
+        fetchAllPages((from, to) => sb.from('customer_targets')
+          .select('customer_id, category, target_qty')
+          .in('customer_id', ids)
+          .gte('target_month', range.monthStart).lte('target_month', range.monthEndLast)
+          .range(from, to))
+      ]);
+      if (achErr) console.warn('[loadCustomerList achieved]', achErr.message);
+      if (tgtErr) console.warn('[loadCustomerList target]', tgtErr.message);
+
+      const achievedByCustomer = {};
+      (achievedRows || []).forEach((r) => {
+        const bucket = achievedByCustomer[r.customer_id] || (achievedByCustomer[r.customer_id] = { __total: 0 });
+        bucket[r.category] = (bucket[r.category] || 0) + (r.quantity || 0);
+        bucket.__total += (r.quantity || 0);
+      });
+      const targetByCustomer = {};
+      (targetRows || []).forEach((r) => {
+        const bucket = targetByCustomer[r.customer_id] || (targetByCustomer[r.customer_id] = { __total: 0 });
+        bucket[r.category] = (bucket[r.category] || 0) + Number(r.target_qty || 0);
+        bucket.__total += Number(r.target_qty || 0);
+      });
+
+      custListCache = { customers, achievedByCustomer, targetByCustomer };
+
+      // % tiến độ = SUM(achieved)/SUM(target) toàn bộ category của khách trong
+      // kỳ (giống cách v_kpi_full tính I/J bằng SUM/SUM), KHÔNG phải trung
+      // bình cộng % từng category.
+      body.innerHTML = customers.map((c) => {
+        const achieved = achievedByCustomer[c.id]?.__total || 0;
+        const target = targetByCustomer[c.id]?.__total || 0;
+        let pctHtml;
+        if (target <= 0) {
+          pctHtml = `<span class="cust-pct-none">${achieved > 0 ? 'Chưa có target' : '—'}</span>`;
+        } else {
+          const pct = (achieved / target) * 100;
+          const cls = pct >= 80 ? 'cust-pct-good' : 'cust-pct-bad';
+          pctHtml = `<span class="${cls}">${pct.toFixed(1)}%</span>`;
+        }
+        return `<div class="pp-card cust-row" data-customer-id="${c.id}">
+          <span class="cust-row-name">${he(c.full_name)}</span>
+          <span class="cust-row-pct">${pctHtml}</span>
+          <span class="cust-row-nums">${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)}</span>
+        </div>`;
+      }).join('');
+
+      body.querySelectorAll('.cust-row').forEach((row) => {
+        row.addEventListener('click', () => openCustomerDetail(parseInt(row.dataset.customerId, 10)));
+      });
+    }
+
+    function closeCustomerDetail() {
+      document.getElementById('custDetailView')?.classList.add('hidden');
+      document.getElementById('custListView')?.classList.remove('hidden');
+      custSelectedCustomerId = null;
+    }
+
+    async function openCustomerDetail(customerId) {
+      custSelectedCustomerId = customerId;
+      const customer = custListCache.customers.find((c) => c.id === customerId);
+      if (!customer) return;
+      document.getElementById('custListView')?.classList.add('hidden');
+      document.getElementById('custDetailView')?.classList.remove('hidden');
+      document.getElementById('custDetailName').textContent = customer.full_name;
+
+      const achieved = custListCache.achievedByCustomer[customerId] || { __total: 0 };
+      const target = custListCache.targetByCustomer[customerId] || { __total: 0 };
+      const totalAchieved = achieved.__total || 0;
+      const totalTarget = target.__total || 0;
+      const totalPct = totalTarget > 0 ? (totalAchieved / totalTarget * 100) : null;
+      document.getElementById('custDetailTotal').innerHTML = totalTarget > 0
+        ? `Tổng kỳ này: <b class="${totalPct >= 80 ? 'cust-pct-good' : 'cust-pct-bad'}">${totalPct.toFixed(1)}%</b> (${fmtQtyMsi(totalAchieved)} / ${fmtQtyMsi(totalTarget)})`
+        : `Tổng kỳ này: ${fmtQtyMsi(totalAchieved)} đã bán — chưa có target`;
+
+      // Gộp theo nhóm cha (family) = coalesce(parent_category, category),
+      // lấy đúng mapping đang dùng trong v_kpi_full (getCategoryParentMap,
+      // đọc từ targets, không định nghĩa lại).
+      const parentMap = await getCategoryParentMap();
+      const families = {};
+      Object.keys(parentMap).forEach((cat) => {
+        const fam = parentMap[cat] || cat;
+        families[fam] = families[fam] || { achieved: 0, target: 0 };
+        families[fam].achieved += achieved[cat] || 0;
+        families[fam].target += target[cat] || 0;
+      });
+
+      const catBody = document.getElementById('custDetailCategoryBody');
+      catBody.innerHTML = Object.keys(families).sort().map((fam) => {
+        const { achieved: a, target: t } = families[fam];
+        const pct = t > 0 ? (a / t * 100) : null;
+        const pctText = pct === null ? '—' : `${pct.toFixed(1)}%`;
+        const pctCls = pct === null ? 'cust-pct-none' : (pct >= 80 ? 'cust-pct-good' : 'cust-pct-bad');
+        return `<div class="cust-detail-row">
+          <span class="cust-detail-cat">${escapeHtmlForDistyReport(fam)}</span>
+          <span class="cust-detail-num">${fmtQtyMsi(t)}</span>
+          <span class="cust-detail-num">${fmtQtyMsi(a)}</span>
+          <span class="cust-detail-num ${pctCls}">${pctText}</span>
+        </div>`;
+      }).join('');
+    }
+
+    async function saveCustTarget() {
+      const msgEl = document.getElementById('custTargetMsg');
+      const category = document.getElementById('custTargetCategory')?.value;
+      const monthVal = document.getElementById('custTargetMonth')?.value; // "YYYY-MM"
+      const qty = Number(document.getElementById('custTargetQty')?.value);
+      if (!custSelectedCustomerId || !category || !monthVal || !Number.isFinite(qty) || qty < 0) {
+        msgEl.textContent = 'Điền đủ hạng mục / tháng / số lượng hợp lệ.';
+        msgEl.style.color = '#b30012';
+        return;
+      }
+      const targetMonth = `${monthVal}-01`;
+
+      // Không có ràng buộc UNIQUE trên (customer_id, category, target_month)
+      // trong migration v16 — tự làm "upsert" bằng tìm-rồi-update/insert.
+      const { data: existing, error: findErr } = await sb.from('customer_targets')
+        .select('id').eq('customer_id', custSelectedCustomerId).eq('category', category).eq('target_month', targetMonth).maybeSingle();
+      if (findErr) { msgEl.textContent = 'Lỗi kiểm tra: ' + findErr.message; msgEl.style.color = '#b30012'; return; }
+
+      const payload = { customer_id: custSelectedCustomerId, category, target_month: targetMonth, target_qty: qty, created_by: currentUser?.id || null };
+      const { error: saveErr } = existing
+        ? await sb.from('customer_targets').update(payload).eq('id', existing.id)
+        : await sb.from('customer_targets').insert(payload);
+      if (saveErr) { msgEl.textContent = 'Lỗi lưu: ' + saveErr.message; msgEl.style.color = '#b30012'; return; }
+
+      msgEl.textContent = 'Đã lưu.';
+      msgEl.style.color = '#1c9a5b';
+      showMsiToast('Đã lưu target tháng.');
+
+      // Cảnh báo vượt quota Nam giao — CHỈ cảnh báo, không chặn lưu (đã lưu ở trên rồi).
+      const parentMap = await getCategoryParentMap();
+      const familyKey = parentMap[category] || category;
+      const [y, m] = monthVal.split('-').map(Number);
+      const quarterStr = `${y} Q${Math.floor((m - 1) / 3) + 1}`;
+      const { data: allocRow, error: allocErr } = await sb.from('v_customer_target_allocation')
+        .select('vuot_target, allocated_qty, quota_qty')
+        .eq('staff_id', custStaffId).eq('quarter', quarterStr).eq('family_key', familyKey)
+        .maybeSingle();
+      if (allocErr) console.warn('[saveCustTarget alloc check]', allocErr.message);
+      else if (allocRow?.vuot_target) {
+        showMsiToastHtml(
+          `<span class="cust-over-warn">⚠ Vượt target quý ${quarterStr} — nhóm "${escapeHtmlForDistyReport(familyKey)}": ` +
+          `đã phân bổ ${fmtQtyMsi(allocRow.allocated_qty)} / Nam giao ${fmtQtyMsi(allocRow.quota_qty)}</span>`,
+          4000
+        );
+      }
+
+      await loadCustomerList();
+      await openCustomerDetail(custSelectedCustomerId);
     }
 
     // Danh sách khách hàng cho dropdown chọn CK — cache theo lần load pane gần nhất.
