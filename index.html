@@ -1480,14 +1480,19 @@
     .cust-toolbar-group select, .cust-toolbar-group input {
       padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.82rem;
     }
+    #custListBody { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; overflow: hidden; }
     .cust-row {
       display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(90px, auto) minmax(0, 1fr);
-      align-items: center; gap: 14px; cursor: pointer;
+      grid-template-columns: minmax(0, 1.4fr) minmax(70px, auto) minmax(0, 1fr);
+      align-items: center; gap: 10px; cursor: pointer;
+      padding: 7px 10px;
+      border-bottom: 1px solid #f0f2f5;
     }
-    .cust-row-name { font-weight: 600; color: #111827; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cust-row-pct { font-weight: 700; font-size: 0.98rem; text-align: right; white-space: nowrap; }
-    .cust-row-nums { color: #6b7280; font-size: 0.82rem; text-align: right; white-space: nowrap; }
+    .cust-row:last-child { border-bottom: none; }
+    .cust-row:hover { background: #f8fafc; }
+    .cust-row-name { font-weight: 600; color: #111827; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cust-row-pct { font-weight: 700; font-size: 0.9rem; text-align: right; white-space: nowrap; }
+    .cust-row-nums { color: #6b7280; font-size: 0.76rem; text-align: right; white-space: nowrap; }
     .cust-detail-total { font-size: 0.84rem; color: #374151; }
     .cust-detail-header, .cust-detail-row {
       display: grid; grid-template-columns: minmax(0, 1.4fr) 90px 90px 70px;
@@ -2740,7 +2745,7 @@
         </div>
 
         <div id="custListView">
-          <div class="pp-card-list" id="custListBody"><div class="pp-card-placeholder">Đang tải...</div></div>
+          <div id="custListBody"><div class="pp-card-placeholder">Đang tải...</div></div>
         </div>
 
         <div id="custDetailView" class="hidden">
@@ -5849,7 +5854,7 @@
           const cls = pct >= 80 ? 'cust-pct-good' : 'cust-pct-bad';
           pctHtml = `<span class="${cls}">${pct.toFixed(1)}%</span>`;
         }
-        return `<div class="pp-card cust-row" data-customer-id="${c.id}">
+        return `<div class="cust-row" data-customer-id="${c.id}">
           <span class="cust-row-name">${he(c.full_name)}</span>
           <span class="cust-row-pct">${pctHtml}</span>
           <span class="cust-row-nums">${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)}</span>
