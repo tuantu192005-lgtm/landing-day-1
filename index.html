@@ -1485,14 +1485,24 @@
     .cust-legend-swatch:not(:first-child) { margin-left: 8px; }
     .cust-legend-prev { background: #cbd5e1; }
     .cust-legend-cur { background: #102a4e; }
+    /* Layout 2 cột màn danh sách tổng: bảng KH bên trái (~50%), bên phải để
+       trống chừa chỗ cho tính năng/biểu đồ sau này — thu về 1 cột full-width
+       ở mobile/tablet hẹp (xem media query cuối file). */
+    .cust-list-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    .cust-list-aside { min-height: 1px; }
     #custListBody { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; overflow: hidden; }
-    .cust-row {
+    .cust-row, .cust-row-header {
       display: grid;
       grid-template-columns: minmax(0, 1.3fr) minmax(96px, auto) minmax(0, 1fr);
-      align-items: center; gap: 10px; cursor: pointer;
+      align-items: center; gap: 10px;
       padding: 7px 10px;
-      border-bottom: 1px solid #f0f2f5;
     }
+    .cust-row { cursor: pointer; border-bottom: 1px solid #f0f2f5; }
+    .cust-row-header {
+      padding: 0 10px 6px;
+      font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em;
+    }
+    .cust-row-header span:not(:first-child) { text-align: right; }
     .cust-row:last-child { border-bottom: none; }
     .cust-row:hover { background: #f8fafc; }
     .cust-row-name { font-weight: 600; color: #111827; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1529,11 +1539,17 @@
       padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.82rem;
     }
     .cust-over-warn { color: #c0392b; font-weight: 600; }
+    /* Dưới 900px: bỏ chỗ trống bên phải, bảng KH về full-width. */
+    @media (max-width: 900px) {
+      .cust-list-layout { grid-template-columns: 1fr; }
+      .cust-list-aside { display: none; }
+    }
     @media (max-width: 640px) {
       .cust-row { grid-template-columns: 1fr auto; grid-template-areas: "name pct" "nums nums"; row-gap: 4px; }
       .cust-row-name { grid-area: name; }
       .cust-row-pct { grid-area: pct; }
       .cust-row-nums { grid-area: nums; text-align: left; }
+      .cust-row-header { display: none; }
       .cust-detail-header { display: none; }
       .cust-detail-row { grid-template-columns: 1fr; row-gap: 4px; }
       .cust-detail-num { text-align: left; }
@@ -2769,7 +2785,15 @@
         </div>
 
         <div id="custListView">
-          <div id="custListBody"><div class="pp-card-placeholder">Đang tải...</div></div>
+          <div class="cust-list-layout">
+            <div class="cust-list-main">
+              <div class="cust-row-header">
+                <span>Khách hàng</span><span>Tiến độ</span><span>Đã đạt / Target</span>
+              </div>
+              <div id="custListBody"><div class="pp-card-placeholder">Đang tải...</div></div>
+            </div>
+            <div class="cust-list-aside" id="custListAside"></div>
+          </div>
         </div>
 
         <div id="custDetailView" class="hidden">
