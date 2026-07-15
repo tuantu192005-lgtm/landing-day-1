@@ -1474,11 +1474,11 @@
       .pp-card-row { grid-template-columns: 1fr 1fr; }
     }
     /* ── Menu Khách hàng ── */
-    .cust-toolbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
-    .cust-toolbar-group { display: flex; flex-direction: column; gap: 4px; }
-    .cust-toolbar-group label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+    .cust-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    .cust-toolbar-group { display: flex; flex-direction: column; gap: 3px; }
+    .cust-toolbar-group label { font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
     .cust-toolbar-group select, .cust-toolbar-group input {
-      padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.88rem;
+      padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.82rem;
     }
     .cust-row {
       display: grid;
@@ -1488,22 +1488,28 @@
     .cust-row-name { font-weight: 600; color: #111827; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .cust-row-pct { font-weight: 700; font-size: 0.98rem; text-align: right; white-space: nowrap; }
     .cust-row-nums { color: #6b7280; font-size: 0.82rem; text-align: right; white-space: nowrap; }
+    .cust-detail-total { font-size: 0.84rem; color: #374151; }
+    .cust-detail-header, .cust-detail-row {
+      display: grid; grid-template-columns: minmax(0, 1.4fr) 90px 90px 70px;
+      align-items: center; gap: 8px; padding: 5px 10px;
+    }
+    .cust-detail-header { font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+    .cust-detail-header span:not(:first-child), .cust-detail-row .cust-detail-num { text-align: right; }
+    #custDetailCategoryBody { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; overflow: hidden; }
+    .cust-detail-row { border-bottom: 1px solid #f0f2f5; }
+    .cust-detail-row:last-child { border-bottom: none; }
+    .cust-detail-cat { font-weight: 600; color: #111827; font-size: 0.8rem; }
+    .cust-detail-num { font-size: 0.78rem; color: #374151; }
+    /* Đặt SAU .cust-detail-num vì cùng specificity — pct-good/bad phải thắng
+       để tô đỏ/xanh đúng trong bảng nhóm sản phẩm (span mang cả 2 class). */
     .cust-pct-good { color: #1c9a5b; }
     .cust-pct-bad { color: #c0392b; }
     .cust-pct-none { color: #9ca3af; font-weight: 400; }
-    .cust-detail-total { font-size: 0.9rem; color: #374151; }
-    .cust-detail-header, .cust-detail-row {
-      display: grid; grid-template-columns: minmax(0, 1.4fr) 110px 110px 90px;
-      align-items: center; gap: 12px; padding: 8px 14px;
-    }
-    .cust-detail-header { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
-    .cust-detail-header span:not(:first-child), .cust-detail-row .cust-detail-num { text-align: right; }
-    .cust-detail-row { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; margin-top: 8px; }
-    .cust-detail-cat { font-weight: 600; color: #111827; font-size: 0.88rem; }
-    .cust-detail-num { font-size: 0.86rem; color: #374151; }
-    .cust-target-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .cust-panel-compact { padding: 10px 14px; }
+    .cust-panel-compact h4 { margin: 0 0 6px !important; }
+    .cust-target-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .cust-target-form select, .cust-target-form input {
-      padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.88rem;
+      padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.82rem;
     }
     .cust-over-warn { color: #c0392b; font-weight: 600; }
     @media (max-width: 640px) {
@@ -2694,7 +2700,7 @@
       </section>
 
       <section class="msi-tab-pane" id="tab-customers">
-        <div class="msi-panel" style="margin-bottom:14px">
+        <div class="msi-panel cust-panel-compact" style="margin-bottom:10px">
           <div class="cust-toolbar">
             <div class="cust-toolbar-group" id="custStaffFilterWrap" style="display:none">
               <label for="custStaffFilter">Nhân viên</label>
@@ -2739,23 +2745,23 @@
 
         <div id="custDetailView" class="hidden">
           <button type="button" class="btn-secondary" id="custDetailBackBtn"><i class="fas fa-arrow-left"></i> Quay lại danh sách</button>
-          <h3 id="custDetailName" style="margin:14px 0 4px"></h3>
+          <h3 id="custDetailName" style="margin:10px 0 2px;font-size:1rem"></h3>
           <div class="cust-detail-total" id="custDetailTotal"></div>
 
-          <div class="cust-detail-header" style="margin-top:14px">
+          <div class="cust-detail-header" style="margin-top:10px">
             <span>Nhóm sản phẩm</span><span>Target</span><span>Đã đạt</span><span>%</span>
           </div>
           <div id="custDetailCategoryBody"></div>
 
-          <div class="msi-panel" style="margin-top:16px">
-            <h4 style="font-size:13px;margin:0 0 10px">Nhập / sửa target tháng</h4>
+          <div class="msi-panel cust-panel-compact" style="margin-top:10px">
+            <h4 style="font-size:12px">Nhập / sửa target tháng</h4>
             <div class="cust-target-form">
               <select id="custTargetCategory"></select>
               <input type="month" id="custTargetMonth" />
               <input type="number" id="custTargetQty" placeholder="Số lượng target" min="0" step="1" />
               <button type="button" class="btn-primary" id="custTargetSaveBtn">Lưu</button>
             </div>
-            <div id="custTargetMsg" style="font-size:12px;margin-top:8px"></div>
+            <div id="custTargetMsg" style="font-size:11px;margin-top:6px"></div>
           </div>
         </div>
       </section>
