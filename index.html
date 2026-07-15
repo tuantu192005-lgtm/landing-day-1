@@ -1480,10 +1480,15 @@
     .cust-toolbar-group select, .cust-toolbar-group input {
       padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.82rem;
     }
+    .cust-compare-legend { display: flex; align-items: center; font-size: 10px; color: #6b7280; margin-left: 2px; white-space: nowrap; }
+    .cust-legend-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; }
+    .cust-legend-swatch:not(:first-child) { margin-left: 8px; }
+    .cust-legend-prev { background: #cbd5e1; }
+    .cust-legend-cur { background: #102a4e; }
     #custListBody { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; overflow: hidden; }
     .cust-row {
       display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(70px, auto) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.3fr) minmax(96px, auto) minmax(0, 1fr);
       align-items: center; gap: 10px; cursor: pointer;
       padding: 7px 10px;
       border-bottom: 1px solid #f0f2f5;
@@ -1491,11 +1496,16 @@
     .cust-row:last-child { border-bottom: none; }
     .cust-row:hover { background: #f8fafc; }
     .cust-row-name { font-weight: 600; color: #111827; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cust-row-pct { font-weight: 700; font-size: 0.9rem; text-align: right; white-space: nowrap; }
+    .cust-row-pct { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; white-space: nowrap; }
+    .cust-row-pct-val { font-weight: 700; font-size: 0.9rem; }
     .cust-row-nums { color: #6b7280; font-size: 0.76rem; text-align: right; white-space: nowrap; }
+    .cust-delta { font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .cust-delta-up { color: #1c9a5b; }
+    .cust-delta-down { color: #c0392b; }
+    .cust-delta-flat { color: #9ca3af; font-weight: 600; }
     .cust-detail-total { font-size: 0.84rem; color: #374151; }
     .cust-detail-header, .cust-detail-row {
-      display: grid; grid-template-columns: minmax(0, 1.4fr) 90px 90px 70px;
+      display: grid; grid-template-columns: minmax(0, 1.05fr) 72px 72px 56px 106px;
       align-items: center; gap: 8px; padding: 5px 10px;
     }
     .cust-detail-header { font-size: 10px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
@@ -1510,6 +1520,8 @@
     .cust-pct-good { color: #1c9a5b; }
     .cust-pct-bad { color: #c0392b; }
     .cust-pct-none { color: #9ca3af; font-weight: 400; }
+    .cust-mini-chart-cell { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+    .cust-mini-chart-cell svg { display: block; flex-shrink: 0; }
     .cust-panel-compact { padding: 10px 14px; }
     .cust-panel-compact h4 { margin: 0 0 6px !important; }
     .cust-target-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -1525,6 +1537,7 @@
       .cust-detail-header { display: none; }
       .cust-detail-row { grid-template-columns: 1fr; row-gap: 4px; }
       .cust-detail-num { text-align: left; }
+      .cust-mini-chart-cell { justify-content: flex-start; }
     }
     /* ── compact products list table ── */
     .products-table td, .products-table th { padding: 4px 8px; font-size: 12px; }
@@ -2741,6 +2754,17 @@
                 <option value="11">Tháng 11</option><option value="12">Tháng 12</option>
               </select>
             </div>
+            <div class="cust-toolbar-group">
+              <label for="custCompareMode">So sánh</label>
+              <select id="custCompareMode">
+                <option value="prev" selected>Kỳ liền trước</option>
+                <option value="yoy">Cùng kỳ năm trước</option>
+              </select>
+            </div>
+            <div class="cust-compare-legend">
+              <span class="cust-legend-swatch cust-legend-prev"></span>Kỳ trước
+              <span class="cust-legend-swatch cust-legend-cur"></span>Kỳ này
+            </div>
           </div>
         </div>
 
@@ -2754,7 +2778,7 @@
           <div class="cust-detail-total" id="custDetailTotal"></div>
 
           <div class="cust-detail-header" style="margin-top:10px">
-            <span>Nhóm sản phẩm</span><span>Target</span><span>Đã đạt</span><span>%</span>
+            <span>Nhóm sản phẩm</span><span>Target</span><span>Đã đạt</span><span>%</span><span>So sánh</span>
           </div>
           <div id="custDetailCategoryBody"></div>
 
@@ -5723,6 +5747,65 @@
       return { year, startMonth, endMonth, startDate, endExclusive, monthStart: startDate, monthEndLast };
     }
 
+    function getCustCompareMode() {
+      return document.getElementById('custCompareMode')?.value || 'prev';
+    }
+
+    // Dời lùi 1 range (từ getCustPeriodRange) theo compareMode: 'prev' = kỳ liền
+    // trước (lùi đúng bằng độ dài kỳ — 1/3/12 tháng cho tháng/quý/năm), 'yoy' =
+    // cùng kỳ năm trước (luôn lùi 12 tháng). Ở mode Năm 2 lựa chọn ra kết quả
+    // giống nhau (lùi 12 tháng) — không cần case riêng.
+    function shiftCustPeriodRange(range, compareMode) {
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const periodLenMonths = range.endMonth - range.startMonth + 1;
+      const offsetMonths = compareMode === 'yoy' ? -12 : -periodLenMonths;
+      const absStart = range.year * 12 + (range.startMonth - 1) + offsetMonths;
+      const newYear = Math.floor(absStart / 12);
+      const newStartMonth = (absStart % 12) + 1;
+      const newEndMonth = newStartMonth + periodLenMonths - 1;
+      const startDate = `${newYear}-${pad2(newStartMonth)}-01`;
+      const nextMonthDate = new Date(newYear, newEndMonth, 1);
+      const endExclusive = `${nextMonthDate.getFullYear()}-${pad2(nextMonthDate.getMonth() + 1)}-01`;
+      const monthEndLast = `${newYear}-${pad2(newEndMonth)}-01`;
+      return { year: newYear, startMonth: newStartMonth, endMonth: newEndMonth, startDate, endExclusive, monthStart: startDate, monthEndLast };
+    }
+
+    // Chênh lệch % tiến độ (điểm phần trăm) giữa kỳ hiện tại và kỳ so sánh —
+    // dùng cho mũi tên ở màn danh sách. null nếu 1 trong 2 kỳ chưa có target.
+    function renderCustPctDelta(curPct, cmpPct) {
+      if (curPct === null || cmpPct === null) return '';
+      const diff = curPct - cmpPct;
+      if (Math.abs(diff) < 0.05) return `<span class="cust-delta cust-delta-flat">–</span>`;
+      const cls = diff >= 0 ? 'cust-delta-up' : 'cust-delta-down';
+      const arrow = diff >= 0 ? '▲' : '▼';
+      return `<span class="cust-delta ${cls}">${arrow}${Math.abs(diff).toFixed(0)}%</span>`;
+    }
+
+    // Mini bar chart SVG so sánh số lượng đã đạt 2 kỳ (kỳ trước / kỳ này) —
+    // dùng ở breakdown nhóm sản phẩm màn chi tiết KH.
+    function renderCustMiniChart(prevQty, curQty) {
+      const w = 54, h = 22, barW = 16, gap = 4;
+      const max = Math.max(prevQty, curQty, 1);
+      const prevH = Math.max(2, Math.round((prevQty / max) * (h - 2)));
+      const curH = Math.max(2, Math.round((curQty / max) * (h - 2)));
+      const x1 = 0, x2 = barW + gap;
+      return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Kỳ trước ${fmtQtyMsi(prevQty)}, kỳ này ${fmtQtyMsi(curQty)}">
+        <rect x="${x1}" y="${h - prevH}" width="${barW}" height="${prevH}" rx="2" fill="#cbd5e1"><title>Kỳ trước: ${fmtQtyMsi(prevQty)}</title></rect>
+        <rect x="${x2}" y="${h - curH}" width="${barW}" height="${curH}" rx="2" fill="#102a4e"><title>Kỳ này: ${fmtQtyMsi(curQty)}</title></rect>
+      </svg>`;
+    }
+
+    // Delta tăng trưởng số lượng (không phải điểm %) — dùng cạnh mini chart.
+    function renderCustQtyDelta(prevQty, curQty) {
+      if (prevQty <= 0 && curQty <= 0) return `<span class="cust-delta cust-delta-flat">—</span>`;
+      if (prevQty <= 0) return `<span class="cust-delta cust-delta-up">Mới</span>`;
+      const pct = ((curQty - prevQty) / prevQty) * 100;
+      if (Math.abs(pct) < 0.5) return `<span class="cust-delta cust-delta-flat">–</span>`;
+      const cls = pct >= 0 ? 'cust-delta-up' : 'cust-delta-down';
+      const arrow = pct >= 0 ? '▲' : '▼';
+      return `<span class="cust-delta ${cls}">${arrow}${Math.abs(pct).toFixed(0)}%</span>`;
+    }
+
     function populateCustPeriodSelectors() {
       const yearSel = document.getElementById('custPeriodYear');
       const now = new Date();
@@ -5777,6 +5860,13 @@
         });
       });
 
+      // Đổi chế độ so sánh không đổi kỳ đang xem — chỉ tính lại phần so sánh
+      // của màn đang mở (danh sách hoặc chi tiết), không đóng chi tiết KH.
+      document.getElementById('custCompareMode')?.addEventListener('change', () => {
+        if (custSelectedCustomerId) openCustomerDetail(custSelectedCustomerId);
+        else loadCustomerList();
+      });
+
       document.getElementById('custDetailBackBtn')?.addEventListener('click', closeCustomerDetail);
       document.getElementById('custTargetSaveBtn')?.addEventListener('click', saveCustTarget);
 
@@ -5807,10 +5897,19 @@
       }
       const ids = customers.map((c) => c.id);
       const range = getCustPeriodRange();
+      const compareMode = getCustCompareMode();
+      const cmpRange = shiftCustPeriodRange(range, compareMode);
 
       // fetchAllPages: PostgREST giới hạn 1000 dòng/request, sellout theo
       // năm/quý có thể vượt mốc đó — không dùng .limit() thường ở đây.
-      const [{ data: achievedRows, error: achErr }, { data: targetRows, error: tgtErr }] = await Promise.all([
+      // Query thêm kỳ so sánh (achieved + target) để tính mũi tên %  thay đổi
+      // cạnh %  tiến độ — không đổi cách tính %  tiến độ hiện có.
+      const [
+        { data: achievedRows, error: achErr },
+        { data: targetRows, error: tgtErr },
+        { data: cmpAchievedRows, error: cmpAchErr },
+        { data: cmpTargetRows, error: cmpTgtErr }
+      ] = await Promise.all([
         fetchAllPages((from, to) => sb.from('v_sellout_categorized')
           .select('customer_id, category, quantity')
           .in('customer_id', ids)
@@ -5820,23 +5919,37 @@
           .select('customer_id, category, target_qty')
           .in('customer_id', ids)
           .gte('target_month', range.monthStart).lte('target_month', range.monthEndLast)
+          .range(from, to)),
+        fetchAllPages((from, to) => sb.from('v_sellout_categorized')
+          .select('customer_id, category, quantity')
+          .in('customer_id', ids)
+          .gte('sale_date', cmpRange.startDate).lt('sale_date', cmpRange.endExclusive)
+          .range(from, to)),
+        fetchAllPages((from, to) => sb.from('customer_targets')
+          .select('customer_id, category, target_qty')
+          .in('customer_id', ids)
+          .gte('target_month', cmpRange.monthStart).lte('target_month', cmpRange.monthEndLast)
           .range(from, to))
       ]);
       if (achErr) console.warn('[loadCustomerList achieved]', achErr.message);
       if (tgtErr) console.warn('[loadCustomerList target]', tgtErr.message);
+      if (cmpAchErr) console.warn('[loadCustomerList cmp achieved]', cmpAchErr.message);
+      if (cmpTgtErr) console.warn('[loadCustomerList cmp target]', cmpTgtErr.message);
 
-      const achievedByCustomer = {};
-      (achievedRows || []).forEach((r) => {
-        const bucket = achievedByCustomer[r.customer_id] || (achievedByCustomer[r.customer_id] = { __total: 0 });
-        bucket[r.category] = (bucket[r.category] || 0) + (r.quantity || 0);
-        bucket.__total += (r.quantity || 0);
-      });
-      const targetByCustomer = {};
-      (targetRows || []).forEach((r) => {
-        const bucket = targetByCustomer[r.customer_id] || (targetByCustomer[r.customer_id] = { __total: 0 });
-        bucket[r.category] = (bucket[r.category] || 0) + Number(r.target_qty || 0);
-        bucket.__total += Number(r.target_qty || 0);
-      });
+      const sumByCustomer = (rows, qtyField) => {
+        const map = {};
+        (rows || []).forEach((r) => {
+          const bucket = map[r.customer_id] || (map[r.customer_id] = { __total: 0 });
+          const v = qtyField === 'quantity' ? (r.quantity || 0) : Number(r.target_qty || 0);
+          bucket[r.category] = (bucket[r.category] || 0) + v;
+          bucket.__total += v;
+        });
+        return map;
+      };
+      const achievedByCustomer = sumByCustomer(achievedRows, 'quantity');
+      const targetByCustomer = sumByCustomer(targetRows, 'target_qty');
+      const cmpAchievedByCustomer = sumByCustomer(cmpAchievedRows, 'quantity');
+      const cmpTargetByCustomer = sumByCustomer(cmpTargetRows, 'target_qty');
 
       custListCache = { customers, achievedByCustomer, targetByCustomer };
 
@@ -5846,17 +5959,21 @@
       body.innerHTML = customers.map((c) => {
         const achieved = achievedByCustomer[c.id]?.__total || 0;
         const target = targetByCustomer[c.id]?.__total || 0;
-        let pctHtml;
+        const cmpAchieved = cmpAchievedByCustomer[c.id]?.__total || 0;
+        const cmpTarget = cmpTargetByCustomer[c.id]?.__total || 0;
+        let pctHtml, curPct = null;
         if (target <= 0) {
           pctHtml = `<span class="cust-pct-none">${achieved > 0 ? 'Chưa có target' : '—'}</span>`;
         } else {
-          const pct = (achieved / target) * 100;
-          const cls = pct >= 80 ? 'cust-pct-good' : 'cust-pct-bad';
-          pctHtml = `<span class="${cls}">${pct.toFixed(1)}%</span>`;
+          curPct = (achieved / target) * 100;
+          const cls = curPct >= 80 ? 'cust-pct-good' : 'cust-pct-bad';
+          pctHtml = `<span class="cust-row-pct-val ${cls}">${curPct.toFixed(1)}%</span>`;
         }
+        const cmpPct = cmpTarget > 0 ? (cmpAchieved / cmpTarget) * 100 : null;
+        const deltaHtml = renderCustPctDelta(curPct, cmpPct);
         return `<div class="cust-row" data-customer-id="${c.id}">
           <span class="cust-row-name">${he(c.full_name)}</span>
-          <span class="cust-row-pct">${pctHtml}</span>
+          <span class="cust-row-pct">${pctHtml}${deltaHtml}</span>
           <span class="cust-row-nums">${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)}</span>
         </div>`;
       }).join('');
@@ -5901,17 +6018,39 @@
         families[fam].target += target[cat] || 0;
       });
 
+      // Đã đạt kỳ so sánh (kỳ liền trước / cùng kỳ năm trước, theo lựa chọn ở
+      // đầu trang) — chỉ cần achieved (không cần target kỳ trước) để vẽ mini
+      // chart so sánh theo nhóm sản phẩm. Query riêng cho đúng 1 khách này.
+      const cmpRange = shiftCustPeriodRange(getCustPeriodRange(), getCustCompareMode());
+      const { data: cmpAchievedRows, error: cmpErr } = await fetchAllPages((from, to) => sb.from('v_sellout_categorized')
+        .select('category, quantity')
+        .eq('customer_id', customerId)
+        .gte('sale_date', cmpRange.startDate).lt('sale_date', cmpRange.endExclusive)
+        .range(from, to));
+      if (cmpErr) console.warn('[openCustomerDetail cmp achieved]', cmpErr.message);
+      const cmpAchievedByCategory = {};
+      (cmpAchievedRows || []).forEach((r) => {
+        cmpAchievedByCategory[r.category] = (cmpAchievedByCategory[r.category] || 0) + (r.quantity || 0);
+      });
+      const cmpFamilyAchieved = {};
+      Object.keys(parentMap).forEach((cat) => {
+        const fam = parentMap[cat] || cat;
+        cmpFamilyAchieved[fam] = (cmpFamilyAchieved[fam] || 0) + (cmpAchievedByCategory[cat] || 0);
+      });
+
       const catBody = document.getElementById('custDetailCategoryBody');
       catBody.innerHTML = Object.keys(families).sort().map((fam) => {
         const { achieved: a, target: t } = families[fam];
         const pct = t > 0 ? (a / t * 100) : null;
         const pctText = pct === null ? '—' : `${pct.toFixed(1)}%`;
         const pctCls = pct === null ? 'cust-pct-none' : (pct >= 80 ? 'cust-pct-good' : 'cust-pct-bad');
+        const prevA = cmpFamilyAchieved[fam] || 0;
         return `<div class="cust-detail-row">
           <span class="cust-detail-cat">${escapeHtmlForDistyReport(fam)}</span>
           <span class="cust-detail-num">${fmtQtyMsi(t)}</span>
           <span class="cust-detail-num">${fmtQtyMsi(a)}</span>
           <span class="cust-detail-num ${pctCls}">${pctText}</span>
+          <span class="cust-mini-chart-cell">${renderCustMiniChart(prevA, a)}${renderCustQtyDelta(prevA, a)}</span>
         </div>`;
       }).join('');
     }
