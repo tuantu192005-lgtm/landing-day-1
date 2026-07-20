@@ -1514,6 +1514,10 @@
     .cust-delta-down { color: #c0392b; }
     .cust-delta-flat { color: #9ca3af; font-weight: 600; }
     .cust-detail-total { font-size: 0.84rem; color: #374151; }
+    .cust-reassign-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .cust-reassign-rep { font-size: 0.82rem; color: #374151; }
+    .cust-reassign-bar .btn-secondary { padding: 5px 12px; font-size: 0.8rem; }
+    .cust-reassign-form { margin-top: 8px; }
     .cust-detail-header, .cust-detail-row {
       display: grid; grid-template-columns: minmax(0, 1.05fr) 72px 72px 56px 106px;
       align-items: center; gap: 8px; padding: 5px 10px;
@@ -2801,6 +2805,19 @@
           <h3 id="custDetailName" style="margin:10px 0 2px;font-size:1rem"></h3>
           <div class="cust-detail-total" id="custDetailTotal"></div>
 
+          <div class="cust-reassign-bar">
+            <span class="cust-reassign-rep">Đang phụ trách: <b id="custReassignRepName"></b></span>
+            <button type="button" class="btn-secondary hidden" id="custReassignToggleBtn">
+              <i class="fas fa-people-arrows"></i> Bàn giao khách hàng
+            </button>
+          </div>
+          <div class="cust-target-form cust-reassign-form hidden" id="custReassignForm">
+            <select id="custReassignNewStaff"></select>
+            <button type="button" class="btn-primary" id="custReassignConfirmBtn">Xác nhận</button>
+            <button type="button" class="btn-secondary" id="custReassignCancelBtn">Hủy</button>
+          </div>
+          <div id="custReassignMsg" style="font-size:11px;margin-top:4px"></div>
+
           <div class="cust-detail-header" style="margin-top:10px">
             <span>Nhóm sản phẩm</span><span>Target</span><span>Đã đạt</span><span>%</span><span>So sánh</span>
           </div>
@@ -2998,11 +3015,17 @@
     let currentUser = null;
 
     const EMPLOYEES = [
-      { id: '2a4d4e1b-f197-4d89-9d61-82abc346bba2', name: 'Tú' },
-      { id: '80004214-c116-42e3-b511-36ebe488e51a', name: 'Lập' },
-      { id: 'c21deac8-e2ab-4d11-8269-dada620941b6', name: 'Linh' },
-      { id: '8ad49887-563a-44aa-bdcc-46a69734b402', name: 'Tâm' }
+      { id: '2a4d4e1b-f197-4d89-9d61-82abc346bba2', name: 'Tú', email: 'tu@msivn.io.vn' },
+      { id: '80004214-c116-42e3-b511-36ebe488e51a', name: 'Lập', email: 'lap@msivn.io.vn' },
+      { id: 'c21deac8-e2ab-4d11-8269-dada620941b6', name: 'Linh', email: 'linh@msivn.io.vn' },
+      { id: '8ad49887-563a-44aa-bdcc-46a69734b402', name: 'Tâm', email: 'tam@msivn.io.vn' }
     ];
+
+    // CHỈ Nam có quyền bàn giao KH (quyết định giữ nguyên đúng RLS hiện tại —
+    // đã test thật: nhân viên, kể cả đang là rep của KH đó, bị RLS chặn ghi
+    // customer_assignments; chỉ role='admin' ghi được). id lấy từ profiles
+    // (nam@msivn.io.vn).
+    const NAM_PROFILE_ID = '9158c797-c667-478f-92a7-4f5ac658c6d5';
 
     function showScreen(id) {
       screens.forEach((screen) => screen.classList.toggle('active', screen.id === id));
@@ -5894,6 +5917,16 @@
       document.getElementById('custDetailBackBtn')?.addEventListener('click', closeCustomerDetail);
       document.getElementById('custTargetSaveBtn')?.addEventListener('click', saveCustTarget);
 
+      document.getElementById('custReassignToggleBtn')?.addEventListener('click', () => {
+        document.getElementById('custReassignForm')?.classList.toggle('hidden');
+        document.getElementById('custReassignMsg').textContent = '';
+      });
+      document.getElementById('custReassignCancelBtn')?.addEventListener('click', () => {
+        document.getElementById('custReassignForm')?.classList.add('hidden');
+        document.getElementById('custReassignMsg').textContent = '';
+      });
+      document.getElementById('custReassignConfirmBtn')?.addEventListener('click', confirmReassignCustomer);
+
       // 16 category thật cho dropdown nhập target — lấy từ targets (nguồn thật),
       // không tự bịa nhãn nhóm mới.
       const catSel = document.getElementById('custTargetCategory');
@@ -6020,6 +6053,7 @@
       document.getElementById('custListView')?.classList.add('hidden');
       document.getElementById('custDetailView')?.classList.remove('hidden');
       document.getElementById('custDetailName').textContent = customer.full_name;
+      setupCustReassignUi();
 
       const achieved = custListCache.achievedByCustomer[customerId] || { __total: 0 };
       const target = custListCache.targetByCustomer[customerId] || { __total: 0 };
@@ -6077,6 +6111,58 @@
           <span class="cust-mini-chart-cell">${renderCustMiniChart(prevA, a)}${renderCustQtyDelta(prevA, a)}</span>
         </div>`;
       }).join('');
+    }
+
+    // Hiện nút "Bàn giao khách hàng" CHỈ cho Nam — quyết định giữ nguyên đúng
+    // RLS hiện tại (đã test thật: nhân viên, kể cả đang là rep của KH đó, bị
+    // RLS chặn ghi customer_assignments; chỉ role='admin' ghi được). Đây là
+    // gate ở UI khớp với chặn thật ở DB — không tự nới thêm quyền cho staff.
+    function setupCustReassignUi() {
+      const repEmp = EMPLOYEES.find((e) => e.id === custStaffId);
+      document.getElementById('custReassignRepName').textContent = repEmp?.name || '—';
+
+      const canReassign = currentUser?.id === NAM_PROFILE_ID;
+      document.getElementById('custReassignToggleBtn')?.classList.toggle('hidden', !canReassign);
+      document.getElementById('custReassignForm')?.classList.add('hidden');
+      document.getElementById('custReassignMsg').textContent = '';
+
+      const otherStaff = EMPLOYEES.filter((e) => e.id !== custStaffId);
+      const staffSel = document.getElementById('custReassignNewStaff');
+      if (staffSel) staffSel.innerHTML = otherStaff.map((e) => `<option value="${e.email}">${e.name}</option>`).join('');
+    }
+
+    async function confirmReassignCustomer() {
+      const msgEl = document.getElementById('custReassignMsg');
+      const newEmail = document.getElementById('custReassignNewStaff')?.value;
+      if (!custSelectedCustomerId || !newEmail) return;
+      const btn = document.getElementById('custReassignConfirmBtn');
+      btn.disabled = true;
+      msgEl.style.color = '#6b7280';
+      msgEl.textContent = 'Đang xử lý...';
+
+      const { error } = await sb.rpc('reassign_customer', {
+        p_customer_id: custSelectedCustomerId,
+        p_new_sales_email: newEmail,
+        p_note: `Bàn giao qua giao diện web bởi ${currentUser?.name || currentUser?.email || ''}`
+      });
+      btn.disabled = false;
+
+      if (error) {
+        msgEl.style.color = '#b30012';
+        msgEl.textContent = 'Lỗi: ' + error.message;
+        return;
+      }
+
+      const newEmp = EMPLOYEES.find((e) => e.email === newEmail);
+      document.getElementById('custReassignRepName').textContent = newEmp?.name || '—';
+      document.getElementById('custReassignForm')?.classList.add('hidden');
+      msgEl.textContent = '';
+      showMsiToast(`Đã bàn giao cho ${newEmp?.name || newEmail}.`);
+
+      // custStaffId (bộ lọc đang xem) không đổi nhưng danh sách KH thuộc nó
+      // đã đổi — làm mới nền để quay lại danh sách thấy đúng ngay, không cần
+      // reload trang.
+      loadCustomerList();
     }
 
     async function saveCustTarget() {
