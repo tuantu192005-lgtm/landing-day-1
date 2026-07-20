@@ -1559,6 +1559,15 @@
       .cust-detail-num { text-align: left; }
       .cust-mini-chart-cell { justify-content: flex-start; }
     }
+    /* ── Quản lý tài khoản (Nam) ── */
+    .acct-row { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
+    .acct-row-main { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .acct-row-name { font-weight: 600; color: #111827; font-size: 0.9rem; min-width: 100px; }
+    .acct-row-email { color: #6b7280; font-size: 0.84rem; flex: 1; min-width: 160px; }
+    .acct-row-role { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; background: #f1f5f9; border-radius: 4px; padding: 2px 8px; }
+    .acct-edit-toggle { padding: 5px 12px; font-size: 0.8rem; }
+    .acct-edit-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f2f5; max-width: 380px; }
+    .acct-edit-form .form-group { margin-bottom: 12px; }
     /* ── compact products list table ── */
     .products-table td, .products-table th { padding: 4px 8px; font-size: 12px; }
     .products-table .sku-cell {
@@ -2119,6 +2128,7 @@
         <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i> Disty Inventory</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-weekly-report"><i class="fas fa-calendar-week"></i> Weekly Report</button>
         <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i> Data Source</button>
+        <button type="button" class="msi-menu-btn hidden" id="navAccountsBtn" data-tab="tab-accounts"><i class="fas fa-user-shield"></i> Quản lý tài khoản</button>
       </nav>
       <div class="msi-header-right">
         <div class="notif-bell-wrap">
@@ -2880,6 +2890,40 @@
           </div>
         </div>
       </section>
+
+      <section class="msi-tab-pane" id="tab-accounts">
+        <div id="acctAccessDenied" class="msi-placeholder hidden">
+          <i class="fas fa-lock"></i>
+          <p>Bạn không có quyền truy cập màn này.</p>
+        </div>
+        <div id="acctContent">
+          <div class="msi-panel" style="margin-bottom:20px;max-width:420px">
+            <h3>Tạo tài khoản mới</h3>
+            <p class="msi-panel-note">Tự đặt mật khẩu, không qua luồng gửi email mời.</p>
+            <div class="form-group">
+              <label for="acctNewName">Tên hiển thị</label>
+              <input type="text" id="acctNewName" placeholder="VD: Hùng" />
+            </div>
+            <div class="form-group">
+              <label for="acctNewEmail">Email đăng nhập</label>
+              <input type="email" id="acctNewEmail" placeholder="hung@msivn.io.vn" />
+            </div>
+            <div class="form-group">
+              <label for="acctNewPassword">Mật khẩu</label>
+              <input type="password" id="acctNewPassword" placeholder="Tối thiểu 6 ký tự" />
+            </div>
+            <div class="dashboard-actions">
+              <button type="button" class="btn-primary" id="acctCreateBtn">Tạo tài khoản</button>
+            </div>
+            <div class="login-error" id="acctCreateMsg"></div>
+          </div>
+
+          <div class="msi-panel">
+            <h3>Tài khoản hiện có</h3>
+            <div id="acctListBody"><div class="pp-card-placeholder">Đang tải...</div></div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -3074,7 +3118,7 @@
       return { ...msiFilters };
     }
 
-    const TABS_NO_FILTER = new Set(['tab-products', 'tab-disty-inventory', 'tab-customers']);
+    const TABS_NO_FILTER = new Set(['tab-products', 'tab-disty-inventory', 'tab-customers', 'tab-accounts']);
 
     function initMsiTabs() {
       document.querySelectorAll('.msi-menu-btn').forEach((btn) => {
@@ -3165,6 +3209,7 @@
       populateYearFilter();
       tabLoaders['tab-summaries']?.();
       initNotificationBell();
+      document.getElementById('navAccountsBtn')?.classList.toggle('hidden', currentUser?.id !== NAM_PROFILE_ID);
     }
 
     // ══ TAB SUMMARIES DASHBOARD ══════════════════════════════
@@ -8537,6 +8582,138 @@
       if (isAdmin) loadImportHistory();
     }
     tabLoaders['tab-data-source'] = loadDataSourceTab;
+
+    // ══ TAB QUẢN LÝ TÀI KHOẢN (chỉ Nam) ══════════════════════
+    // Tạo/sửa tài khoản (email, mật khẩu, tên hiển thị) qua Cloudflare
+    // Pages Function /api/manage-account — endpoint DUY NHẤT được cầm
+    // service role key (biến môi trường phía Cloudflare, không lộ ra
+    // client). Function tự xác thực lại người gọi đúng là Nam (không tin
+    // gate UI này), nên xem đây là UX gate, chặn thật nằm ở server.
+    async function callManageAccountApi(payload) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return { ok: false, error: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại.' };
+      const res = await fetch('/api/manage-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(payload)
+      });
+      try {
+        return await res.json();
+      } catch {
+        return { ok: false, error: `Lỗi server (HTTP ${res.status}).` };
+      }
+    }
+
+    async function loadAccountsTab() {
+      const he = escapeHtmlForDistyReport;
+      const isNam = currentUser?.id === NAM_PROFILE_ID;
+      document.getElementById('acctAccessDenied')?.classList.toggle('hidden', isNam);
+      document.getElementById('acctContent')?.classList.toggle('hidden', !isNam);
+      if (!isNam) return;
+
+      const body = document.getElementById('acctListBody');
+      body.innerHTML = '<div class="pp-card-placeholder">Đang tải...</div>';
+      const { data, error } = await sb.from('profiles').select('id, full_name, email, role, status').order('full_name');
+      if (error) { body.innerHTML = '<div class="pp-card-placeholder">Lỗi tải danh sách: ' + he(error.message) + '</div>'; return; }
+
+      body.innerHTML = (data || []).map((a) => `
+        <div class="acct-row" data-id="${a.id}">
+          <div class="acct-row-main">
+            <span class="acct-row-name">${he(a.full_name || '—')}</span>
+            <span class="acct-row-email">${he(a.email || '—')}</span>
+            <span class="acct-row-role">${he(a.role || '')}</span>
+            <button type="button" class="btn-secondary acct-edit-toggle">Sửa</button>
+          </div>
+          <div class="acct-edit-form hidden">
+            <div class="form-group">
+              <label>Tên hiển thị</label>
+              <input type="text" class="acct-edit-name" value="${he(a.full_name || '')}" />
+            </div>
+            <div class="form-group">
+              <label>Email đăng nhập</label>
+              <input type="email" class="acct-edit-email" value="${he(a.email || '')}" />
+            </div>
+            <div class="form-group">
+              <label>Mật khẩu mới (để trống nếu không đổi)</label>
+              <input type="password" class="acct-edit-password" placeholder="Để trống = giữ nguyên" />
+            </div>
+            <div class="dashboard-actions">
+              <button type="button" class="btn-primary acct-save-btn">Lưu</button>
+              <button type="button" class="btn-secondary acct-cancel-btn">Hủy</button>
+            </div>
+            <div class="login-error acct-edit-msg"></div>
+          </div>
+        </div>
+      `).join('');
+
+      body.querySelectorAll('.acct-row').forEach((row) => {
+        const targetId = row.dataset.id;
+        const formEl = row.querySelector('.acct-edit-form');
+        const msgEl = row.querySelector('.acct-edit-msg');
+        row.querySelector('.acct-edit-toggle').addEventListener('click', () => {
+          formEl.classList.toggle('hidden');
+          msgEl.textContent = '';
+        });
+        row.querySelector('.acct-cancel-btn').addEventListener('click', () => {
+          formEl.classList.add('hidden');
+          msgEl.textContent = '';
+        });
+        row.querySelector('.acct-save-btn').addEventListener('click', async () => {
+          const saveBtn = row.querySelector('.acct-save-btn');
+          const newName = row.querySelector('.acct-edit-name').value.trim();
+          const newEmail = row.querySelector('.acct-edit-email').value.trim();
+          const newPassword = row.querySelector('.acct-edit-password').value;
+          saveBtn.disabled = true;
+          msgEl.style.color = '#6b7280';
+          msgEl.textContent = 'Đang lưu...';
+          const payload = { action: 'update', target_id: targetId, full_name: newName, email: newEmail };
+          if (newPassword) payload.password = newPassword;
+          const result = await callManageAccountApi(payload);
+          saveBtn.disabled = false;
+          if (!result.ok) {
+            msgEl.style.color = '#b30012';
+            msgEl.textContent = result.error || 'Lỗi không xác định.';
+            return;
+          }
+          showMsiToast('Đã lưu tài khoản.');
+          loadAccountsTab();
+        });
+      });
+    }
+    tabLoaders['tab-accounts'] = loadAccountsTab;
+
+    document.getElementById('acctCreateBtn')?.addEventListener('click', async () => {
+      const msgEl = document.getElementById('acctCreateMsg');
+      const nameEl = document.getElementById('acctNewName');
+      const emailEl = document.getElementById('acctNewEmail');
+      const passEl = document.getElementById('acctNewPassword');
+      const full_name = nameEl.value.trim();
+      const email = emailEl.value.trim();
+      const password = passEl.value;
+      if (!full_name || !email || !password) {
+        msgEl.style.color = '#b30012';
+        msgEl.textContent = 'Điền đủ tên hiển thị / email / mật khẩu.';
+        return;
+      }
+      const btn = document.getElementById('acctCreateBtn');
+      btn.disabled = true;
+      msgEl.style.color = '#6b7280';
+      msgEl.textContent = 'Đang tạo...';
+      const result = await callManageAccountApi({ action: 'create', full_name, email, password });
+      btn.disabled = false;
+      if (!result.ok) {
+        msgEl.style.color = '#b30012';
+        msgEl.textContent = result.error || 'Lỗi không xác định.';
+        return;
+      }
+      msgEl.style.color = '#1c9a5b';
+      msgEl.textContent = 'Đã tạo tài khoản.';
+      showMsiToast(`Đã tạo tài khoản cho ${full_name}.`);
+      nameEl.value = '';
+      emailEl.value = '';
+      passEl.value = '';
+      loadAccountsTab();
+    });
 
     /* --- Import / Export Excel sellout_data của chính nhân viên --- */
     function excelSerialToISODate(serial) {
