@@ -132,6 +132,8 @@
       opacity: 0.92;
     }
 
+    #chpwdOpenBtn { padding: 10px 14px; font-size: 0.95rem; }
+
     .app-body {
       display: grid;
       grid-template-columns: 260px 1fr;
@@ -2142,6 +2144,7 @@
           </div>
         </div>
         <span class="user-chip" id="currentUserChip">Chưa đăng nhập</span>
+        <button type="button" class="logout-btn hidden" id="chpwdOpenBtn" title="Đổi mật khẩu"><i class="fas fa-key"></i></button>
         <button class="logout-btn hidden" id="logoutButton">Đăng xuất</button>
         <button type="button" class="msi-hamburger" id="msiHamburger" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
       </div>
@@ -2951,6 +2954,30 @@
       <div style="display:flex;gap:10px;justify-content:flex-end">
         <button type="button" class="btn-primary" id="mergeSuggestYesBtn" style="padding:9px 20px;font-size:13px">Gộp luôn</button>
         <button type="button" class="btn-secondary" id="mergeSuggestNoBtn" style="padding:9px 20px;font-size:13px">Không, chỉ lưu tên mới</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal đổi mật khẩu (tự đổi cho chính mình, ai đăng nhập cũng thấy) -->
+  <div id="chpwdModal" class="hidden" style="position:fixed;inset:0;z-index:10003;background:rgba(10,26,60,0.55);display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:12px;padding:24px 28px;max-width:380px;width:100%;box-shadow:0 12px 48px rgba(10,26,60,0.3)">
+      <h3 style="margin:0 0 16px;font-size:14px;font-weight:700;color:#1a2b4c">Đổi mật khẩu</h3>
+      <div class="form-group">
+        <label for="chpwdCurrent">Mật khẩu hiện tại</label>
+        <input type="password" id="chpwdCurrent" autocomplete="current-password" />
+      </div>
+      <div class="form-group">
+        <label for="chpwdNew">Mật khẩu mới</label>
+        <input type="password" id="chpwdNew" autocomplete="new-password" placeholder="Tối thiểu 6 ký tự" />
+      </div>
+      <div class="form-group">
+        <label for="chpwdConfirm">Nhập lại mật khẩu mới</label>
+        <input type="password" id="chpwdConfirm" autocomplete="new-password" />
+      </div>
+      <div class="login-error" id="chpwdMsg"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button type="button" class="btn-primary" id="chpwdSaveBtn" style="padding:9px 20px;font-size:13px">Lưu</button>
+        <button type="button" class="btn-secondary" id="chpwdCancelBtn" style="padding:9px 20px;font-size:13px">Hủy</button>
       </div>
     </div>
   </div>
@@ -8375,6 +8402,7 @@
       loginError.textContent = '';
       currentUserChip.textContent = `${currentUser.name} (${currentUser.email})`;
       logoutButton.classList.remove('hidden');
+      document.getElementById('chpwdOpenBtn')?.classList.remove('hidden');
       showScreen('mainApp');
       initMsiApp();
     }
@@ -8401,12 +8429,84 @@
       currentUser = null;
       currentUserChip.textContent = 'Chưa đăng nhập';
       logoutButton.classList.add('hidden');
+      document.getElementById('chpwdOpenBtn')?.classList.add('hidden');
       if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
       document.getElementById('notifBellBadge')?.classList.add('hidden');
       document.getElementById('notifDropdown')?.classList.add('hidden');
       const notifListEl = document.getElementById('notifDropdownList');
       if (notifListEl) notifListEl.innerHTML = '';
       showScreen('loginScreen');
+    });
+
+    // ── Đổi mật khẩu (tự đổi cho chính mình) ──────────────────────
+    // Xác thực mật khẩu hiện tại bằng cách đăng nhập lại (signInWithPassword)
+    // — cách chuẩn của Supabase Auth để "re-auth" trước khi đổi mật khẩu ở
+    // client, không cần service role/endpoint riêng vì người dùng chỉ đổi
+    // được mật khẩu của chính mình (session hiện tại).
+    function openChpwdModal() {
+      document.getElementById('chpwdCurrent').value = '';
+      document.getElementById('chpwdNew').value = '';
+      document.getElementById('chpwdConfirm').value = '';
+      document.getElementById('chpwdMsg').textContent = '';
+      document.getElementById('chpwdModal')?.classList.remove('hidden');
+    }
+    function closeChpwdModal() {
+      document.getElementById('chpwdModal')?.classList.add('hidden');
+    }
+    document.getElementById('chpwdOpenBtn')?.addEventListener('click', openChpwdModal);
+    document.getElementById('chpwdCancelBtn')?.addEventListener('click', closeChpwdModal);
+
+    document.getElementById('chpwdSaveBtn')?.addEventListener('click', async () => {
+      const msgEl = document.getElementById('chpwdMsg');
+      const curPass = document.getElementById('chpwdCurrent').value;
+      const newPass = document.getElementById('chpwdNew').value;
+      const confirmPass = document.getElementById('chpwdConfirm').value;
+
+      if (!curPass || !newPass || !confirmPass) {
+        msgEl.textContent = 'Điền đủ cả 3 ô.';
+        return;
+      }
+      if (newPass.length < 6) {
+        msgEl.textContent = 'Mật khẩu mới phải từ 6 ký tự trở lên.';
+        return;
+      }
+      if (newPass !== confirmPass) {
+        msgEl.textContent = 'Mật khẩu mới nhập lại không khớp.';
+        return;
+      }
+      if (!currentUser?.email) {
+        msgEl.textContent = 'Không xác định được tài khoản đang đăng nhập.';
+        return;
+      }
+
+      const btn = document.getElementById('chpwdSaveBtn');
+      btn.disabled = true;
+      msgEl.style.color = '#6b7280';
+      msgEl.textContent = 'Đang xử lý...';
+
+      // Xác nhận đúng mật khẩu hiện tại bằng cách đăng nhập lại chính tài
+      // khoản này — nếu sai, signInWithPassword trả lỗi ngay, không đổi gì.
+      const { error: reauthErr } = await sb.auth.signInWithPassword({
+        email: currentUser.email,
+        password: curPass
+      });
+      if (reauthErr) {
+        btn.disabled = false;
+        msgEl.style.color = '#b30012';
+        msgEl.textContent = 'Mật khẩu hiện tại không đúng.';
+        return;
+      }
+
+      const { error: updateErr } = await sb.auth.updateUser({ password: newPass });
+      btn.disabled = false;
+      if (updateErr) {
+        msgEl.style.color = '#b30012';
+        msgEl.textContent = 'Lỗi đổi mật khẩu: ' + updateErr.message;
+        return;
+      }
+
+      closeChpwdModal();
+      showMsiToast('Đã đổi mật khẩu.');
     });
 
     document.addEventListener('click', (event) => {
