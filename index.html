@@ -946,25 +946,66 @@
       padding: 3px;
     }
 
+    /* Sidebar trái kiểu Supabase: hẹp chỉ icon (56px) mặc định, hover mở
+       rộng đè lên (overlay) nội dung, KHÔNG đẩy layout — content luôn chừa
+       sẵn margin-left = đúng bề rộng lúc thu gọn nên không bao giờ nhảy. */
+    .msi-sidebar {
+      position: fixed;
+      top: 64px;
+      left: 0;
+      bottom: 0;
+      width: 56px;
+      z-index: 45;
+      background: linear-gradient(180deg, var(--navy-strong), var(--navy-soft));
+      overflow-x: hidden;
+      overflow-y: auto;
+      transition: width 0.16s ease;
+      box-shadow: 2px 0 14px rgba(16, 42, 78, 0.15);
+    }
+
+    .msi-sidebar:hover {
+      width: 232px;
+    }
+
     .msi-menu {
       display: flex;
+      flex-direction: column;
       gap: 3px;
-      flex: 1;
-      min-width: 0;
-      overflow-x: auto;
+      padding: 10px 8px;
     }
 
     .msi-menu-btn {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
       background: none;
       border: none;
       color: rgba(255, 255, 255, 0.72);
-      padding: 8px 12px;
+      padding: 10px 12px;
       border-radius: 10px;
       font-weight: 600;
       font-size: 13px;
       cursor: pointer;
       white-space: nowrap;
+      overflow: hidden;
       transition: background 0.15s, color 0.15s;
+    }
+
+    .msi-menu-btn i {
+      width: 18px;
+      flex-shrink: 0;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    .msi-menu-label {
+      opacity: 0;
+      transition: opacity 0.1s ease;
+    }
+
+    .msi-sidebar:hover .msi-menu-label {
+      opacity: 1;
     }
 
     .msi-menu-btn:hover {
@@ -982,6 +1023,7 @@
       align-items: center;
       gap: 12px;
       flex-shrink: 0;
+      margin-left: auto;
     }
 
     .msi-hamburger {
@@ -1087,6 +1129,7 @@
       padding: 14px 28px;
       background: #eef2f8;
       border-bottom: 1px solid var(--border);
+      margin-left: 56px;
     }
 
     .msi-filter-item {
@@ -1115,6 +1158,7 @@
 
     .msi-tab-content {
       padding: 28px;
+      margin-left: 56px;
     }
 
     .msi-tab-pane {
@@ -1151,9 +1195,28 @@
     }
 
     @media (max-width: 860px) {
+      /* Mobile không có hover — bỏ hẳn kiểu sidebar-thu-gọn, quay lại đúng
+         dropdown cũ mở bằng nút hamburger. Sidebar chỉ còn là điểm neo
+         (sticky, cao 0) để dropdown luôn bung đúng ngay dưới header dù
+         trang đã cuộn xuống — trước đây điểm neo này là header sticky,
+         nay nav không còn nằm trong header nữa nên phải tự neo lấy. */
+      .msi-sidebar {
+        position: sticky;
+        top: 64px;
+        left: 0;
+        width: auto;
+        height: 0;
+        overflow: visible;
+        background: none;
+        box-shadow: none;
+        z-index: 45;
+      }
+      .msi-sidebar:hover {
+        width: auto;
+      }
       .msi-menu {
         position: absolute;
-        top: 64px;
+        top: 0;
         left: 0;
         right: 0;
         flex-direction: column;
@@ -1164,6 +1227,13 @@
       }
       .msi-menu.open {
         display: flex;
+      }
+      .msi-menu-label {
+        opacity: 1;
+      }
+      .msi-filter-bar,
+      .msi-tab-content {
+        margin-left: 0;
       }
       .msi-hamburger {
         display: inline-flex;
@@ -2122,16 +2192,6 @@
         <img src="Logo.png" alt="MSI" />
         <span>MSI</span>
       </div>
-      <nav class="msi-menu" id="msiMenu">
-        <button type="button" class="msi-menu-btn active" data-tab="tab-summaries"><i class="fas fa-chart-pie"></i> Summaries Dashboard</button>
-        <button type="button" class="msi-menu-btn" data-tab="tab-sales-kpi"><i class="fas fa-bullseye"></i> Sales &amp; KPI</button>
-        <button type="button" class="msi-menu-btn" data-tab="tab-customers"><i class="fas fa-address-card"></i> Khách hàng</button>
-        <button type="button" class="msi-menu-btn" data-tab="tab-products"><i class="fas fa-box"></i> Sản phẩm</button>
-        <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i> Disty Inventory</button>
-        <button type="button" class="msi-menu-btn" data-tab="tab-weekly-report"><i class="fas fa-calendar-week"></i> Weekly Report</button>
-        <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i> Data Source</button>
-        <button type="button" class="msi-menu-btn hidden" id="navAccountsBtn" data-tab="tab-accounts"><i class="fas fa-user-shield"></i> Quản lý tài khoản</button>
-      </nav>
       <div class="msi-header-right">
         <div class="notif-bell-wrap">
           <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Thông báo">
@@ -2149,6 +2209,19 @@
         <button type="button" class="msi-hamburger" id="msiHamburger" aria-label="Mở menu"><i class="fas fa-bars"></i></button>
       </div>
     </header>
+
+    <aside class="msi-sidebar" id="msiSidebar">
+      <nav class="msi-menu" id="msiMenu">
+        <button type="button" class="msi-menu-btn active" data-tab="tab-summaries"><i class="fas fa-chart-pie"></i><span class="msi-menu-label">Summaries Dashboard</span></button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-sales-kpi"><i class="fas fa-bullseye"></i><span class="msi-menu-label">Sales &amp; KPI</span></button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-customers"><i class="fas fa-address-card"></i><span class="msi-menu-label">Khách hàng</span></button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-products"><i class="fas fa-box"></i><span class="msi-menu-label">Sản phẩm</span></button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-disty-inventory"><i class="fas fa-boxes"></i><span class="msi-menu-label">Disty Inventory</span></button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-weekly-report"><i class="fas fa-calendar-week"></i><span class="msi-menu-label">Weekly Report</span></button>
+        <button type="button" class="msi-menu-btn" data-tab="tab-data-source"><i class="fas fa-database"></i><span class="msi-menu-label">Data Source</span></button>
+        <button type="button" class="msi-menu-btn hidden" id="navAccountsBtn" data-tab="tab-accounts"><i class="fas fa-user-shield"></i><span class="msi-menu-label">Quản lý tài khoản</span></button>
+      </nav>
+    </aside>
 
     <div class="msi-filter-bar" id="msiFilterBar">
       <div class="msi-filter-item">
