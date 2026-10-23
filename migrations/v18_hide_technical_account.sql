@@ -1,4 +1,12 @@
 -- =====================================================================
+-- ⚠️  CAP NHAT: Chay v18 nay xong da gay loi "infinite recursion detected
+--     in policy for relation profiles" (do 2 policy CU admin_all /
+--     lead_own_team tu doc lai profiles). Da sua bang v18b_fix_recursion.sql
+--     (chuyen phan doc profiles vao ham SECURITY DEFINER). Phan is_technical
+--     + 3 policy restrictive o file nay VAN DUNG va duoc giu nguyen trong
+--     v18b. Xem file v18b_fix_recursion.sql.
+-- =====================================================================
+--
 -- MIGRATION v18: An tai khoan ky thuat tuantu192005@gmail.com (Nguyen Van
 -- Tu) khoi moi tai khoan khac, CHAN PHIA MAY CHU (RLS).
 --
