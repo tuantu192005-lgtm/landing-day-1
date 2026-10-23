@@ -1637,6 +1637,15 @@
     .acct-row-name { font-weight: 600; color: #111827; font-size: 0.9rem; min-width: 100px; }
     .acct-row-email { color: #6b7280; font-size: 0.84rem; flex: 1; min-width: 160px; }
     .acct-row-role { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; background: #f1f5f9; border-radius: 4px; padding: 2px 8px; }
+    .acct-khoai { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 0.78rem; color: #6b7280; }
+    .acct-khoai .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+    .acct-khoai .switch input { opacity: 0; width: 0; height: 0; }
+    .acct-khoai .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; transition: .2s; border-radius: 22px; }
+    .acct-khoai .switch .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #fff; transition: .2s; border-radius: 50%; }
+    .acct-khoai .switch input:checked + .slider { background: #16a34a; }
+    .acct-khoai .switch input:checked + .slider:before { transform: translateX(16px); }
+    .acct-khoai .switch input:disabled + .slider { opacity: .55; cursor: not-allowed; }
+    .acct-khoai-badge { font-size: 0.7rem; color: #92400e; background: #fef3c7; border-radius: 4px; padding: 2px 8px; margin-left: auto; }
     .acct-edit-toggle { padding: 5px 12px; font-size: 0.8rem; }
     .acct-edit-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f2f5; max-width: 380px; }
     .acct-edit-form .form-group { margin-bottom: 12px; }
@@ -8789,12 +8798,30 @@
       const { data, error } = await sb.from('profiles').select('id, full_name, email, role, status').order('full_name');
       if (error) { body.innerHTML = '<div class="pp-card-placeholder">Lỗi tải danh sách: ' + he(error.message) + '</div>'; return; }
 
-      body.innerHTML = (data || []).map((a) => `
+      // Quyen xem Kho tai lieu AI (kho-ai) — bang rieng kho_ai_access, chi
+      // Nam doc/ghi duoc het nho RLS (xem migrations/v17_kho_ai_access.sql).
+      const { data: khoAiRows, error: khoAiErr } = await sb.from('kho_ai_access').select('profile_id, has_access');
+      if (khoAiErr) console.warn('[loadAccountsTab] kho_ai_access:', khoAiErr.message);
+      const khoAiMap = {};
+      (khoAiRows || []).forEach((r) => { khoAiMap[r.profile_id] = !!r.has_access; });
+
+      body.innerHTML = (data || []).map((a) => {
+        const isAdminRow = a.role === 'admin';
+        const khoAiControl = isAdminRow
+          ? `<span class="acct-khoai-badge">Luôn có quyền (Admin)</span>`
+          : `<label class="acct-khoai">Xem kho AI
+              <span class="switch">
+                <input type="checkbox" class="acct-khoai-input" ${khoAiMap[a.id] ? 'checked' : ''} />
+                <span class="slider"></span>
+              </span>
+            </label>`;
+        return `
         <div class="acct-row" data-id="${a.id}">
           <div class="acct-row-main">
             <span class="acct-row-name">${he(a.full_name || '—')}</span>
             <span class="acct-row-email">${he(a.email || '—')}</span>
             <span class="acct-row-role">${he(a.role || '')}</span>
+            ${khoAiControl}
             <button type="button" class="btn-secondary acct-edit-toggle">Sửa</button>
           </div>
           <div class="acct-edit-form hidden">
@@ -8817,7 +8844,8 @@
             <div class="login-error acct-edit-msg"></div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       body.querySelectorAll('.acct-row').forEach((row) => {
         const targetId = row.dataset.id;
@@ -8830,6 +8858,22 @@
         row.querySelector('.acct-cancel-btn').addEventListener('click', () => {
           formEl.classList.add('hidden');
           msgEl.textContent = '';
+        });
+        const khoAiInput = row.querySelector('.acct-khoai-input');
+        khoAiInput?.addEventListener('change', async () => {
+          const newVal = khoAiInput.checked;
+          khoAiInput.disabled = true;
+          const { error } = await sb.from('kho_ai_access')
+            .update({ has_access: newVal, updated_by: currentUser.id, updated_at: new Date().toISOString() })
+            .eq('profile_id', targetId);
+          khoAiInput.disabled = false;
+          if (error) {
+            khoAiInput.checked = !newVal;
+            showMsiToast('Lỗi cập nhật quyền kho AI: ' + error.message);
+            return;
+          }
+          showMsiToast(newVal ? 'Đã cấp quyền xem kho AI.' : 'Đã thu hồi quyền xem kho AI.');
+          loadAccountsTab();
         });
         row.querySelector('.acct-save-btn').addEventListener('click', async () => {
           const saveBtn = row.querySelector('.acct-save-btn');
