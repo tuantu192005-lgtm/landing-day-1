@@ -52,7 +52,28 @@ export async function onRequestPost({ request, env }) {
   if (!callerId) {
     return json({ ok: false, error: 'Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại.' }, 401);
   }
-  if (callerId !== NAM_PROFILE_ID) {
+
+  const adminHeaders = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  // Doc co (is_technical) cua 1 profile bang service key (bypass RLS). Tra ve
+  // null neu khong tim thay.
+  async function getProfileFlags(id) {
+    const r = await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${id}&select=id,is_technical`, { headers: adminHeaders });
+    if (!r.ok) return null;
+    const rows = await r.json().catch(() => []);
+    return rows?.[0] || null;
+  }
+
+  // Ai duoc quan ly tai khoan: Nam (UUID co dinh) HOAC tai khoan ky thuat
+  // (is_technical = true, dat o migration v18). Service role bypass RLS nen
+  // phai kiem tra o DAY, khong the dua vao RLS.
+  const callerFlags = await getProfileFlags(callerId);
+  const callerIsManager = callerId === NAM_PROFILE_ID || callerFlags?.is_technical === true;
+  if (!callerIsManager) {
     return json({ ok: false, error: 'Bạn không có quyền quản lý tài khoản.' }, 403);
   }
 
@@ -63,11 +84,15 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, error: 'Body không hợp lệ.' }, 400);
   }
 
-  const adminHeaders = {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
-    'Content-Type': 'application/json'
-  };
+  // Chot bao ve tai khoan ky thuat: khong ai duoc sua/xoa no, tru chinh no.
+  // (RLS da chan phia client; endpoint nay dung service key BO QUA RLS nen
+  // phai tu chan lai o day.)
+  if (body.action === 'update' && body.target_id && body.target_id !== callerId) {
+    const targetFlags = await getProfileFlags(body.target_id);
+    if (targetFlags?.is_technical === true) {
+      return json({ ok: false, error: 'Không thể sửa tài khoản kỹ thuật.' }, 403);
+    }
+  }
 
   if (body.action === 'create') {
     const email = (body.email || '').trim();

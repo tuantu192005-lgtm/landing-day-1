@@ -3180,6 +3180,14 @@
     // (nam@msivn.io.vn).
     const NAM_PROFILE_ID = '9158c797-c667-478f-92a7-4f5ac658c6d5';
 
+    // Ai duoc "quan ly tat ca" (mo man Quan ly tai khoan, ban giao KH...):
+    // Nam, HOAC tai khoan ky thuat (is_technical) — tuantu192005@gmail.com.
+    // Dung co dinh Nam + co is_technical, KHONG dung role==='admin' chung de
+    // tranh vo tinh cho admin khac sau nay.
+    function canManageAll() {
+      return currentUser?.id === NAM_PROFILE_ID || currentUser?.is_technical === true;
+    }
+
     function showScreen(id) {
       screens.forEach((screen) => screen.classList.toggle('active', screen.id === id));
       const currentLinks = document.querySelectorAll('.nav-link');
@@ -3318,7 +3326,7 @@
       populateYearFilter();
       tabLoaders['tab-summaries']?.();
       initNotificationBell();
-      document.getElementById('navAccountsBtn')?.classList.toggle('hidden', currentUser?.id !== NAM_PROFILE_ID);
+      document.getElementById('navAccountsBtn')?.classList.toggle('hidden', !canManageAll());
     }
 
     // ══ TAB SUMMARIES DASHBOARD ══════════════════════════════
@@ -6275,7 +6283,7 @@
       const repEmp = EMPLOYEES.find((e) => e.id === custStaffId);
       document.getElementById('custReassignRepName').textContent = repEmp?.name || '—';
 
-      const canReassign = currentUser?.id === NAM_PROFILE_ID;
+      const canReassign = canManageAll();
       document.getElementById('custReassignToggleBtn')?.classList.toggle('hidden', !canReassign);
       document.getElementById('custReassignForm')?.classList.add('hidden');
       document.getElementById('custReassignMsg').textContent = '';
@@ -8479,7 +8487,11 @@
         email: session.user.email,
         name:  profile.full_name || session.user.email,
         role:  profile.role      || 'staff',
-        team:  profile.team      || ''
+        team:  profile.team      || '',
+        // Tai khoan ky thuat (tuantu192005@gmail.com) — dau is_technical do
+        // migration v18 dat. Truoc khi chay migration, cot chua co ->
+        // undefined -> false, nen khong anh huong ai.
+        is_technical: profile.is_technical === true
       };
       loginError.textContent = '';
       currentUserChip.textContent = `${currentUser.name} (${currentUser.email})`;
@@ -8788,10 +8800,10 @@
 
     async function loadAccountsTab() {
       const he = escapeHtmlForDistyReport;
-      const isNam = currentUser?.id === NAM_PROFILE_ID;
-      document.getElementById('acctAccessDenied')?.classList.toggle('hidden', isNam);
-      document.getElementById('acctContent')?.classList.toggle('hidden', !isNam);
-      if (!isNam) return;
+      const canManage = canManageAll();
+      document.getElementById('acctAccessDenied')?.classList.toggle('hidden', canManage);
+      document.getElementById('acctContent')?.classList.toggle('hidden', !canManage);
+      if (!canManage) return;
 
       const body = document.getElementById('acctListBody');
       body.innerHTML = '<div class="pp-card-placeholder">Đang tải...</div>';
