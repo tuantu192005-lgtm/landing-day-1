@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" href="Logo.png" type="image/png" />
+  <link rel="icon" href="favicon-msi.png" type="image/png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
   <title>Hệ thống Quản lý Nhân viên Bán hàng</title>
   <style>
     :root {
-      --navy: #102a4e;
-      --navy-strong: #0b1f3d;
-      --navy-soft: #2a4d7c;
+      --navy: #FF0000;
+      --navy-strong: #cc0000;
+      --navy-soft: #ff4d4d;
       --white: #ffffff;
-      --bg: #e8eff8;
-      --surface: #f7fbff;
-      --surface-strong: #dce6f3;
-      --text: #11213a;
-      --muted: #5e6f8a;
-      --border: rgba(17, 33, 58, 0.12);
-      --shadow: 0 24px 50px rgba(16, 42, 78, 0.12);
-      --shadow-soft: 0 16px 30px rgba(16, 42, 78, 0.08);
+      --bg: #f2f3f3;
+      --surface: #ffffff;
+      --surface-strong: #eef0f0;
+      --text: #1A1A1A;
+      --muted: #A6B1B1;
+      --border: rgba(166, 177, 177, 0.4);
+      --shadow: 0 24px 50px rgba(26, 26, 26, 0.12);
+      --shadow-soft: 0 16px 30px rgba(26, 26, 26, 0.08);
       font-family: 'Inter', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
     }
 
@@ -31,7 +31,7 @@
     body {
       margin: 0;
       min-height: 100%;
-      background: linear-gradient(180deg, #f1f6fd 0%, #e3ebf6 100%);
+      background: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
       color: var(--text);
     }
 
@@ -57,40 +57,6 @@
 
     .app-shell {
       width: min(1200px, 100%);
-      background: rgba(255, 255, 255, 0.96);
-      border-radius: 28px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      border: 1px solid rgba(16, 42, 78, 0.08);
-    }
-
-    .app-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 24px 32px;
-      background: linear-gradient(90deg, var(--navy), var(--navy-soft));
-      color: var(--white);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .brand img {
-      width: 46px;
-      border-radius: 14px;
-      background: var(--white);
-      padding: 8px;
-    }
-
-    .brand h1 {
-      margin: 0;
-      font-size: 1.4rem;
-      letter-spacing: 0.02em;
     }
 
     .header-actions {
@@ -220,7 +186,7 @@
     .quick-card {
       padding: 22px;
       border-radius: 22px;
-      background: linear-gradient(180deg, #0b1f3d 0%, #19355f 100%);
+      background: linear-gradient(180deg, #cc0000 0%, #FF0000 100%);
       color: var(--white);
       min-width: 220px;
       display: grid;
@@ -259,8 +225,8 @@
       padding: 24px;
       border-radius: 22px;
       background: linear-gradient(180deg, #ffffff 0%, #eef4fb 100%);
-      border: 1px solid rgba(16, 42, 78, 0.08);
-      box-shadow: 0 16px 30px rgba(16, 42, 78, 0.06);
+      border: 1px solid rgba(26, 26, 26, 0.08);
+      box-shadow: 0 16px 30px rgba(26, 26, 26, 0.06);
     }
 
     .stat-card p {
@@ -337,7 +303,7 @@
     }
 
     .target-table thead th {
-      background: linear-gradient(90deg, rgba(16,42,78,0.06), rgba(16,42,78,0.02));
+      background: linear-gradient(90deg, rgba(26,26,26,0.06), rgba(26,26,26,0.02));
       color: var(--navy-strong);
       font-weight: 700;
     }
@@ -374,22 +340,58 @@
     }
 
     .login-screen {
-      display: grid;
-      grid-template-columns: 500px 1fr;
-      min-height: 760px;
+      display: flex;
+      justify-content: center;
+      padding: 40px 0;
     }
 
-    .login-panel,
-    .info-panel {
-      padding: 40px;
+    .login-panel {
+      width: 100%;
+      max-width: 440px;
+      padding: 44px 36px;
       background: var(--white);
       border-radius: 28px;
       box-shadow: var(--shadow-soft);
     }
 
-    .login-panel h2,
-    .info-panel h3 {
-      margin: 0 0 20px;
+    .login-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+      margin-bottom: 30px;
+    }
+
+    .login-brand img {
+      width: 68px;
+      height: auto;
+      object-fit: contain;
+      margin-bottom: 6px;
+    }
+
+    .login-brand h1 {
+      margin: 0;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .login-brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .login-footnote {
+      margin: 22px 0 0;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      text-align: center;
     }
 
     .form-group {
@@ -408,8 +410,8 @@
       width: 100%;
       padding: 16px 18px;
       border-radius: 14px;
-      border: 1px solid #d9e2f0;
-      background: #f8fbff;
+      border: 1px solid #e5e5e5;
+      background: #f5f5f5;
       color: var(--text);
       transition: border-color 0.2s ease;
     }
@@ -435,27 +437,16 @@
 
     .login-submit button {
       width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 1rem;
     }
 
     .login-error {
       color: #b30012;
       font-size: 0.95rem;
       margin-top: 6px;
-    }
-
-    .info-panel ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: grid;
-      gap: 14px;
-    }
-
-    .info-panel li {
-      padding: 16px 18px;
-      border-radius: 16px;
-      background: #f5f9ff;
-      border: 1px solid #dbe8ff;
     }
 
     .chart-card {
@@ -548,7 +539,7 @@
       border-radius: 22px;
       background: linear-gradient(135deg, var(--navy-soft) 0%, var(--navy-strong) 100%);
       color: #fff;
-      box-shadow: 0 16px 30px rgba(16, 42, 78, 0.18);
+      box-shadow: 0 16px 30px rgba(26, 26, 26, 0.18);
       min-width: 0;
     }
 
@@ -655,9 +646,6 @@
         order: 1;
       }
 
-      .login-screen {
-        grid-template-columns: 1fr;
-      }
     }
 
     @media (max-width: 700px) {
@@ -669,19 +657,13 @@
         border-radius: 22px;
       }
 
-      .app-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
       .welcome-panel,
       .stat-grid {
         grid-template-columns: 1fr;
       }
 
-      .login-panel,
-      .info-panel {
-        padding: 26px;
+      .login-panel {
+        padding: 30px 24px;
       }
 
       .sidebar h2 {
@@ -699,10 +681,6 @@
     }
 
     @media (max-width: 520px) {
-      .app-header {
-        padding: 20px;
-      }
-
       .sidebar {
         padding: 24px;
       }
@@ -741,13 +719,13 @@
       align-items: center;
       justify-content: center;
       font-size: 1.4rem;
-      box-shadow: 0 8px 24px rgba(16,42,78,0.38);
+      box-shadow: 0 8px 24px rgba(26,26,26,0.38);
       z-index: 9999;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     /* TAM AN CHATBOT: xoa dong nay de bat lai giao dien chatbot */
     #chatbot-fab { display: none !important; }
-    #chatbot-fab:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(16,42,78,0.45); }
+    #chatbot-fab:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(26,26,26,0.45); }
     #chatbot-fab .fab-badge {
       position: absolute; top: -4px; right: -4px;
       width: 18px; height: 18px;
@@ -764,12 +742,12 @@
       max-width: calc(100vw - 40px);
       background: #fff;
       border-radius: 18px;
-      box-shadow: 0 20px 60px rgba(16,42,78,0.22);
+      box-shadow: 0 20px 60px rgba(26,26,26,0.22);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       z-index: 9998;
-      border: 1px solid rgba(16,42,78,0.1);
+      border: 1px solid rgba(26,26,26,0.1);
       transform: scale(0.92) translateY(12px);
       opacity: 0;
       pointer-events: none;
@@ -828,7 +806,7 @@
       background: #fff;
       border-radius: 4px 16px 16px 16px;
       color: #1a2a3a;
-      box-shadow: 0 1px 4px rgba(16,42,78,0.08);
+      box-shadow: 0 1px 4px rgba(26,26,26,0.08);
     }
     .cb-msg.user {
       align-self: flex-end;
@@ -925,7 +903,7 @@
       height: 64px;
       background: linear-gradient(90deg, var(--navy-strong), var(--navy-soft));
       color: var(--white);
-      box-shadow: 0 6px 18px rgba(16, 42, 78, 0.18);
+      box-shadow: 0 6px 18px rgba(26, 26, 26, 0.18);
     }
 
     .msi-brand {
@@ -960,7 +938,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       transition: width 0.16s ease;
-      box-shadow: 2px 0 14px rgba(16, 42, 78, 0.15);
+      box-shadow: 2px 0 14px rgba(26, 26, 26, 0.15);
     }
 
     .msi-sidebar:hover {
@@ -1060,7 +1038,7 @@
       padding: 0 4px;
       background: #e53e3e;
       color: #fff;
-      border: 2px solid var(--navy-strong, #102a4e);
+      border: 2px solid var(--navy-strong, #cc0000);
       border-radius: 10px;
       font-size: 10px;
       font-weight: 700;
@@ -1076,8 +1054,8 @@
       max-height: 420px;
       background: #fff;
       border-radius: 12px;
-      box-shadow: 0 16px 48px rgba(16,42,78,0.28);
-      border: 1px solid rgba(16,42,78,0.08);
+      box-shadow: 0 16px 48px rgba(26,26,26,0.28);
+      border: 1px solid rgba(26,26,26,0.08);
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -1556,7 +1534,7 @@
     .cust-legend-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; }
     .cust-legend-swatch:not(:first-child) { margin-left: 8px; }
     .cust-legend-prev { background: #cbd5e1; }
-    .cust-legend-cur { background: #102a4e; }
+    .cust-legend-cur { background: #FF0000; }
     /* Layout 2 cột màn danh sách tổng: bảng KH bên trái (~50%), bên phải để
        trống chừa chỗ cho tính năng/biểu đồ sau này — thu về 1 cột full-width
        ở mobile/tablet hẹp (xem media query cuối file). */
@@ -1839,7 +1817,7 @@
 
     .msi-employee-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 18px 32px rgba(16, 42, 78, 0.14);
+      box-shadow: 0 18px 32px rgba(26, 26, 26, 0.14);
     }
 
     .msi-achieve-pct {
@@ -2152,19 +2130,13 @@
 <body>
   <!-- ══ LOGIN (màn hình riêng, trước khi đăng nhập) ══ -->
   <div class="app-shell screen active" id="loginScreen">
-    <header class="app-header">
-      <div class="brand">
-        <img src="Logo.png" alt="Logo" />
-        <div>
-          <h1>Quản lý Nhân viên Bán hàng</h1>
-          <p style="margin:0; opacity:0.85; font-size:0.95rem;">Đăng nhập để vào hệ thống</p>
-        </div>
-      </div>
-    </header>
     <div class="login-screen">
       <div class="login-panel">
-        <h2>Đăng nhập</h2>
-        <p>Nhập email và mật khẩu để truy cập Dashboard.</p>
+        <div class="login-brand">
+          <img src="login-logo.png" alt="MSI" />
+          <h1>Quản lý Nhân viên Bán hàng</h1>
+          <p>Đăng nhập bằng tài khoản được admin cấp để vào hệ thống</p>
+        </div>
         <form id="loginForm">
           <div class="form-group">
             <label for="emailInput">Email</label>
@@ -2179,18 +2151,8 @@
           </div>
           <div class="login-error" id="loginError"></div>
         </form>
+        <p class="login-footnote">Admin xem toàn bộ team. Nhân viên chỉ xem phần việc của mình.</p>
       </div>
-      <aside class="info-panel">
-        <h3>Hướng dẫn đăng nhập</h3>
-        <ul>
-          <li><strong>Email</strong> đã được admin cấp</li>
-          <li><strong>Mật khẩu</strong> do admin thiết lập</li>
-        </ul>
-        <div style="margin-top:18px; padding:20px; border-radius:18px; background:#f5f9ff; border:1px solid #dbe8ff;">
-          <strong>Phân quyền</strong>
-          <p style="margin:10px 0 0; color:#5e6f8a; line-height:1.7;">Admin xem toàn bộ team. Nhân viên chỉ xem phần việc của mình.</p>
-        </div>
-      </aside>
     </div>
   </div>
 
@@ -2687,7 +2649,7 @@
               <div id="productNppCodesPane" class="msi-subtab-pane hidden">
                 <div class="msi-panel">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-                    <span style="font-size:12px;color:#5e6f8a" id="productNppCodesCount"></span>
+                    <span style="font-size:12px;color:#A6B1B1" id="productNppCodesCount"></span>
                     <button type="button" id="addNppCodeBtn" class="btn-secondary hidden" style="font-size:12px">+ Thêm mapping</button>
                   </div>
                   <div class="table-wrapper">
@@ -2698,15 +2660,15 @@
                   </div>
                   <div id="addNppCodeForm" class="hidden" style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb">
                     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-                      <div><label style="font-size:11px;color:#5e6f8a;display:block;margin-bottom:3px">NPP</label>
+                      <div><label style="font-size:11px;color:#A6B1B1;display:block;margin-bottom:3px">NPP</label>
                         <select id="addNppCodeDisty" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px">
                           <option value="">-- Chọn --</option>
                           <option>DGW</option><option>SPC</option><option>KTC</option><option>NWH</option>
                           <option>MAI HOANG</option><option>AD</option><option>PSD</option><option>MEKO</option>
                         </select></div>
-                      <div><label style="font-size:11px;color:#5e6f8a;display:block;margin-bottom:3px">Mã NPP</label>
+                      <div><label style="font-size:11px;color:#A6B1B1;display:block;margin-bottom:3px">Mã NPP</label>
                         <input type="text" id="addNppCodeCode" placeholder="VD: 912-V530-061" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px;width:150px" /></div>
-                      <div><label style="font-size:11px;color:#5e6f8a;display:block;margin-bottom:3px">Tên model</label>
+                      <div><label style="font-size:11px;color:#A6B1B1;display:block;margin-bottom:3px">Tên model</label>
                         <input type="text" id="addNppCodeName" placeholder="Tên sản phẩm theo NPP" style="border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-size:12px;width:200px" /></div>
                       <button type="button" id="saveNppCodeBtn" class="btn-primary" style="font-size:12px">Lưu</button>
                       <button type="button" id="cancelNppCodeBtn" class="btn-secondary" style="font-size:12px">Huỷ</button>
@@ -3132,7 +3094,7 @@
           <option value="mapped">Đã map</option>
         </select>
         <input type="text" id="mappingNppSearch" placeholder="Tìm mã / tên model..." style="border:1px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:13px;width:220px" />
-        <span id="mappingNppCountBadge" style="font-size:12px;color:#5e6f8a;margin-left:4px"></span>
+        <span id="mappingNppCountBadge" style="font-size:12px;color:#A6B1B1;margin-left:4px"></span>
       </div>
       <!-- Table (scrollable) -->
       <div style="overflow-y:auto;flex:1;border:1px solid #e5e7eb;border-radius:8px">
@@ -4309,7 +4271,7 @@
         }
       });
 
-      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#A6B1B1'; }
 
       const ops = [];
       if (updates.length) ops.push(sb.from('targets').upsert(updates));
@@ -4866,11 +4828,11 @@
       }));
 
       if (!targetUpsertRows.length && !weightUpdateRows.length && !ratioUpsertRows.length) {
-        if (msgEl) { msgEl.textContent = 'Chưa nhập giá trị nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Chưa nhập giá trị nào để lưu.'; msgEl.style.color = '#A6B1B1'; }
         return;
       }
 
-      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#A6B1B1'; }
 
       if (targetUpsertRows.length) {
         const { error } = await sb.from('annual_targets').upsert(targetUpsertRows, { onConflict: 'year,category' });
@@ -5041,11 +5003,11 @@
       });
 
       if (!upsertRows.length) {
-        if (msgEl) { msgEl.textContent = 'Chưa nhập giá trị nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Chưa nhập giá trị nào để lưu.'; msgEl.style.color = '#A6B1B1'; }
         return;
       }
 
-      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#A6B1B1'; }
       const { error } = await sb.from('annual_staff_targets').upsert(upsertRows, { onConflict: 'year,category,assigned_to' });
       if (error) {
         if (msgEl) { msgEl.textContent = 'Lỗi lưu phân bổ: ' + error.message; msgEl.style.color = '#b30012'; }
@@ -5112,7 +5074,7 @@
     async function loadInventoryTab() {
       _diAllRows = []; _diPage = 0;
       const tbody = document.getElementById('diInvTableBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#5e6f8a">⏳ Đang tải dữ liệu...</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#A6B1B1">⏳ Đang tải dữ liệu...</td></tr>';
       const countEl = document.getElementById('diInvCountBadge');
       if (countEl) countEl.textContent = '';
 
@@ -5668,7 +5630,7 @@
       document.getElementById('editProductBtn')?.classList.toggle('hidden', !isProductsAdmin());
       document.getElementById('mergeWithBtn')?.classList.toggle('hidden', !isProductsAdmin());
       const editSkuBtn = isProductsAdmin()
-        ? ` <button type="button" id="editSkuBtn" style="margin-left:8px;font-size:11px;padding:2px 8px;background:none;border:1px solid #5e6f8a;border-radius:4px;cursor:pointer;color:#5e6f8a">Sửa SKU</button>`
+        ? ` <button type="button" id="editSkuBtn" style="margin-left:8px;font-size:11px;padding:2px 8px;background:none;border:1px solid #A6B1B1;border-radius:4px;cursor:pointer;color:#A6B1B1">Sửa SKU</button>`
         : '';
       const infoRows = [
         { label: 'SKU', value: `<span style="font-family:monospace;font-size:12px">${data.sku}</span>${editSkuBtn}` },
@@ -6000,7 +5962,7 @@
       const x1 = 0, x2 = barW + gap;
       return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Kỳ trước ${fmtQtyMsi(prevQty)}, kỳ này ${fmtQtyMsi(curQty)}">
         <rect x="${x1}" y="${h - prevH}" width="${barW}" height="${prevH}" rx="2" fill="#cbd5e1"><title>Kỳ trước: ${fmtQtyMsi(prevQty)}</title></rect>
-        <rect x="${x2}" y="${h - curH}" width="${barW}" height="${curH}" rx="2" fill="#102a4e"><title>Kỳ này: ${fmtQtyMsi(curQty)}</title></rect>
+        <rect x="${x2}" y="${h - curH}" width="${barW}" height="${curH}" rx="2" fill="#FF0000"><title>Kỳ này: ${fmtQtyMsi(curQty)}</title></rect>
       </svg>`;
     }
 
@@ -6498,10 +6460,10 @@
     // nao update() theo dung id (dong da ton tai trong DB).
     async function savePricingRows(rows, msgEl) {
       if (!rows.length) {
-        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#A6B1B1'; }
         return false;
       }
-      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#A6B1B1'; }
 
       const newRows = rows.filter((r) => r.isNew).map(({ isNew, ...fields }) => fields);
       const existingRows = rows.filter((r) => !r.isNew);
@@ -6549,7 +6511,7 @@
       // goi 2 lan se ra 2 id khac nhau va lam hong buoc 2.
       const baseRows = collectEditablePricingRows(quarter);
       if (!baseRows.length) {
-        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Chưa có dòng nào để lưu.'; msgEl.style.color = '#A6B1B1'; }
         return;
       }
 
@@ -6778,7 +6740,7 @@
       const end = Math.min((_mapPage + 1) * MAP_PAGE_SIZE, total);
       el.innerHTML =
         `<button class="btn-secondary map-page-btn" data-dir="-1" ${_mapPage === 0 ? 'disabled' : ''} style="font-size:12px;padding:4px 10px">← Trước</button>` +
-        `<span style="font-size:12px;color:#5e6f8a">Trang ${_mapPage + 1}/${pages} (${start}–${end} / ${total})</span>` +
+        `<span style="font-size:12px;color:#A6B1B1">Trang ${_mapPage + 1}/${pages} (${start}–${end} / ${total})</span>` +
         `<button class="btn-secondary map-page-btn" data-dir="1" ${_mapPage >= pages - 1 ? 'disabled' : ''} style="font-size:12px;padding:4px 10px">Sau →</button>`;
     }
 
@@ -6926,7 +6888,7 @@
         return;
       }
 
-      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang lưu...'; msgEl.style.color = '#A6B1B1'; }
       const normName = normalizeModelName(modelName);
       const { error } = await sb.from('products_master').upsert({
         sku, model_name: modelName, normalized_name: normName,
@@ -7071,7 +7033,7 @@
       const dstSku = currentProductSku;
       const msgEl = document.getElementById('mergeInlineMsg');
       if (!srcSku || !dstSku) return;
-      msgEl.style.color = '#5e6f8a'; msgEl.textContent = 'Đang gộp...';
+      msgEl.style.color = '#A6B1B1'; msgEl.textContent = 'Đang gộp...';
       document.getElementById('mergeConfirmSection')?.classList.add('hidden');
       try {
         await mergeProducts(srcSku, dstSku);
@@ -7116,14 +7078,14 @@
       if (!newSku) { msgEl.textContent = 'Vui lòng nhập SKU mới.'; msgEl.style.color = '#b30012'; return; }
       if (newSku === oldSku) { msgEl.textContent = 'SKU mới trùng với SKU hiện tại.'; msgEl.style.color = '#b30012'; return; }
 
-      msgEl.textContent = 'Đang kiểm tra SKU...'; msgEl.style.color = '#5e6f8a';
+      msgEl.textContent = 'Đang kiểm tra SKU...'; msgEl.style.color = '#A6B1B1';
       const { data: exists } = await sb.from('products_master').select('sku').eq('sku', newSku).maybeSingle();
       if (exists) {
         msgEl.innerHTML = 'SKU này đã tồn tại. Dùng <strong>⇄ Gộp với SKU khác</strong> để gộp 2 sản phẩm thay thế.';
         msgEl.style.color = '#b30012'; return;
       }
 
-      msgEl.textContent = 'Đang cập nhật SKU...'; msgEl.style.color = '#5e6f8a';
+      msgEl.textContent = 'Đang cập nhật SKU...'; msgEl.style.color = '#A6B1B1';
       try {
         const d = currentProductData;
         // 1. Tạo products_master mới với SKU mới
@@ -7406,7 +7368,7 @@
 
       modal?.classList.remove('hidden');
       contentEl?.classList.add('hidden');
-      statusEl.innerHTML = '<span style="color:#5e6f8a">⏳ Đang tải và phân tích dữ liệu sản phẩm...</span>';
+      statusEl.innerHTML = '<span style="color:#A6B1B1">⏳ Đang tải và phân tích dữ liệu sản phẩm...</span>';
       statusEl.style.display = '';
 
       try {
@@ -8387,13 +8349,13 @@
       event.target.value = '';
       if (!file) return;
       const msgEl = document.getElementById('productsMessage');
-      if (msgEl) { msgEl.textContent = 'Đang đọc file...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang đọc file...'; msgEl.style.color = '#A6B1B1'; }
 
       try {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: 'array' });
 
-        if (msgEl) { msgEl.textContent = 'Đang load danh sách sản phẩm...'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Đang load danh sách sản phẩm...'; msgEl.style.color = '#A6B1B1'; }
         const normToSku = await buildNormToSkuMap();
 
         const parsedList = [];
@@ -8405,7 +8367,7 @@
           parsedList.push(parseDistySheetSync(disty, sheetName, rows));
         }
 
-        if (msgEl) { msgEl.textContent = 'Đang kiểm tra dữ liệu...'; msgEl.style.color = '#5e6f8a'; }
+        if (msgEl) { msgEl.textContent = 'Đang kiểm tra dữ liệu...'; msgEl.style.color = '#A6B1B1'; }
         const existingWeeks = await checkExistingInventoryWeeks(parsedList);
         const report = buildImportReport(parsedList, existingWeeks, skippedSheets, normToSku);
         const hasErrors = report.errors.length > 0;
@@ -8423,7 +8385,7 @@
       if (!pending) return;
       document.getElementById('importReportModal')?.classList.add('hidden');
       const msgEl = document.getElementById('productsMessage');
-      if (msgEl) { msgEl.textContent = 'Đang lưu vào DB...'; msgEl.style.color = '#5e6f8a'; }
+      if (msgEl) { msgEl.textContent = 'Đang lưu vào DB...'; msgEl.style.color = '#A6B1B1'; }
       try {
         const results = [];
         for (const p of pending.parsedList) {
@@ -8968,7 +8930,7 @@
 
     function setSelloutMessage(text, kind) {
       if (!selloutMessage) return;
-      selloutMessage.style.color = kind === 'error' ? '#b30012' : kind === 'success' ? '#1c4d2b' : '#5e6f8a';
+      selloutMessage.style.color = kind === 'error' ? '#b30012' : kind === 'success' ? '#1c4d2b' : '#A6B1B1';
       selloutMessage.textContent = text;
     }
 
