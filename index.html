@@ -3,20 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="icon" href="Logo.png?v=3" type="image/png" />
+  <link rel="icon" href="favicon.png?v=1" type="image/png" sizes="256x256" />
+  <link rel="apple-touch-icon" href="favicon.png?v=1" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-  <title>Hệ thống Quản lý Nhân viên Bán hàng</title>
+  <title>MSI Sales Management</title>
   <style>
     :root {
       --navy: #FF0000;
       --navy-strong: #1A1A1A;
       --navy-soft: #ff4d4d;
       --white: #ffffff;
-      --bg: #f2f3f3;
+      --bg: #f4f6f8;
       --surface: #ffffff;
       --surface-strong: #eef0f0;
       --text: #1A1A1A;
-      --muted: #A6B1B1;
+      --muted: #6b7680;
+      --ok: #16a34a;
+      --ok-soft: #dcfce7;
+      --warn: #f59e0b;
+      --warn-soft: #fef3c7;
+      --bad: #ef4444;
+      --bad-soft: #fee2e2;
       --border: rgba(166, 177, 177, 0.4);
       --shadow: 0 24px 50px rgba(26, 26, 26, 0.12);
       --shadow-soft: 0 16px 30px rgba(26, 26, 26, 0.08);
@@ -335,9 +342,23 @@
     .btn-secondary {
       padding: 14px 24px;
       background: var(--white);
-      color: var(--navy);
-      border: 1px solid var(--navy);
+      color: #374151;
+      border: 1px solid #d1d5db;
     }
+    .btn-secondary:hover { color: var(--navy); border-color: var(--navy); }
+
+    /* Nút nguy hiểm (Xóa): xám, chỉ đỏ khi rê chuột, tách xa nút Xem */
+    .btn-danger-ghost {
+      padding: 2px 8px;
+      font-size: 11px;
+      margin-left: 10px;
+      background: transparent;
+      color: #9ca3af;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-danger-ghost:hover { color: #b91c1c; background: var(--bad-soft); }
 
     .login-screen {
       display: flex;
@@ -902,11 +923,24 @@
       gap: 14px;
       padding: 0 18px;
       height: 64px;
-      background: linear-gradient(90deg, #1a1a1a 0%, #2b2b2b 100%);
+      background: #ffffff;
       border-bottom: 3px solid var(--navy);
-      color: var(--white);
-      box-shadow: 0 6px 18px rgba(26, 26, 26, 0.18);
+      color: var(--text);
+      box-shadow: 0 4px 14px rgba(26, 26, 26, 0.08);
     }
+
+    /* Header sáng: nút/chip đổi sang nền xám nhạt, chữ tối */
+    .msi-header .user-chip {
+      background: #f1f3f5;
+      border: 1px solid #e2e6ea;
+      color: var(--text);
+    }
+    .msi-header .logout-btn {
+      background: #f1f3f5;
+      border: 1px solid #e2e6ea;
+      color: var(--text);
+    }
+    .msi-header .logout-btn:hover { background: #e7eaee; opacity: 1; }
 
     .msi-brand {
       display: flex;
@@ -920,7 +954,7 @@
 
     .msi-brand img {
       width: auto;
-      height: 26px;
+      height: 40px;
       object-fit: contain;
       flex-shrink: 0;
     }
@@ -935,11 +969,12 @@
       bottom: 0;
       width: 56px;
       z-index: 45;
-      background: linear-gradient(180deg, #1a1a1a 0%, #262626 100%);
+      background: #ffffff;
+      border-right: 1px solid #e5e8eb;
       overflow-x: hidden;
       overflow-y: auto;
       transition: width 0.16s ease;
-      box-shadow: 2px 0 14px rgba(26, 26, 26, 0.15);
+      box-shadow: 2px 0 14px rgba(26, 26, 26, 0.06);
     }
 
     .msi-sidebar:hover {
@@ -960,7 +995,7 @@
       width: 100%;
       background: none;
       border: none;
-      color: rgba(255, 255, 255, 0.72);
+      color: #5b6670;
       padding: 10px 12px;
       border-radius: 10px;
       font-weight: 600;
@@ -988,13 +1023,13 @@
     }
 
     .msi-menu-btn:hover {
-      color: var(--white);
-      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      background: #f1f3f5;
     }
 
     .msi-menu-btn.active {
       color: var(--navy);
-      background: var(--white);
+      background: #fff0f0;
       font-weight: 700;
     }
 
@@ -1008,9 +1043,9 @@
 
     .msi-hamburger {
       display: none;
-      background: rgba(255, 255, 255, 0.14);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: var(--white);
+      background: #f1f3f5;
+      border: 1px solid #e2e6ea;
+      color: var(--text);
       width: 38px;
       height: 38px;
       border-radius: 10px;
@@ -1021,16 +1056,16 @@
     .notif-bell-wrap { position: relative; }
     .notif-bell-btn {
       position: relative;
-      background: rgba(255, 255, 255, 0.14);
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      color: var(--white);
+      background: #f1f3f5;
+      border: 1px solid #e2e6ea;
+      color: var(--text);
       width: 38px;
       height: 38px;
       border-radius: 10px;
       cursor: pointer;
       font-size: 1rem;
     }
-    .notif-bell-btn:hover { background: rgba(255, 255, 255, 0.22); }
+    .notif-bell-btn:hover { background: #e7eaee; }
     .notif-bell-badge {
       position: absolute;
       top: -4px;
@@ -1040,7 +1075,7 @@
       padding: 0 4px;
       background: #e53e3e;
       color: #fff;
-      border: 2px solid var(--navy-strong, #1a1a1a);
+      border: 2px solid #ffffff;
       border-radius: 10px;
       font-size: 10px;
       font-weight: 700;
@@ -1107,7 +1142,7 @@
       gap: 18px;
       flex-wrap: wrap;
       padding: 14px 28px;
-      background: #eef2f8;
+      background: #ffffff;
       border-bottom: 1px solid var(--border);
       margin-left: 56px;
     }
@@ -1192,10 +1227,10 @@
         left: 0;
         right: 0;
         flex-direction: column;
-        background: var(--navy-strong);
+        background: #ffffff;
         padding: 8px;
         display: none;
-        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
       }
       .msi-menu.open {
         display: flex;
@@ -1294,6 +1329,21 @@
     .msi-compare-line .down { color: #c0392b; }
     .msi-compare-line .flat,
     .msi-compare-line .gray { color: var(--muted); font-weight: 500; }
+    /* Chưa có kỳ trước thì ẩn dòng so sánh thay vì lặp câu thông báo ở mỗi thẻ */
+    .msi-compare-line .gray { display: none; }
+
+    /* Thanh tiến độ so với Target: xanh ≥100%, cam 70–100%, đỏ nhạt <70% */
+    .kpi-bar { height: 8px; border-radius: 999px; background: #eceff1; overflow: hidden; }
+    .kpi-bar-fill { height: 100%; width: 0; border-radius: 999px; background: var(--muted); transition: width .3s ease; }
+    .msi-kpi-card[data-status="ok"]   { border-top: 4px solid var(--ok); }
+    .msi-kpi-card[data-status="warn"] { border-top: 4px solid var(--warn); }
+    .msi-kpi-card[data-status="bad"]  { border-top: 4px solid var(--bad); }
+    .msi-kpi-card[data-status="ok"]   .kpi-bar-fill { background: var(--ok); }
+    .msi-kpi-card[data-status="warn"] .kpi-bar-fill { background: var(--warn); }
+    .msi-kpi-card[data-status="bad"]  .kpi-bar-fill { background: var(--bad); }
+    .msi-kpi-card[data-status="ok"]   .msi-kpi-val { color: var(--ok); }
+    .msi-kpi-card[data-status="warn"] .msi-kpi-val { color: #b45309; }
+    .msi-kpi-card[data-status="bad"]  .msi-kpi-val { color: #b91c1c; }
 
     .msi-panel {
       background: var(--white);
@@ -1429,7 +1479,25 @@
       border-radius: 6px;
     }
     .pp-field-readonly-value { font-size: 0.92rem; color: #111827; padding: 6px 0; }
-    .pp-field-net .pp-net { font-weight: 700; font-size: 1rem; display:block; padding: 6px 0; }
+    .pp-field { min-width: 0; }
+    /* Net Price cùng chiều cao/padding với ô nhập để thẳng hàng với Hero */
+    .pp-field-net .pp-net,
+    .pp-field-net .pp-field-readonly-value {
+      display: block;
+      box-sizing: border-box;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #f9fafb;
+    }
+    .pp-card-row-hero { grid-template-columns: repeat(2, minmax(0, 220px)); }
+    .pp-card-row-extras { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    /* Hai ô ngày xếp dọc, co theo cột — không còn tràn khỏi thẻ */
+    .pp-card-row-extras .pp-extra-dates { flex-direction: column; align-items: stretch; gap: 4px; }
+    .pp-card-row-extras .pp-extra-dates span { display: none; }
+    .pp-card-row-extras .pp-extra-dates input[type="date"] { min-width: 0; width: 100%; }
     .pp-field-disty { margin-bottom: 12px; }
     .pp-disty-checks { display: flex; flex-wrap: wrap; gap: 8px; }
     .pp-disty-chip {
@@ -1516,6 +1584,7 @@
     .pp-status-rejected { background:#fee2e2;color:#991b1b; }
     @media (max-width: 640px) {
       .pp-card-row { grid-template-columns: 1fr 1fr; }
+      .pp-card-row-hero, .pp-card-row-extras { grid-template-columns: 1fr 1fr; }
     }
     /* ── Menu Khách hàng ── */
     .cust-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
@@ -1533,7 +1602,14 @@
        trống chừa chỗ cho tính năng/biểu đồ sau này — thu về 1 cột full-width
        ở mobile/tablet hẹp (xem media query cuối file). */
     .cust-list-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    /* Cột phải chưa có nội dung thì bảng khách hàng dùng hết bề ngang */
+    .cust-list-layout:has(.cust-list-aside:not(:has(*))) { grid-template-columns: 1fr; }
     .cust-list-aside { min-height: 1px; }
+    .cust-empty-toggle {
+      display: block; width: 100%; padding: 10px; border: none; border-top: 1px solid #f0f2f5;
+      background: #f9fafb; color: #6b7280; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    }
+    .cust-empty-toggle:hover { color: var(--navy); background: #fff0f0; }
     #custListBody { border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; overflow: hidden; }
     .cust-row, .cust-row-header {
       display: grid;
@@ -1718,9 +1794,9 @@
       transition: width 0.4s;
     }
 
-    .msi-progress-fill.over  { background: #1c9a5b; }
-    .msi-progress-fill.warn  { background: #e0a800; }
-    .msi-progress-fill.low   { background: #c0392b; }
+    .msi-progress-fill.over  { background: var(--ok); }
+    .msi-progress-fill.warn  { background: var(--warn); }
+    .msi-progress-fill.low   { background: var(--bad); }
 
     .msi-progress-nums {
       font-size: 0.85rem;
@@ -1794,11 +1870,13 @@
 
     .msi-employee-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
       gap: 16px;
     }
 
     .msi-employee-card {
+      min-width: 0;
+      overflow-wrap: anywhere;
       background: var(--white);
       border: 1px solid var(--border);
       border-radius: 16px;
@@ -1822,13 +1900,13 @@
       line-height: 1;
     }
 
-    .msi-achieve-pct.over { color: #1c9a5b; }
-    .msi-achieve-pct.warn { color: #e0a800; }
-    .msi-achieve-pct.low  { color: #c0392b; }
+    .msi-achieve-pct.over { color: var(--ok); }
+    .msi-achieve-pct.warn { color: #b45309; }
+    .msi-achieve-pct.low  { color: #b91c1c; }
 
-    .nam-kpi-status.over { color: #1c9a5b; font-weight: 700; }
-    .nam-kpi-status.warn { color: #e0a800; font-weight: 700; }
-    .nam-kpi-status.low  { color: #c0392b; font-weight: 700; }
+    .nam-kpi-status.over { color: var(--ok); font-weight: 700; }
+    .nam-kpi-status.warn { color: #b45309; font-weight: 700; }
+    .nam-kpi-status.low  { color: #b91c1c; font-weight: 700; }
 
     .nam-kpi-table th,
     .nam-kpi-table td {
@@ -2236,18 +2314,19 @@
         <div id="summariesContent">
           <div class="msi-kpi-grid">
             <div class="msi-kpi-card">
-              <span class="msi-kpi-lbl">Sell-out</span>
+              <span class="msi-kpi-lbl">Sell-out (unit)</span>
               <strong class="msi-kpi-val" id="kpiSellOut">—</strong>
               <div class="msi-compare-line" id="kpiSellOutCompare"></div>
             </div>
             <div class="msi-kpi-card">
-              <span class="msi-kpi-lbl">Target</span>
+              <span class="msi-kpi-lbl">Target (unit)</span>
               <strong class="msi-kpi-val" id="kpiTarget">—</strong>
               <div class="msi-compare-line" id="kpiTargetCompare"></div>
             </div>
-            <div class="msi-kpi-card">
+            <div class="msi-kpi-card" id="kpiAchievementCard">
               <span class="msi-kpi-lbl">% Achievement</span>
               <strong class="msi-kpi-val" id="kpiAchievement">—</strong>
+              <div class="kpi-bar"><div class="kpi-bar-fill" id="kpiAchievementBar"></div></div>
               <div class="msi-compare-line" id="kpiAchievementCompare"></div>
             </div>
             <div class="msi-kpi-card">
@@ -2519,9 +2598,9 @@
               <button type="button" class="btn-primary hidden" id="addProductBtn">+ Thêm sản phẩm</button>
               <button type="button" class="btn-secondary hidden" id="importProductsBtn">Import từ Excel</button>
               <input type="file" id="importProductsInput" accept=".xlsx,.xls" class="hidden" />
-              <button type="button" class="btn-secondary hidden" id="detectDupSkuBtn" style="color:#7c3aed;border-color:#7c3aed">🔍 Phát hiện SKU trùng</button>
-              <button type="button" class="btn-secondary hidden" id="tempSkuBtn" style="color:#b45309;border-color:#b45309">📋 SKU tạm</button>
-              <button type="button" class="btn-secondary hidden" id="mappingNppBtn" style="color:#0369a1;border-color:#0369a1">🔗 Mapping NPP</button>
+              <button type="button" class="btn-secondary hidden" id="detectDupSkuBtn">🔍 Phát hiện SKU trùng</button>
+              <button type="button" class="btn-secondary hidden" id="tempSkuBtn">📋 SKU tạm</button>
+              <button type="button" class="btn-secondary hidden" id="mappingNppBtn">🔗 Mapping NPP</button>
             </div>
             <div class="table-wrapper">
               <table class="target-table products-table" id="productsTable">
@@ -3265,7 +3344,9 @@
       for (let y = maxYear; y >= minYear; y--) years.push(y);
       if (!years.length) years.push(thisYear);
       sel.innerHTML = '<option value="">Tất cả</option>' + years.map((y) => `<option value="${y}">${y}</option>`).join('');
-      msiFilters.year = '';
+      // Mặc định = năm có dữ liệu mới nhất (maxYear), không phải "Tất cả".
+      sel.value = String(years[0]);
+      msiFilters.year = sel.value;
     }
 
     function initMsiApp() {
@@ -3278,8 +3359,8 @@
       document.querySelectorAll('.msi-tab-pane').forEach((p) => p.classList.remove('active'));
       document.querySelector('.msi-menu-btn[data-tab="tab-summaries"]')?.classList.add('active');
       document.getElementById('tab-summaries')?.classList.add('active');
-      populateYearFilter();
-      tabLoaders['tab-summaries']?.();
+      // Chờ có năm mặc định rồi mới tải Summaries để không tải 2 lần với bộ lọc khác nhau.
+      populateYearFilter().catch(() => {}).finally(() => tabLoaders['tab-summaries']?.());
       initNotificationBell();
       document.getElementById('navAccountsBtn')?.classList.toggle('hidden', !canManageAll());
     }
@@ -3290,7 +3371,34 @@
     // phụ thuộc dropdown Năm) — đúng nghĩa "tuần này"/"tháng này".
     let summariesMonthChartInstance = null;
     let summariesWeekChartInstance = null;
-    const MSI_CHART_COLORS = ['#102a4e', '#2a4d7c', '#5b86b5', '#9db9dd', '#e8b43a', '#7c4a1e', '#0c4a6e', '#831843', '#14532d', '#4c1d95'];
+    const MSI_CHART_COLORS = ['#E60012', '#1A1A1A', '#2563EB', '#F59E0B', '#16A34A', '#7C3AED', '#0891B2', '#EC4899'];
+    const MSI_CHART_OTHER_COLOR = '#A6B1B1';
+    const MSI_CHART_MAX_SERIES = 6;
+
+    // Giữ MSI_CHART_MAX_SERIES nhóm lớn nhất (theo tổng toàn kỳ), gộp phần còn
+    // lại thành "Khác"; trả về [{ name, color, pick(bucket) }] theo thứ tự lớn → nhỏ.
+    function buildChartSeries(keys, byBucket) {
+      const totals = {};
+      keys.forEach((k) => Object.entries(byBucket[k] || {}).forEach(([name, qty]) => {
+        totals[name] = (totals[name] || 0) + (qty || 0);
+      }));
+      const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([name]) => name);
+      const top = ranked.slice(0, MSI_CHART_MAX_SERIES);
+      const rest = new Set(ranked.slice(MSI_CHART_MAX_SERIES));
+      const series = top.map((name, i) => ({
+        name,
+        color: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
+        pick: (bucket) => bucket[name] || 0
+      }));
+      if (rest.size) {
+        series.push({
+          name: 'Khác',
+          color: MSI_CHART_OTHER_COLOR,
+          pick: (bucket) => [...rest].reduce((s, n) => s + (bucket[n] || 0), 0)
+        });
+      }
+      return series;
+    }
 
     function getCurrentQuarterNumber(date = new Date()) {
       return Math.floor(date.getMonth() / 3) + 1;
@@ -3571,6 +3679,13 @@
       document.getElementById('kpiAchievement').textContent = current.achievementPct === null ? '—' : `${current.achievementPct.toFixed(1)}%${achievementSuffix || ''}`;
       document.getElementById('kpiTopLob').textContent = current.topLob;
 
+      const achievement = current.achievementPct;
+      const achievementCard = document.getElementById('kpiAchievementCard');
+      if (achievementCard) {
+        achievementCard.dataset.status = achievement === null ? '' : achievement >= 100 ? 'ok' : achievement >= 70 ? 'warn' : 'bad';
+        document.getElementById('kpiAchievementBar').style.width = `${achievement === null ? 0 : Math.min(achievement, 100)}%`;
+      }
+
       renderCompareLine('kpiSellOutCompare', current.sellOutQty, previous.sellOutQty, previous.hasAnyData, previousLabel);
       renderCompareLine('kpiTargetCompare', current.targetQty, previous.targetQty, previous.hasAnyData, previousLabel);
       renderAchievementCompareLine('kpiAchievementCompare', current.achievementPct, previous.achievementPct, previous.hasAnyData, previousLabel);
@@ -3605,15 +3720,16 @@
       const canvas = document.getElementById('summariesMonthChart');
       if (!canvas) return;
       const { keys, labels } = buildAxisBuckets(axisType, start, end);
-      const lobSet = new Set();
-      keys.forEach((k) => Object.keys(byBucket[k] || {}).forEach((lob) => lobSet.add(lob)));
-      const lobs = [...lobSet].sort();
-      const datasets = lobs.map((lob, i) => ({
-        label: lob,
-        data: keys.map((k) => (byBucket[k] || {})[lob] || 0),
-        borderColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
-        backgroundColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length],
+      // Kỳ chưa có dữ liệu (bucket vắng mặt) → null để đường dừng lại, không
+      // rơi về 0 gây hiểu nhầm là doanh số sụp.
+      const datasets = buildChartSeries(keys, byBucket).map((s) => ({
+        label: s.name,
+        data: keys.map((k) => (byBucket[k] ? s.pick(byBucket[k]) : null)),
+        borderColor: s.color,
+        backgroundColor: s.color,
         tension: 0.25,
+        spanGaps: false,
+        pointRadius: 3,
         fill: false
       }));
       if (summariesMonthChartInstance) summariesMonthChartInstance.destroy();
@@ -3628,19 +3744,21 @@
       const canvas = document.getElementById('summariesWeekChart');
       if (!canvas) return;
       const { keys, labels } = buildAxisBuckets(axisType, start, end);
-      const nppSet = new Set();
-      keys.forEach((k) => Object.keys(byBucket[k] || {}).forEach((npp) => nppSet.add(npp)));
-      const npps = [...nppSet].sort();
-      const datasets = npps.map((npp, i) => ({
-        label: npp,
-        data: keys.map((k) => (byBucket[k] || {})[npp] || 0),
-        backgroundColor: MSI_CHART_COLORS[i % MSI_CHART_COLORS.length]
+      const datasets = buildChartSeries(keys, byBucket).map((s) => ({
+        label: s.name,
+        data: keys.map((k) => (byBucket[k] ? s.pick(byBucket[k]) : null)),
+        backgroundColor: s.color
       }));
       if (summariesWeekChartInstance) summariesWeekChartInstance.destroy();
       summariesWeekChartInstance = new Chart(canvas.getContext('2d'), {
         type: 'bar',
         data: { labels, datasets },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { x: { stacked: true }, y: { stacked: true } }
+        }
       });
     }
 
@@ -4285,7 +4403,7 @@
     function achieveRateColorClass(pct) {
       if (pct === null) return '';
       if (pct >= 100) return 'over';
-      if (pct >= 80) return 'warn';
+      if (pct >= 70) return 'warn';
       return 'low';
     }
 
@@ -5514,7 +5632,7 @@
           <td>${statusHtml}</td>
           <td>
             <button type="button" class="btn-secondary product-detail-btn" data-sku="${p.sku}" style="padding:2px 8px;font-size:11px">Xem</button>
-            ${isAdmin ? `<button type="button" class="btn-secondary product-delete-btn" data-sku="${p.sku}" style="padding:2px 8px;font-size:11px">Xóa</button>` : ''}
+            ${isAdmin ? `<button type="button" class="btn-danger-ghost product-delete-btn" data-sku="${p.sku}">Xóa</button>` : ''}
           </td>
         </tr>`;
       }).join('');
@@ -5716,13 +5834,15 @@
             <div class="pp-field"><label>Nhân viên</label><div class="pp-field-readonly-value">${empName}</div></div>
             <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
           </div>
-          <div class="pp-card-row">
+          <div class="pp-card-row pp-card-row-hero">
             <div class="pp-field"><label>Hero</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.hero)}</div></div>
+            <div class="pp-field pp-field-net"><label>Net Price</label><div class="pp-field-readonly-value">${fmtQtyMsi(net)}</div></div>
+          </div>
+          <div class="pp-card-row pp-card-row-extras">
             <div class="pp-field"><label>Extra 1</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_1)}</div>${extraDateRangeRo(1)}</div>
             <div class="pp-field"><label>Extra 2</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_2)}</div>${extraDateRangeRo(2)}</div>
             <div class="pp-field"><label>Extra 3</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_3)}</div>${extraDateRangeRo(3)}</div>
             <div class="pp-field"><label>Extra 4</label><div class="pp-field-readonly-value">${fmtQtyMsi(r.extra_4)}</div>${extraDateRangeRo(4)}</div>
-            <div class="pp-field pp-field-net"><label>Net Price</label><div class="pp-field-readonly-value">${fmtQtyMsi(net)}</div></div>
           </div>
           ${r.note ? `<div class="pp-field pp-field-note"><label>Ghi chú</label><div class="pp-field-readonly-value">${he(r.note)}</div></div>` : ''}
           ${r.rejection_note ? `<div class="pp-field pp-field-note"><label>Ghi chú của quản lý</label><div class="pp-field-readonly-value">${he(r.rejection_note)}</div></div>` : ''}
@@ -5758,13 +5878,15 @@
             <div class="pp-field"><label>Nhân viên</label>${assignedField}</div>
             <div class="pp-field"><label>Trạng thái</label><div class="pp-field-readonly-value">${statusBadge}</div></div>
           </div>
-          <div class="pp-card-row">
+          <div class="pp-card-row pp-card-row-hero">
             <div class="pp-field"><label>Hero</label><input type="number" class="pp-hero" value="${r.hero ?? 0}" /></div>
+            <div class="pp-field pp-field-net"><label>Net Price</label><span class="pp-net">${fmtQtyMsi(net)}</span></div>
+          </div>
+          <div class="pp-card-row pp-card-row-extras">
             <div class="pp-field"><label>Extra 1</label><input type="number" class="pp-extra1" value="${r.extra_1 ?? 0}" />${extraDateRangeInputs(1)}</div>
             <div class="pp-field"><label>Extra 2</label><input type="number" class="pp-extra2" value="${r.extra_2 ?? 0}" />${extraDateRangeInputs(2)}</div>
             <div class="pp-field"><label>Extra 3</label><input type="number" class="pp-extra3" value="${r.extra_3 ?? 0}" />${extraDateRangeInputs(3)}</div>
             <div class="pp-field"><label>Extra 4</label><input type="number" class="pp-extra4" value="${r.extra_4 ?? 0}" />${extraDateRangeInputs(4)}</div>
-            <div class="pp-field pp-field-net"><label>Net Price</label><span class="pp-net">${fmtQtyMsi(net)}</span></div>
           </div>
           <div class="pp-field pp-field-note">
             <label>Ghi chú</label>
@@ -6130,7 +6252,12 @@
       // % tiến độ = SUM(achieved)/SUM(target) toàn bộ category của khách trong
       // kỳ (giống cách v_kpi_full tính I/J bằng SUM/SUM), KHÔNG phải trung
       // bình cộng % từng category.
-      body.innerHTML = customers.map((c) => {
+      // Khách chưa có số liệu (achieved = 0 và target = 0) gom xuống cuối, ẩn
+      // mặc định sau 1 nút bấm để danh sách không bị nhiễu bởi dòng "— 0 / 0".
+      const isEmptyCustomer = (c) => !(achievedByCustomer[c.id]?.__total) && !(targetByCustomer[c.id]?.__total);
+      const activeCustomers = customers.filter((c) => !isEmptyCustomer(c));
+      const emptyCustomers = customers.filter(isEmptyCustomer);
+      const renderCustRow = (c) => {
         const achieved = achievedByCustomer[c.id]?.__total || 0;
         const target = targetByCustomer[c.id]?.__total || 0;
         const cmpAchieved = cmpAchievedByCustomer[c.id]?.__total || 0;
@@ -6150,7 +6277,19 @@
           <span class="cust-row-pct">${pctHtml}${deltaHtml}</span>
           <span class="cust-row-nums">${fmtQtyMsi(achieved)} / ${fmtQtyMsi(target)}</span>
         </div>`;
-      }).join('');
+      };
+      body.innerHTML = activeCustomers.map(renderCustRow).join('')
+        + (emptyCustomers.length
+          ? `<button type="button" class="cust-empty-toggle" id="custEmptyToggle">Hiện ${emptyCustomers.length} khách chưa có số liệu</button>
+             <div id="custEmptyRows" class="hidden">${emptyCustomers.map(renderCustRow).join('')}</div>`
+          : '');
+      document.getElementById('custEmptyToggle')?.addEventListener('click', (e) => {
+        const rows = document.getElementById('custEmptyRows');
+        const nowHidden = rows.classList.toggle('hidden');
+        e.currentTarget.textContent = nowHidden
+          ? `Hiện ${emptyCustomers.length} khách chưa có số liệu`
+          : 'Ẩn khách chưa có số liệu';
+      });
 
       body.querySelectorAll('.cust-row').forEach((row) => {
         row.addEventListener('click', () => openCustomerDetail(parseInt(row.dataset.customerId, 10)));
